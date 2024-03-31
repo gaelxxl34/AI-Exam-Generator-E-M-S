@@ -1,0 +1,91 @@
+.navbar-brand img {
+    height: 100%;  /* Make logo take the full height of the navbar */
+    min-width: 220px;  /* Minimum width of 150px for the logo */
+}
+.navbar {
+    background-color: #7a0000; /* Set the background color of the navbar to red */
+}
+
+a, .navbar-toggler-icon {
+    color: white !important; /* Make anchor text and toggler icon white */
+}
+
+
+ .large-margin-bottom {
+     margin-bottom: 70px;
+     /* Adjust this value as needed */
+ }
+.a-moi{
+    color: black !important;
+}
+
+.navbar-toggler {
+    border-color: rgba(255, 255, 255, 0.1); /* Make toggler border slightly visible or adjust as needed */
+}
+
+.navbar-toggler-icon {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg viewBox='0 0 30 30' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke='rgba(255, 255, 255, 1)' stroke-width='2' stroke-linecap='round' stroke-miterlimit='10' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
+}
+
+/* Customize the search button */
+.btn-outline-success {
+    color: white;
+    border-color: black;
+}
+
+.btn-outline-success:hover {
+    color: white;
+    background-color: black;
+    border-color: black;
+}
+
+
+
+  .footer {
+      background-color: #7a0000;
+      /* Dark red color */
+  }
+
+hr {
+    border-color: white !important;
+  
+}
+
+  .footer .container {
+      padding: 20px;
+  }
+
+  .footer .logo img {
+      max-width: 25%;
+    margin-bottom: 10px;
+      /* Make sure the image is responsive */
+  }
+
+  .footer .logo,
+  .footer .copyright {
+      text-align: left;
+      color: white;
+      /* Text color */
+  }
+
+  @media (max-width: 768px) {
+
+      .footer .logo,
+      .footer .copyright {
+          text-align: left;
+      }
+    .footer .logo img {
+      max-width: 100%;
+      margin-bottom: 10px;
+      /* Make sure the image is responsive */
+   
+     }
+  }
+
+
+
+
+
+
+
+  
