@@ -41,9 +41,6 @@ To start using PEMS, follow these steps:
 ## Contribution
 Contributions to the PEMS project are welcome. If you wish to contribute, please fork the repository and submit a pull request with your proposed changes or improvements.
 
-## License
-[Specify the license under which your project is released]
-
 ---
 
 For more information and support, please contact the project maintainers.
