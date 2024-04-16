@@ -6,13 +6,16 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "barryvdh/laravel-dompdf": "^2.1",
+        "dompdf/dompdf": "^2.0",
         "google/cloud-core": "^1.56",
         "google/cloud-firestore": "^1.42",
         "kreait/laravel-firebase": "^5.8",
         "laravel/framework": "^11.0",
         "laravel/tinker": "^2.9",
         "setasign/fpdf": "^1.8",
-        "setasign/fpdi": "^2.6"
+        "setasign/fpdi": "^2.6",
+        "smalot/pdfparser": "^2.9"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

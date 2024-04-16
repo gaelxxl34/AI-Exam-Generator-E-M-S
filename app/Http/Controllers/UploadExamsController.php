@@ -5,66 +5,58 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\View;
-use Illuminate\Support\Facades\Http;
-use setasign\Fpdi\Fpdi;
-
+// use PDF;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Str;
+use Kreait\Firebase\Contract\Storage;
+// use Barryvdh\DomPDF\Facade\Pdf;
 class UploadExamsController extends Controller
 {
-    public function uploadExam(Request $request)
+    public function uploadExam(Request $request, Storage $storage)
     {
-        \Log::info('uploadExam method called');
+        Log::info('uploadExam method called');
 
-        // Start with basic validation
+        // Enhanced validation to include practical exams
         $validatedData = $request->validate([
             'faculty' => 'required|string',
-            'courseUnit' => 'required|string', // Validate the course unit
+            'courseUnit' => 'required|string',
+            'format' => 'required|string',
             'sectionA' => 'required|array|min:1',
-            'sectionB' => 'required|array|min:1',
+            'sectionB' => 'sometimes|required|array|min:1',
             'sectionC' => 'sometimes|required|array|min:1',
-            'sectionA.*' => 'required|string|max:255',
-            'sectionB.*' => 'required|string|max:255',
-            'sectionC.*' => 'sometimes|required|string|max:255',
+            'sectionA.*' => 'required|string',
+            'sectionB.*' => 'sometimes|required|string',
+            'sectionC.*' => 'sometimes|required|string',
         ]);
 
         try {
-            $firestore = app('firebase.firestore');
-            $database = $firestore->database();
-            $examsRef = $database->collection('Exams');
+            $firestore = app('firebase.firestore')->database();
+            $examsRef = $firestore->collection('Exams');
 
             $examData = [
-                'faculty' => $request->faculty,
-
-                'courseUnit' => $request->courseUnit, // Include the course unit in the exam data
+                'faculty' => $validatedData['faculty'],
+                'courseUnit' => $validatedData['courseUnit'],
+                'format' => $validatedData['format'],
                 'created_at' => new \DateTime(),
+                'sections' => []
             ];
 
-            if ($request->has('sectionA')) {
-                $examData['sections']['A'] = array_combine(
-                    range(1, count($request->sectionA)),
-                    array_values($request->sectionA)
-                );
-            }
-
-            if ($request->has('sectionB')) {
-                $examData['sections']['B'] = array_combine(
-                    range(1, count($request->sectionB)),
-                    array_values($request->sectionB)
-                );
-            }
-
-            if ($request->has('sectionC')) {
-                $examData['sections']['C'] = array_combine(
-                    range(1, count($request->sectionC)),
-                    array_values($request->sectionC)
-                );
+            // Process sections based on format
+            foreach (['A', 'B', 'C'] as $section) {
+                if ($request->has("section$section")) {
+                    $content = $request->input("section$section");
+                    // Process and upload images for each section content
+                    // $processedContent = $this->processSectionContent($content, $storage);
+                    // $examData['sections'][$section] = $processedContent;
+                    $examData['sections'][$section] = $content;
+                }
             }
 
             $examsRef->add($examData);
 
-            return redirect()->route('admin.dashboard')->with('success', 'Exam uploaded successfully.');
+            return redirect()->route('lecturer.l-dashboard')->with('success', 'Exam uploaded successfully.');
         } catch (\Throwable $e) {
-            \Log::error($e->getMessage());
+            Log::error("Error uploading exam: " . $e->getMessage());
             return back()->withErrors(['upload_error' => 'Error uploading exam.'])->with('message', 'Error uploading exam: ' . $e->getMessage());
         }
     }
@@ -72,97 +64,77 @@ class UploadExamsController extends Controller
 
 
 
-    private function paraphraseText($text, $apiKey)
-    {
-        \Log::info('API Key: ' . $apiKey);
-
-        $paraphraseEndpoint = 'https://api.ai21.com/studio/v1/paraphrase';
-
-        \Log::info('Calling Paraphrase API for text: ' . $text);
-
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $apiKey,
-            'Content-Type' => 'application/json'
-        ])->post($paraphraseEndpoint, [
-                    'text' => $text,
-                    'numOfParaphrases' => 1,
-                    'maxOutputLength' => 400 // Adjust as per your requirement
-                ]);
-
-        \Log::info('API Response: ' . $response->body());
-
-        if ($response->successful()) {
-            $data = $response->json();
-            if (!empty($data['suggestions'])) {
-                // Randomly select one of the paraphrases
-                $randomIndex = array_rand($data['suggestions']);
-                return $data['suggestions'][$randomIndex]['text'];
-            }
-        }
-
-        \Log::info('paraphraseText method completed with original text');
-        return $text; // Return original text if paraphrase fails
-    }
-
-
-
 
     public function getRandomQuestions(Request $request)
     {
         \Log::info('getRandomQuestions method started');
-
-        // Assuming the selected course is passed as a request parameter
         $selectedCourse = $request->input('course');
 
         try {
-            // Query Firestore to get exams for the selected course
-            $examsQuery = app('firebase.firestore')->database()->collection('Exams')
-                ->where('courseUnit', '==', $selectedCourse);
+            $firestore = app('firebase.firestore')->database();
+
+            // Fetch course information directly from the Courses collection
+            $courseRef = $firestore->collection('Courses')->document($selectedCourse);
+            $courseDocument = $courseRef->snapshot();
+
+            if (!$courseDocument->exists()) {
+                \Log::error("Course $selectedCourse not found in Courses collection");
+                throw new \Exception("Course $selectedCourse not found.");
+            }
+
+            $courseData = $courseDocument->data();
+            $code = $courseData['code'] ?? 'default_code';
+            $program = $courseData['program'] ?? 'default_program';
+            $year_sem = $courseData['year_sem'] ?? 'default_year_sem';
+            \Log::info("Course details fetched: Code: $code, Program: $program, Year/Sem: $year_sem");
+
+            // Fetch exams based on the course code
+            $examsQuery = $firestore->collection('Exams')->where('courseCode', '==', $code);
             $examsSnapshot = $examsQuery->documents();
 
-            if (!$examsSnapshot->isEmpty()) {
-                $sectionAQuestions = [];
-                $sectionBQuestions = [];
+            $sections = []; // Initialize as an empty array
 
-                foreach ($examsSnapshot as $exam) {
+            foreach ($examsSnapshot as $exam) {
+                if ($exam->exists()) {
                     $data = $exam->data();
 
-                    if (isset($data['sections']['A'])) {
-                        $sectionAQuestions = array_merge($sectionAQuestions, $data['sections']['A']);
-                    }
+                    foreach ($data['sections'] as $section => $contents) {
+                        if (!isset($sections[$section])) {
+                            $sections[$section] = [];
+                        }
 
-                    if (isset($data['sections']['B'])) {
-                        $sectionBQuestions = array_merge($sectionBQuestions, $data['sections']['B']);
+                        foreach ($contents as $index => $content) {
+                            $doc = new \DOMDocument();
+                            @$doc->loadHTML($content, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+
+                            $sections[$section][] = $doc->saveHTML();
+                        }
                     }
                 }
-
-                shuffle($sectionAQuestions);
-                shuffle($sectionBQuestions);
-
-                $apiKey = env('AI21_API_KEY'); // Make sure to set this in your .env file
-
-                // Paraphrase Section A Questions
-                $randomAQuestions = array_slice($sectionAQuestions, 0, 10);
-                $randomAQuestions = array_map(function ($question) use ($apiKey) {
-                    return $this->paraphraseText($question, $apiKey);
-                }, $randomAQuestions);
-
-                // Paraphrase Section B Questions (if needed)
-                $randomBQuestions = array_slice($sectionBQuestions, 0, 4);
-                $randomBQuestions = array_map(function ($question) use ($apiKey) {
-                    return $this->paraphraseText($question, $apiKey);
-                }, $randomBQuestions);
-
-
-
-                return View::make('admin.view-generated-exam', [
-                    'courseUnit' => $selectedCourse,
-                    'sectionAQuestions' => $randomAQuestions,
-                    'sectionBQuestions' => $randomBQuestions,
-                ]);
-            } else {
-                return 'No exams found for the selected course';
             }
+
+            // Shuffle and slice questions for each section
+            foreach ($sections as $section => $questions) {
+                shuffle($questions);
+                $count = ($section == 'A') ? 10 : 4; // Adjust based on your needs
+                $sections[$section] = array_slice($questions, 0, $count);
+            }
+
+            // Store the sections data in the session
+            session(['sections' => $sections]);
+
+            session([
+                'faculty' => $courseData['faculty'] ?? 'default_faculty',
+                'code' => $code,
+                'program' => $program,
+                'year_sem' => $year_sem,
+            ]);
+
+            return view('admin.view-generated-exam', [
+                'courseUnit' => $selectedCourse,
+                'sections' => $sections
+            ]);
+
         } catch (\Exception $e) {
             \Log::error('Error in getRandomQuestions: ' . $e->getMessage());
             return 'Error: ' . $e->getMessage();
@@ -170,99 +142,63 @@ class UploadExamsController extends Controller
     }
 
 
-    public function addQuestionsToPdf($sectionAQuestions, $sectionBQuestions, $courseUnit)
-    {
-        \Log::info('addQuestionsToPdf method started');
-
-        $pdf = new Fpdi();
-
-        // Load the PDF template
-        $templatePath = public_path('template.pdf');
-        $pdf->setSourceFile($templatePath);
-
-        // Import and add the first page of the template
-        $pdf->AddPage();
-        $tplIdFirst = $pdf->importPage(1);
-        $pdf->useTemplate($tplIdFirst);
-
-        // Import and add the second page of the template for the content
-        $pdf->AddPage();
-        $tplIdSecond = $pdf->importPage(2);
-        $pdf->useTemplate($tplIdSecond);
-
-        // Title and questions settings
-        $pdf->SetFont('Helvetica', 'B', 14);
-
-        // Coordinates for Section A title and questions
-        $x = 10;
-        $y = 10;
-
-        // Section A Title
-        $pdf->SetXY($x, $y);
-        $pdf->Cell(0, 10, 'SECTION A (40 MARKS)', 0, 1, 'C');
-        $y += 15;
-
-        $pdf->SetFont('Helvetica', '', 12);
-
-        // Write Section A questions
-        foreach ($sectionAQuestions as $index => $question) {
-            if ($y > 270) {
-                $pdf->AddPage(); // Add a new page if needed
-                $y = 10; // Reset y-coordinate for the new page
-            }
-
-            $pdf->SetXY($x, $y);
-            $pdf->Write(10, "Q" . ($index + 1) . ": " . $question);
-            $y += 10;
-        }
-
-        // Add some space above Section B title
-        $y += 5; // Increase space before Section B title
-
-        // Check space for Section B
-        if ($y > 260) {
-            $pdf->AddPage();
-            $y = 10;
-        } else {
-            // Ensure we have space for the title
-            $y += 10;
-        }
-
-        // Section B Title
-        $pdf->SetFont('Helvetica', 'B', 14);
-        $pdf->SetXY($x, $y);
-        $pdf->Cell(0, 10, 'SECTION B (60 MARKS)', 0, 1, 'C');
-        $y += 15;
-
-        $pdf->SetFont('Helvetica', '', 12);
-
-        // Write Section B questions (up to 5 questions)
-        foreach ($sectionBQuestions as $index => $question) {
-            if ($index >= 5)
-                break; // Ensure no more than 5 questions are processed
-
-            $pdf->SetXY($x, $y);
-            $pdf->Write(10, "Q" . ($index + 1) . ": " . $question);
-            $y += 10;
-        }
-
-        // Output the PDF to the browser for download
-        $pdf->Output('I', "Exam_$courseUnit.pdf");
-    }
-
-
-
-
 
 
     public function generatePdf(Request $request)
     {
         $courseUnit = $request->input('courseUnit');
-        $sectionAQuestions = json_decode($request->input('sectionAQuestions'), true);
-        $sectionBQuestions = json_decode($request->input('sectionBQuestions'), true);
+        $sections = session('sections'); // Retrieve the sections data from the session
+        $facultyOf = $request->input('facultyOf');
+        $examPeriod = $request->input('examPeriod');
+        $date = $request->input('date');
+        $time = $request->input('time');
+        $examInstructions = $request->input('examInstructions');
 
-        return $this->addQuestionsToPdf($sectionAQuestions, $sectionBQuestions, $courseUnit);
+
+        // Retrieve additional session data
+        $faculty = session('faculty');
+        $code = session('code');
+        $program = session('program');
+        $yearSem = session('year_sem');
+
+        \Log::info('PDF generation started with courseUnit: ' . $courseUnit);
+
+        // Generate the PDF from the 'admin.exam-template' view and pass in the necessary data
+        $pdf = PDF::loadView('admin.exam-template', [
+            'sections' => $sections,
+            'courseUnit' => $courseUnit,
+            // Pass additional data to the view
+            'faculty' => $faculty,
+            'code' => $code,
+            'program' => $program,
+            'yearSem' => $yearSem,
+            'facultyOf' => $facultyOf,
+            'examPeriod' => $examPeriod,
+            'date' => $date,
+            'time' => $time,
+            'examInstructions' => $examInstructions
+        ]);
+
+        // Set paper size to A4 and orientation to portrait
+        $pdf->setPaper('A4', 'portrait');
+
+        // Enable remote images to load
+        $pdf->getDomPDF()->set_option('isRemoteEnabled', true);
+
+        // Stream the PDF to the browser where it can be printed or saved
+        return $pdf->stream("Exam_{$courseUnit}.pdf");
     }
+
+
+
+
+
+
+
+
+
+
+
 
 
 

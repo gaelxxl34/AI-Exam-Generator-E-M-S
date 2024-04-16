@@ -53,29 +53,11 @@ class RegisterLecturerController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6',
             'image' => 'required|image|mimes:jpeg,png,jpg,gif,svg',
+            'faculty' => 'required|string', // Ensure faculty is a required input
+            'courses' => 'required|array', // Validate that courses are provided and is an array
         ]);
 
         try {
-            $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
-            \Log::info('Current user email: ' . $currentUserEmail);
-
-            $firestore = app('firebase.firestore');
-            $database = $firestore->database();
-            $usersRef = $database->collection('Users');
-
-            $query = $usersRef->where('email', '==', $currentUserEmail);
-            $currentUserSnapshots = $query->documents();
-
-            if ($currentUserSnapshots->isEmpty()) {
-                \Log::error("Firestore user not found with email: $currentUserEmail");
-                throw new \Exception('Current user not found in Firestore.');
-            }
-
-            $currentUserDocument = iterator_to_array($currentUserSnapshots)[0];
-            $currentUserData = $currentUserDocument->data();
-            $faculty = $currentUserData['faculty'] ?? 'default_faculty';
-            \Log::info("Faculty fetched: $faculty");
-
             $auth = app('firebase.auth');
             $userProperties = [
                 'email' => $validatedData['email'],
@@ -93,17 +75,22 @@ class RegisterLecturerController extends Controller
             $storage->upload($uploadedFile, ['name' => $imagePath]);
             \Log::info('Image uploaded to Firebase Storage: ' . $imagePath);
 
+            $firestore = app('firebase.firestore');
+            $database = $firestore->database();
+            $usersRef = $database->collection('Users');
+
             $usersRef->document($createdUser->uid)->set([
                 'firstName' => $validatedData['firstName'],
                 'lastName' => $validatedData['lastName'],
                 'email' => $validatedData['email'],
                 'profile_picture' => $imagePath,
                 'role' => 'lecturer',
-                'faculty' => $faculty,
+                'faculty' => $validatedData['faculty'], // Use the faculty from the validated data
+                'courses' => $validatedData['courses'],
             ]);
-            \Log::info('Lecturer data added to Firestore');
+            \Log::info('Lecturer data added to Firestore with courses');
 
-            return redirect()->intended('/admin/lecturer-list')->with('success', 'Lecturer registered successfully.');
+            return redirect()->intended('/superadmin/lecturer-list')->with('success', 'Lecturer registered successfully.');
         } catch (\Throwable $e) {
             \Log::error('Error registering lecturer: ' . $e->getMessage());
             return back()->withErrors(['upload_error' => 'Error registering lecturer.'])->with('message', 'Error registering lecturer: ' . $e->getMessage());
@@ -113,68 +100,44 @@ class RegisterLecturerController extends Controller
 
 
 
+
+
     public function lecturerList()
     {
         \Log::info('lecturerList method called');
 
         try {
-            $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
-            \Log::info('Current user email: ' . $currentUserEmail);
-
             $firestore = app('firebase.firestore');
             $database = $firestore->database();
             $usersRef = $database->collection('Users');
 
-            $query = $usersRef->where('email', '==', $currentUserEmail);
-            $currentUserSnapshots = $query->documents();
-
-            if ($currentUserSnapshots->isEmpty()) {
-                \Log::error("Firestore user not found with email: $currentUserEmail");
-                throw new \Exception('Current user not found in Firestore.');
-            }
-
-            // Fetch the first document (user data) from the snapshots
-            foreach ($currentUserSnapshots as $currentUserSnapshot) {
-                $currentUserData = $currentUserSnapshot->data();
-                break;  // Just need the first matching document
-            }
-
-            $currentFaculty = $currentUserData['faculty'] ?? null;
-            \Log::info('Current user faculty: ' . $currentFaculty);
-
-            if (!$currentFaculty) {
-                throw new \Exception('Current user faculty not found.');
-            }
-
-            $lecturerQuery = $usersRef->where('role', '=', 'lecturer')->where('faculty', '=', $currentFaculty);
+            // Query for all lecturers regardless of faculty
+            $lecturerQuery = $usersRef->where('role', '=', 'lecturer');
             $lecturerSnapshot = $lecturerQuery->documents();
 
-            if ($lecturerSnapshot->isEmpty()) {
-                \Log::info('No lecturers found in the faculty: ' . $currentFaculty);
-                return 'No lecturers found in your faculty';
-            }
-
-            $userData = [];
+            $lecturersByFaculty = [];
             $storage = app('firebase.storage');
             $bucket = $storage->getBucket();
 
             foreach ($lecturerSnapshot as $lecturer) {
                 $lecturerData = $lecturer->data();
+                $faculty = $lecturerData['faculty'] ?? 'Other';
                 $imageReference = $bucket->object($lecturerData['profile_picture']);
+
+                // Generate a signed URL for the image
                 $profilePictureUrl = $imageReference->exists() ? $imageReference->signedUrl(new \DateTime('+5 minutes')) : null;
 
-                $userData[] = [
+                $lecturersByFaculty[$faculty][] = [
                     'id' => $lecturer->id(),
                     'firstName' => $lecturerData['firstName'] ?? 'N/A',
                     'lastName' => $lecturerData['lastName'] ?? 'N/A',
                     'email' => $lecturerData['email'] ?? 'N/A',
                     'profile_picture' => $profilePictureUrl,
-                    'faculty' => $lecturerData['faculty'] ?? 'N/A',
                 ];
             }
 
-            \Log::info('Lecturers fetched: ' . count($userData));
-            return View::make('admin.lecturer-list', ['lecturers' => $userData]);
+            \Log::info('Lecturers fetched by faculty with image URLs.');
+            return view('superadmin.lecturer-list', ['lecturersByFaculty' => $lecturersByFaculty]);
         } catch (\Exception $e) {
             \Log::error('Error in lecturerList: ' . $e->getMessage());
             return 'Error: ' . $e->getMessage();
@@ -212,7 +175,7 @@ class RegisterLecturerController extends Controller
                     'profile_picture' => $profilePictureUrl,
                 ];
 
-                return view('admin.edit-lecturer', ['lecturer' => $lecturerData]);
+                return view('superadmin.edit-lecturer', ['lecturer' => $lecturerData]);
             } else {
                 return 'lecturer not found';
             }

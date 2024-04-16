@@ -62,43 +62,59 @@ class AuthController extends Controller
     public function authenticate(Request $request)
     {
         $credentials = $request->only('email', 'password');
-        
+
         try {
             $signInResult = $this->firebaseAuth->signInWithEmailAndPassword($credentials['email'], $credentials['password']);
             $uid = $signInResult->firebaseUserId();
-            
-            // Store user details in session if needed
+
+            // Store user details in session
             session()->put('user_email', $credentials['email']);
             session()->put('user', $uid);
 
-            
-            $userRef = app('firebase.firestore')
-                        ->database()
-                        ->collection('Users')
-                        ->document($uid)->snapshot();
+            $firestore = app('firebase.firestore');
+            $database = $firestore->database();
+            $userRef = $database->collection('Users')->document($uid);
+            $userSnapshot = $userRef->snapshot();
 
-            $userData = $userRef->data();
+            if (!$userSnapshot->exists()) {
+                throw new \Exception("User with uid {$uid} does not exist.");
+            }
 
+            $userData = $userSnapshot->data();
 
-            // Store user role in session after successful authentication
+            // Fetch the profile picture URL from Firebase Storage
+            $storage = app('firebase.storage');
+            $bucket = $storage->getBucket();
+            $imagePath = $userData['profile_picture'] ?? null;
+            $profilePictureUrl = null;
+            if ($imagePath) {
+                $imageReference = $bucket->object($imagePath);
+                $profilePictureUrl = $imageReference->exists() ? $imageReference->signedUrl(new \DateTime('+5 minutes')) : null;
+            }
+            \Log::info('Profile picture URL: ' . session('profile_picture'));
+
+            session()->put('user_firstName', $userData['firstName'] ?? 'Unknown');
             session()->put('user_role', $userData['role']);
-        
-        // Check user role and redirect accordingly
-        switch ($userData['role']) {
-            case 'admin':
-                return redirect('/admin/dashboard');
-                break;
-            case 'lecturer':
-                return redirect('/lecturer/l-dashboard');
-                break;
-            default:
-                return redirect('/login');
-                throw new \Exception("User with uid {$uid} does not exist or has no assigned role.");
+            session()->put('profile_picture', $profilePictureUrl);
+            \Log::info('firstName: ' . session('user_firstName'));
+
+            // Check user role and redirect accordingly
+            switch ($userData['role']) {
+                case 'admin':
+                    return redirect('/admin/dashboard');
+                case 'lecturer':
+                    return redirect('/lecturer/lecturer.l-upload-questions');
+                case 'superadmin':
+                    return redirect('/superadmin/super-adm-dashboard');
+                default:
+                    return redirect('/login')->withErrors(['login_error' => 'No valid role assigned to this user.']);
+            }
+        } catch (\Exception $e) {
+            return back()->withErrors(['login_error' => 'Invalid login credentials: ' . $e->getMessage()]);
         }
-    } catch (\Exception $e) {
-        return back()->withErrors(['login_error' => 'Invalid login credentials']);
     }
-    }
+
+
 
 
 

@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\View;
+use App\Http\Controllers\CourseController;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -17,8 +19,15 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
-    public function boot(): void
+    public function boot()
     {
-        //
+        View::composer(['admin.add-past-exams', 'admin.ai-exam-generator'], function ($view) {
+            
+                $courseController = new CourseController;
+                $courseNames = $courseController->fetchCoursesForFaculty(); // This should return just the array
+                $view->with('courseNames', $courseNames);
+            
+        });
     }
+
 }

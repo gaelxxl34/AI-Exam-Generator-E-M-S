@@ -21,11 +21,11 @@
                 <div class="mb-4">
                     <label for="courseDropdown" class="block text-sm font-medium text-gray-700">Choose a course</label>
                     <select id="courseDropdown" name="course" class="block w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" required>
-                        <option value="">Select a course</option>
-                        <option value="Data structures and algorithm">Data structures and algorithm</option>
-                        <option value="Problem solving">Problem solving</option>
-                        <option value="System analysis and design">System analysis and design</option>
-                        <!-- Add other courses as needed -->
+                        <option value="">Select a course</option> 
+                    @foreach($courseNames as $course)
+                        <option value="{{ $course['id'] }}">{{ $course['name'] }}</option>
+                    @endforeach
+
                     </select>
                     <div class="text-red-500 mt-1" style="display: none;" id="courseError">Please select a course.</div>
                 </div>

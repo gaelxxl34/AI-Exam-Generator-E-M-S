@@ -12,7 +12,7 @@
 </head>
 <body>
     
-    @include('partials.admin-navbar')
+    @include('partials.super-admin-navbar')
     <div class="p-4 sm:ml-64 mt-20">
         <div class="container mx-auto mt-3 mb-3 text-center">
             <div class="flex justify-center items-center">

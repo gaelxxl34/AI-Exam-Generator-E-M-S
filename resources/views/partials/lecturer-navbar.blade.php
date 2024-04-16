@@ -26,9 +26,9 @@
                                     class="flex text-sm bg-gray-800 rounded-full focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600"
                                     aria-expanded="false" data-dropdown-toggle="dropdown-user">
                                     <span class="sr-only">Open user menu</span>
-                                    <img class="w-8 h-8 rounded-full"
-                                        src="https://flowbite.com/docs/images/people/profile-picture-5.jpg"
-                                        alt="user photo">
+                                      <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                        <path fill-rule="evenodd" d="M10 4a4 4 0 100 8 4 4 0 000-8zM5 18a6.978 6.978 0 015-2c1.67 0 3.26.65 4.47 1.72A7.963 7.963 0 0010 20a7.963 7.963 0 00-4.47-1.28C6.74 17.65 8.33 18 10 18z" clip-rule="evenodd"></path>
+                                    </svg>
                                 </button>
                             </div>
                             <div class="z-50 hidden my-4 text-base list-none bg-white divide-y divide-gray-100 rounded shadow dark:bg-gray-800 dark:divide-gray-600"
@@ -36,10 +36,10 @@
                                 @if(session('user_email'))
                                     <div class="px-4 py-3" role="none">
                                         <p class="text-sm text-gray-900 dark:text-white" role="none">
-                                            Name
+                                            {{ session('user_firstName') }}
                                         </p>
                                         <p class="text-sm font-medium text-gray-900 truncate dark:text-gray-300" role="none">
-                                            {{session('user_email')}}
+                                            {{ session('user_email') }}
                                         </p>
                                     </div>
                                     <form method="POST" action="{{ route('logout') }}">
@@ -54,14 +54,13 @@
                                             </li>
                                         </ul>
                                     </form>
-
                                 @else
                                     <p>No user logged in.</p>
                                 @endif
-                    
                             </div>
                         </div>
                     </div>
+
                 </div>
             </div>
     </nav>
@@ -72,25 +71,8 @@
         <div class="h-full px-3 pb-4 overflow-y-auto bg-white dark:bg-black">
             <ul class="space-y-2 font-medium">
 
-                <li>
-                    <a href="{{route('lecturer.l-dashboard') }}"
-                        class="flex items-center p-2 text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
-                        <svg class="w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white"
-                            aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor"
-                            viewBox="0 0 22 21">
-                            <path
-                                d="M16.975 11H10V4.025a1 1 0 0 0-1.066-.998 8.5 8.5 0 1 0 9.039 9.039.999.999 0 0 0-1-1.066h.002Z" />
-                            <path
-                                d="M12.5 0c-.157 0-.311.01-.565.027A1 1 0 0 0 11 1.02V10h8.975a1 1 0 0 0 1-.935c.013-.188.028-.374.028-.565A8.51 8.51 0 0 0 12.5 0Z" />
-                        </svg>
-                        <span class="ms-3">Dashboard</span>
-                    </a>
-                </li>
 
-
-              
-
-                <li>
+                  <li>
                     <a href="{{route('lecturer.l-upload-questions') }}"
                         class="flex items-center p-2 text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
                         <svg class="flex-shrink-0 w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white"
@@ -104,21 +86,26 @@
                     </a>
                 </li>
 
-                          
                 <li>
-                    <a href=""
+                    <a href="{{route('lecturer.l-dashboard') }}"
                         class="flex items-center p-2 text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
-                        <svg class="flex-shrink-0 w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white"
-                            aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-                            <!-- Icon representing reviewing past exams, like a magnifying glass over a document -->
-                            <path d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" />
-                            <path d="M12 9a1 1 0 11-2 0 1 1 0 012 0zm-6-1a1 1 0 100 2 1 1 0 000-2z" />
-                            <path fill-rule="evenodd" d="M2.293 3.293A1 1 0 013 3h10a1 1 0 011 1v8a1 1 0 01-1 1H9.414A5.985 5.985 0 005 9.414V3a1 1 0 01.293-.707z" clip-rule="evenodd" />
+                        <svg class="w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white"
+                            aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor"
+                            viewBox="0 0 22 21">
+                            <path
+                                d="M16.975 11H10V4.025a1 1 0 0 0-1.066-.998 8.5 8.5 0 1 0 9.039 9.039.999.999 0 0 0-1-1.066h.002Z" />
+                            <path
+                                d="M12.5 0c-.157 0-.311.01-.565.027A1 1 0 0 0 11 1.02V10h8.975a1 1 0 0 0 1-.935c.013-.188.028-.374.028-.565A8.51 8.51 0 0 0 12.5 0Z" />
                         </svg>
-                        <span class="flex-1 ms-3 whitespace-nowrap">Upload exams</span>
+                        <span class="ms-3">Review Uploaded Exams</span>
                     </a>
                 </li>
 
+
+              
+
+              
+     
 
             </ul>
         </div>

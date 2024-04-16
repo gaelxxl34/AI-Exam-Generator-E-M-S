@@ -4,34 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Dashboard</title>
+    <title>Review Uploaded Exams</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.js"></script>
 
-    
+ 
 </head>
 <body>
     
     @include('partials.lecturer-navbar')
 
-    <div class="p-4 sm:ml-64 mt-20">
-        <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mt-2">
-            <div class="flex-1 bg-gray-200 rounded-lg p-4 shadow">
-                <div class="text-gray-900 text-lg">Courses</div>
-                <div class="text-gray-600 text-2xl">43</div>
+<div class="p-4 sm:ml-64 mt-20">
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        @forelse ($courses as $courseUnit => $exams)
+            <div class="flex flex-col items-center justify-center bg-white rounded-lg border shadow-md hover:shadow-lg">
+                <a href="{{ route('lecturer.l-course-exams', ['courseUnit' => $courseUnit]) }}" class="p-6 w-full text-center">
+                    <h5 class="mb-2 text-xl md:text-2xl font-bold tracking-tight text-gray-900">{{ $courseUnit }}</h5>
+                </a>
             </div>
-            <div class="flex-1 bg-gray-200 rounded-lg p-4 shadow">
-                <div class="text-gray-900 text-lg">Past Exams</div>
-                <div class="text-gray-600 text-2xl">456</div>
+        @empty
+            <div class="col-span-full flex flex-col items-center justify-center ">
+                <img src="https://img.freepik.com/free-vector/error-404-concept-illustration_114360-1811.jpg" alt="No Data Available" class="w-full max-w-lg">
+                <p class="mt-4 text-lg font-semibold text-gray-600">No courses available.</p>
             </div>
-            <div class="flex-1 bg-gray-200 rounded-lg p-4 shadow">
-                <div class="text-gray-900 text-lg">Uploaded Exams</div>
-                <div class="text-gray-600 text-2xl">789</div>
-            </div>
-           
-        </div>
+        @endforelse
     </div>
+</div>
+
+
+
+
+
+
+
+
     
 </body>
 </html>

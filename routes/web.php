@@ -4,9 +4,12 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\RegisterLecturerController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UploadExamsController;
+use App\Http\Middleware\EnsureSuperAdminRole;
 use App\Http\Middleware\EnsureAdminRole;
 use App\Http\Middleware\EnsureLecturerRole;
-
+use App\Http\Controllers\CourseController;
+use App\Http\Controllers\PastExamController;
+//
 
 
 
@@ -62,22 +65,11 @@ Route::get('/forget-password', [AuthController::class, 'showForgetPasswordForm']
 
 
 
-// -- admin
-Route::post('/upload-lecturer', [RegisterLecturerController::class, 'registerLecturer'])
-    ->middleware(EnsureAdminRole::class)
-    ->name('upload.lecturer');
-Route::get('/admin/lecturer-list', [RegisterLecturerController::class, 'lecturerList'])
-    ->middleware(EnsureAdminRole::class)
-    ->name('admin.lecturer-list');
-Route::get('/edit-lecturer/{id}', [RegisterLecturerController::class, 'editLecturer'])
-    ->middleware(EnsureAdminRole::class)
-    ->name('editLecturer');
+// -- ADMIN ROUTING 
+
 Route::put('/admin/update-lecturer-data/{lecturerId}', [RegisterLecturerController::class, 'updateLecturer'])
     ->middleware(EnsureAdminRole::class)
     ->name('admin.update-lecturer-data');
-Route::delete('lecturer.delete/{lecturerId}', [RegisterLecturerController::class, 'deleteLecturer'])
-    ->middleware(EnsureAdminRole::class)
-    ->name('lecturer.delete');
 
 
 
@@ -87,26 +79,53 @@ Route::post('/download-exam', [UploadExamsController::class, 'generatePdf'])
     ->name('download.exam');
 
 
-
-
-
 Route::get('/admin/dashboard', function () {
     return view('admin.dashboard');
 })->middleware(EnsureAdminRole::class)->name('admin.dashboard');
 
+Route::get('/admin/add-courses', function () {
+    return view('admin.add-courses');
+})->middleware(EnsureAdminRole::class)->name('admin.add-courses');
 
-Route::get('/admin/add-lecturer', function () {
-    return view('admin.add-lecturer');
-})->middleware(EnsureAdminRole::class)
-    ->name('admin.add-lecturer');
+
+
+// --- PAST EXAMS ROUTING START 
 Route::get('/admin/add-past-exams', function () {
     return view('admin.add-past-exams');
 })->middleware(EnsureAdminRole::class)
-->name('admin.add-past-exams');
+    ->name('admin.add-past-exams');
+
+Route::post('/upload-past-exam',[PastExamController::class, 'store']);
+
+Route::get('/admin.view-past-exams', [PastExamController::class, 'fetchPastExams'])
+    ->middleware(EnsureAdminRole::class)
+    ->name('admin.view-past-exams');
+
+// PAST EXAMS ROUTING END 
+
+
 Route::get('/admin/ai-exam-generator', function () {
     return view('admin.ai-exam-generator');
 })->middleware(EnsureAdminRole::class)
 ->name('admin.ai-exam-generator');
+
+/// --- START OF COURSES BY FACULTY LIST
+
+Route::post('/upload-courses', [CourseController::class, 'uploadCourses'])
+    ->name('upload.courses');
+
+
+Route::get('/admin/courses-list', [CourseController::class, 'showCourses'])
+    ->name('admin.courses-list');
+
+
+
+Route::get('/admin/edit-courses/{id}', [CourseController::class, 'editCourse'])->name('edit.course');
+
+Route::put('/admin/edit-courses/{id}', [CourseController::class, 'updateCourse'])->name('update.course');
+
+/// -- END OF COURSES BY FACULTY LIST 
+
 
 
 
@@ -121,6 +140,62 @@ Route::get('/lecturer/l-dashboard', function () {
 })->middleware(EnsureLecturerRole::class)->name('lecturer.l-dashboard');
 
 
+
+///////
+
+
+
+Route::get('/lecturer/l-dashboard', [CourseController::class, 'fetchCourses'])
+    ->middleware(EnsureLecturerRole::class)
+    ->name('lecturer.l-dashboard');
+
+Route::get('/lecturer/l-course-exams/{courseUnit}', [CourseController::class, 'courseDetails'])
+    ->middleware(EnsureLecturerRole::class)
+    ->name('lecturer.l-course-exams');
+//////////
+
 Route::get('/lecturer/l-upload-questions', function () {
     return view('lecturer.l-upload-questions');
 })->middleware(EnsureLecturerRole::class)->name('lecturer.l-upload-questions');
+
+Route::get('/lecturer/lecturer.l-upload-questions', [CourseController::class, 'CoursesList'])
+    ->middleware(EnsureLecturerRole::class)
+    ->name('lecturer.l-upload-questions');
+
+
+
+
+
+
+/// -- SUPER  ADMIN ROUTING
+
+Route::get('/superadmin/super-adm-dashboard', function () {
+    return view('superadmin.super-adm-dashboard');
+})->middleware(EnsureSuperAdminRole::class)->name('superadmin.super-adm-dashboard');
+
+Route::get('/superadmin/add-lecturer', function () {
+    return view('superadmin.add-lecturer');
+})->middleware(EnsureSuperAdminRole::class)
+    ->name('superadmin.add-lecturer');
+
+Route::post('/upload-lecturer', [RegisterLecturerController::class, 'registerLecturer'])
+    ->middleware(EnsureSuperAdminRole::class)
+    ->name('upload.lecturer');
+
+Route::get('/superadmin/lecturer-list', [RegisterLecturerController::class, 'lecturerList'])
+    ->middleware(EnsureSuperAdminRole::class)
+    ->name('superadmin.lecturer-list');
+
+Route::get('/edit-lecturer/{id}', [RegisterLecturerController::class, 'editLecturer'])
+    ->middleware(EnsureSuperAdminRole::class)
+    ->name('editLecturer');
+
+Route::delete('lecturer.delete/{lecturerId}', [RegisterLecturerController::class, 'deleteLecturer'])
+    ->middleware(EnsureSuperAdminRole::class)
+    ->name('lecturer.delete');
+
+Route::get('/superadmin/add-lecturer', [CourseController::class, 'AllCourses'])
+    ->name('superadmin.add-lecturer');
+
+
+

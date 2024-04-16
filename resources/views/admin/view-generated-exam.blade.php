@@ -14,68 +14,67 @@
     @include('partials.admin-navbar')
 
 <div class="p-4 sm:ml-64 mt-20 ">
-    <h1 class="text-2xl text-center font-bold mb-8">Exam for {{ $courseUnit }}</h1>
+    
+        <div class="container mx-auto px-4">
+            @if (!empty($sections))
+                <div class="mt-8 bg-white rounded-lg shadow-md">
+                    <h1 class="text-xl font-bold p-4 border-b text-center">{{ "Exam - " . $courseUnit }}</h1>
+                    @foreach ($sections as $sectionName => $questions)
+                        <div class="mt-4 p-4 border-t">
+                            <h2 class="text-lg font-semibold">{{ "Section " . $sectionName }}</h2>
+                            @foreach ($questions as $questionIndex => $question)
+                                <div class="mt-2">
+                                    <p>Question {{ $questionIndex + 1 }}:</p>
+                                    <div class="p-4 bg-gray-100 rounded">{!! $question !!}</div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <div class="mt-8 flex flex-col items-center justify-center">
+                    <!-- Provide a valid image URL for 'No Data Available' -->
+                    <img src="../assets/img/404.jpeg" alt="No Data Available" class="w-1/2 max-w-sm mx-auto">
+                    <p class="mt-4 text-lg font-semibold text-gray-600">No course details available.</p>
+                </div>
+            @endif
+        </div>
+    
 
-    <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-            <tr>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Section A Questions
-                </th>
-            </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-            @forelse($sectionAQuestions as $index => $question)
-                <tr>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm text-gray-900">Question {{ $index + 1 }}: {{ $question }}</div>
-                    </td>
-                </tr>
-            @empty
-                <tr>
-                    <td class="px-6 py-4 whitespace-nowrap">No questions found for Section A.</td>
-                </tr>
-            @endforelse
-        </tbody>
-    </table>
 
-    <table class="min-w-full divide-y divide-gray-200 mt-8">
-        <thead class="bg-gray-50">
-            <tr>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Section B Questions
-                </th>
-            </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-            @forelse($sectionBQuestions as $index => $question)
-                <tr>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm text-gray-900">Question {{ $index + 1 }}: {{ $question }}</div>
-                    </td>
-                </tr>
-            @empty
-                <tr>
-                    <td class="px-6 py-4 whitespace-nowrap">No questions found for Section B.</td>
-                </tr>
-            @endforelse
-        </tbody>
-    </table>
-
-    <div class="flex justify-center mt-8">
-        <form action="{{ route('download.exam') }}" method="POST">
+<div class="flex justify-center mt-8">
+    <div class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4 max-w-2xl w-full">
+        <form action="{{ route('download.exam') }}" method="POST" class="space-y-4">
             @csrf
             <input type="hidden" name="courseUnit" value="{{ $courseUnit }}">
-            <input type="hidden" name="sectionAQuestions" value="{{ json_encode($sectionAQuestions) }}">
-            <input type="hidden" name="sectionBQuestions" value="{{ json_encode($sectionBQuestions) }}">
+
+            <div>
+                <input type="text" name="facultyOf" placeholder="FACULTY OF" required class="w-full px-3 py-2 border rounded shadow-sm">
+            </div>
+            <div>
+                <input type="text" name="examPeriod" placeholder="EXAM PERIOD" required class="w-full px-3 py-2 border rounded shadow-sm">
+            </div>
+            <div>
+                <input type="date" name="date" placeholder="DATE" required class="w-full px-3 py-2 border rounded shadow-sm">
+            </div>
+            <div>
+                <input type="text" name="time" placeholder="TIME" required class="w-full px-3 py-2 border rounded shadow-sm">
+            </div>
+            <div>
+                <textarea name="examInstructions" placeholder="EXAM INSTRUCTIONS" rows="4" required class="w-full px-3 py-2 border rounded shadow-sm"></textarea>
+            </div>
+            
             <div class="flex justify-center mt-8">
                 <button type="submit" class="inline-block px-6 py-2 border border-transparent text-base font-medium rounded-md text-white bg-black hover:bg-red-700">
                     Download Exam
                 </button>
             </div>
         </form>
-
     </div>
+</div>
+
+
+
 
 </div>
 
