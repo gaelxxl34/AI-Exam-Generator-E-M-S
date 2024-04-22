@@ -43,8 +43,7 @@
             <select id="formSelect" name="format" class="block w-full p-2 border border-gray-300 rounded-md mb-4">
                 <option value="">Select an option</option>
                 <option value="AB">A-B</option>
-                <option value="ABC">A-B-C</option>
-                <option value="Practical">Practical Exam</option>
+                <option value="Practical">Practical Exam / Unique Section</option>
             </select>
         </div>
 
