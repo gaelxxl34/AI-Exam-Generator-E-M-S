@@ -23,10 +23,15 @@
             <select id="courseUnit" name="courseUnit" class="block w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" required>
                 <option value="">Select a course</option>
                 @foreach($courseNames as $course)
-                    <option value="{{ $course['id'] }}">{{ $course['name'] }}</option>
+                    <option value="{{ $course['name'] }}">{{ $course['name'] }}</option>
                 @endforeach
 
             </select>
+        </div>
+
+        <div class="mb-4">
+            <label for="program" class="block text-sm font-medium text-gray-700">Program:</label>
+            <input type="text" id="program" name="program" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md" placeholder="Enter program name" required>
         </div>
 
         <label for="year" class="block text-sm font-medium text-gray-700">Year:</label>

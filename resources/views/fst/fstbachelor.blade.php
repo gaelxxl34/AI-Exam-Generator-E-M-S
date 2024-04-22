@@ -18,6 +18,22 @@
     <!-- Customized Bootstrap Stylesheet -->
     <link href="../assets/css/style.css" rel="stylesheet">
     <link href="../assets/css/navbar.css" rel="stylesheet">
+
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+       a.visible-link {
+            color: deepskyblue; /* Bright color for visibility */
+            text-decoration: underline; /* Ensures it's recognized as a link */
+        }
+    </style>
 </head>
 <body>
     @include('partials.navbar')
@@ -32,123 +48,39 @@
                 </div>
                </center>
 
-                <div class="row">
-
-
-                    
-
-                        <div class="col-lg-4 py-3">
-                                        <div class="bg-light py-3 px-1 mb-3">
-                                            <h5 class="m-0" style="font-family: 'Montserrat';">Information Technology (BIT)</h5>
-                                        </div>
-                                        <div class="owl-carousel owl-carousel-3 carousel-item-1 position-relative">
-                                                <div class="position-relative " >
-                                                    <img class="img-fluid w-100 article-container" src="/assets/img/bit 1.webp" style="height: 330px; object-fit: cover;">
-                                                    <div class="overlay position-relative bg-light">
-                                                        <div class="mb-2" style="font-size: 13px;">
-                                                            <a class="a-moi" href="{{route('fst.fstbachelor-common-page') }}">Year 1</a>
-                                                            <span class="px-1">/</span>
-                                                            <span>Semester 1</span>
-                                                        </div>
-                                                        <p class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Encore</p>
-                                                    </div>
-                                                </div>
-                                           
-                                        </div>
-
-                                        
-                         
-                        </div>
-
-                          <div class="col-lg-4 py-3">
-                                        <div class="bg-light py-2 px-1 mb-3">
-                                            <h5 class="m-0" style="font-family: 'Montserrat';">Computer Science (BSCS)</h5>
-                                        </div>
-                                        <div class="owl-carousel owl-carousel-3 carousel-item-1 position-relative">
-                                            
-                                                <div class="position-relative " >
-                                                    <img class="img-fluid w-100 article-container" src="/assets/img/mit 3.webp" style="height: 330px; object-fit: cover;">
-                                                    <div class="overlay position-relative bg-light">
-                                                        <div class="mb-2" style="font-size: 13px;">
-                                                            <a class="a-moi" href="">Semesters</a>
-                                                            <span class="px-1">/</span>
-                                                            <span>1 - 6</span>
-                                                        </div>
-                                                        <p class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Encore</p>
-                                                    </div>
-                                                </div>
-                                        
-                                        </div>
-                         
-                        </div>
-
-                          <div class="col-lg-4 py-3">
-                                        <div class="bg-light py-2 px-1 mb-3">
-                                            <h5 class="m-0" style="font-family: 'Montserrat';">Software Engineering (BSSE)</h5>
-                                        </div>
-                                        <div class="owl-carousel owl-carousel-3 carousel-item-1 position-relative">
-                                            
-                                                <div class="position-relative " >
-                                                    <img class="img-fluid w-100 article-container" src="/assets/img/mit 4.webp" style="height: 330px; object-fit: cover;">
-                                                    <div class="overlay position-relative bg-light">
-                                                        <div class="mb-2" style="font-size: 13px;">
-                                                            <a class="a-moi" href="">Semesters</a>
-                                                            <span class="px-1">/</span>
-                                                            <span>1 - 8</span>
-                                                        </div>
-                                                        <p class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Encore</p>
-                                                    </div>
-                                                </div>
-                                        
-                                        </div>
-                         
-                          </div>
-
-
-                           <div class="col-lg-6 py-3">
-                                        <div class="bg-light py-2 px-1 mb-3">
-                                            <h5 class="m-0" style="font-family: 'Montserrat';">Environment Science & Management (BSEM)</h5>
-                                        </div>
-                                        <div class="owl-carousel owl-carousel-3 carousel-item-1 position-relative">
-                                            
-                                                <div class="position-relative " >
-                                                    <img class="img-fluid w-100 article-container" src="/assets/img/mit 4.webp" style="height: 330px; object-fit: cover;">
-                                                    <div class="overlay position-relative bg-light">
-                                                        <div class="mb-2" style="font-size: 13px;">
-                                                            <a class="a-moi" href="">Semesters</a>
-                                                            <span class="px-1">/</span>
-                                                            <span>1 - 6</span>
-                                                        </div>
-                                                        <p class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Encore</p>
-                                                    </div>
-                                                </div>
-                                        
-                                        </div>
-                         
-                          </div>
-
-                            <div class="col-lg-6 py-3">
-                                        <div class="bg-light py-2 px-1 mb-3">
-                                            <h5 class="m-0" style="font-family: 'Montserrat';">Agricultural Science (BSAS)</h5>
-                                        </div>
-                                        <div class="owl-carousel owl-carousel-3 carousel-item-1 position-relative">
-                                            
-                                                <div class="position-relative " >
-                                                    <img class="img-fluid w-100 article-container" src="/assets/img/mit 4.webp" style="height: 330px; object-fit: cover;">
-                                                    <div class="overlay position-relative bg-light">
-                                                        <div class="mb-2" style="font-size: 13px;">
-                                                            <a class="a-moi" href="">Semesters</a>
-                                                            <span class="px-1">/</span>
-                                                            <span>1 - 6</span>
-                                                        </div>
-                                                        <p class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Encore</p>
-                                                    </div>
-                                                </div>
-                                        
-                                        </div>
-                         
-                          </div>
-                </div>
+<table class="min-w-full divide-y divide-gray-200">
+    <thead>
+        <tr>
+            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-dark uppercase tracking-wider">Program</th>
+            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-dark uppercase tracking-wider">Course Unit</th>
+            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-dark uppercase tracking-wider">Year</th>
+            <th class="px-6 py-3 bg-gray-50">Download</th>
+        </tr>
+    </thead>
+    <tbody class="bg-white divide-y divide-gray-200">
+        @forelse ($examsData as $program => $courses)
+            @foreach ($courses as $courseUnit => $details)
+                @foreach ($details as $index => $data)
+                    <tr>
+                        <!-- Show program name only in the first row of each new program -->
+                        @if ($index == 0)
+                            <td rowspan="{{ count($details) }}" class="px-6 py-4 whitespace-nowrap text-sm text-dark">{{ $program }}</td>
+                        @endif
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-dark">{{ $courseUnit }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-dark">{{ $data['year'] }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-dark">
+                            <a class="a-moi" href="data:application/pdf;base64,{{ $data['file'] }}" download="Exam_{{ $courseUnit }}_{{ $data['year'] }}.pdf" class="text-indigo-600 hover:text-indigo-900">Download</a>
+                        </td>
+                    </tr>
+                @endforeach
+            @endforeach
+        @empty
+            <tr>
+                <td colspan="4" class="px-6 py-4 text-center text-sm text-dark">No data found.</td>
+            </tr>
+        @endforelse
+    </tbody>
+</table>
         </div>
     </div>
     <!-- Master Fst Section Slider End -->

@@ -45,9 +45,6 @@ class UploadExamsController extends Controller
             foreach (['A', 'B', 'C'] as $section) {
                 if ($request->has("section$section")) {
                     $content = $request->input("section$section");
-                    // Process and upload images for each section content
-                    // $processedContent = $this->processSectionContent($content, $storage);
-                    // $examData['sections'][$section] = $processedContent;
                     $examData['sections'][$section] = $content;
                 }
             }
@@ -74,22 +71,35 @@ class UploadExamsController extends Controller
             $firestore = app('firebase.firestore')->database();
 
             // Fetch course information directly from the Courses collection
-            $courseRef = $firestore->collection('Courses')->document($selectedCourse);
-            $courseDocument = $courseRef->snapshot();
+            $coursesRef = $firestore->collection('Courses');
+            $query = $coursesRef->where('name', '==', $selectedCourse);
+            $courseSnapshots = $query->documents();
 
-            if (!$courseDocument->exists()) {
-                \Log::error("Course $selectedCourse not found in Courses collection");
-                throw new \Exception("Course $selectedCourse not found.");
+            if ($courseSnapshots->isEmpty()) {
+                \Log::error("No course found with the name: $selectedCourse");
+                throw new \Exception("No course found with the specified name.");
             }
 
-            $courseData = $courseDocument->data();
+            $courseData = null;
+            foreach ($courseSnapshots as $snapshot) {
+                if ($snapshot->exists()) {
+                    $courseData = $snapshot->data();
+                    break; // Assuming only one course matches the name, so we take the first match.
+                }
+            }
+
+            if ($courseData === null) {
+                \Log::error("No existing course found with the name: $selectedCourse");
+                throw new \Exception("No existing course found.");
+            }
+
             $code = $courseData['code'] ?? 'default_code';
             $program = $courseData['program'] ?? 'default_program';
             $year_sem = $courseData['year_sem'] ?? 'default_year_sem';
             \Log::info("Course details fetched: Code: $code, Program: $program, Year/Sem: $year_sem");
 
             // Fetch exams based on the course code
-            $examsQuery = $firestore->collection('Exams')->where('courseCode', '==', $code);
+            $examsQuery = $firestore->collection('Exams')->where('courseUnit', '==', $selectedCourse);
             $examsSnapshot = $examsQuery->documents();
 
             $sections = []; // Initialize as an empty array
@@ -116,7 +126,7 @@ class UploadExamsController extends Controller
             // Shuffle and slice questions for each section
             foreach ($sections as $section => $questions) {
                 shuffle($questions);
-                $count = ($section == 'A') ? 10 : 4; // Adjust based on your needs
+                $count = ($section == 'A') ? 4 : 6; // Adjust based on your needs
                 $sections[$section] = array_slice($questions, 0, $count);
             }
 
@@ -140,6 +150,7 @@ class UploadExamsController extends Controller
             return 'Error: ' . $e->getMessage();
         }
     }
+
 
 
 

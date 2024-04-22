@@ -26,7 +26,7 @@
         @empty
             <div class="col-span-full flex flex-col items-center justify-center ">
                 <img src="https://img.freepik.com/free-vector/error-404-concept-illustration_114360-1811.jpg" alt="No Data Available" class="w-full max-w-lg">
-                <p class="mt-4 text-lg font-semibold text-gray-600">No courses available.</p>
+                <p class="mt-4 text-lg font-semibold text-gray-600">No exams available.</p>
             </div>
         @endforelse
     </div>

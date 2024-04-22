@@ -18,6 +18,23 @@
     <!-- Customized Bootstrap Stylesheet -->
     <link href="../assets/css/style.css" rel="stylesheet">
     <link href="../assets/css/navbar.css" rel="stylesheet">
+
+        <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+       a.visible-link {
+        color: deepskyblue; /* Bright color for visibility */
+        text-decoration: underline; /* Ensures it's recognized as a link */
+    }
+
+    </style>
 </head>
 <body>
     @include('partials.navbar')
@@ -32,97 +49,33 @@
                 </div>
                </center>
 
-                <div class="row">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead>
+                        <tr>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-dark uppercase tracking-wider">Course Unit</th>
+                            <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-dark uppercase tracking-wider">Year</th>
+                            <th class="px-6 py-3 bg-gray-50">Download</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        @forelse ($examsData as $courseUnit => $details)
+                            @foreach ($details as $data)
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-dark">{{ $courseUnit }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-dark">{{ $data['year'] }}</td>
+                                   <td class="px-6 py-4 whitespace-nowrap text-sm text-dark">
+                                        <a class="a-moi" href="data:application/pdf;base64,{{ $data['file'] }}" download="Exam_{{ $courseUnit }}_{{ $data['year'] }}.pdf" class="visible-link">Download</a>
+                                    </td>
 
-
-                        <div class="col-lg-6 py-3">
-                                        <div class="bg-light py-2 px-4 mb-3">
-                                            <h5 class="m-0" style="font-family: 'Montserrat';">Year 1 Semester 1</h5>
-                                        </div>
-                                        <div class="owl-carousel owl-carousel-3 carousel-item-1 position-relative">
-                                            
-                                                <div class="position-relative " >
-                                                    <img class="img-fluid w-100 article-container" src="/assets/img/mit 1.webp" style="height: 330px; object-fit: cover;">
-                                                    <div class="overlay position-relative bg-light">
-                                                        <div class="mb-2" style="font-size: 13px;">
-                                                            <a class="a-moi" href="{{route('fst.fstmaster-common-page') }}">Past exams</a>
-                                                            <span class="px-1">/</span>
-                                                            <span>2019 - 2024</span>
-                                                        </div>
-                                                        <p class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Encore</p>
-                                                    </div>
-                                                </div>
-                                        
-                                        </div>
-                         
-                        </div>
-
-                        <div class="col-lg-6 py-3">
-                                        <div class="bg-light py-2 px-4 mb-3">
-                                            <h5 class="m-0" style="font-family: 'Montserrat';">Year 1 Semester 2</h5>
-                                        </div>
-                                        <div class="owl-carousel owl-carousel-3 carousel-item-1 position-relative">
-                                            
-                                                <div class="position-relative " >
-                                                    <img class="img-fluid w-100 article-container" src="/assets/img/mit 2.webp" style="height: 330px; object-fit: cover;">
-                                                    <div class="overlay position-relative bg-light">
-                                                        <div class="mb-2" style="font-size: 13px;">
-                                                            <a class="a-moi" href="{{route('fst.fstmaster-common-page') }}">Past exams</a>
-                                                            <span class="px-1">/</span>
-                                                            <span>2019 - 2024</span>
-                                                        </div>
-                                                        <p class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Encore</p>
-                                                    </div>
-                                                </div>
-                                        
-                                        </div>
-                         
-                        </div>
-
-                         <div class="col-lg-6 py-3">
-                                        <div class="bg-light py-2 px-4 mb-3">
-                                            <h5 class="m-0" style="font-family: 'Montserrat';">Year 2 Semester 1</h5>
-                                        </div>
-                                        <div class="owl-carousel owl-carousel-3 carousel-item-1 position-relative">
-                                            
-                                                <div class="position-relative " >
-                                                    <img class="img-fluid w-100 article-container" src="/assets/img/mit 3.webp" style="height: 330px; object-fit: cover;">
-                                                    <div class="overlay position-relative bg-light">
-                                                        <div class="mb-2" style="font-size: 13px;">
-                                                            <a class="a-moi" href="{{route('fst.fstmaster-common-page') }}">Past exams</a>
-                                                            <span class="px-1">/</span>
-                                                            <span>2019 - 2024</span>
-                                                        </div>
-                                                        <p class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Encore</p>
-                                                    </div>
-                                                </div>
-                                        
-                                        </div>
-                         
-                        </div>
-
-                         <div class="col-lg-6 py-3">
-                                        <div class="bg-light py-2 px-4 mb-3">
-                                            <h5 class="m-0" style="font-family: 'Montserrat';">Year 2 Semester 2</h5>
-                                        </div>
-                                        <div class="owl-carousel owl-carousel-3 carousel-item-1 position-relative">
-                                            
-                                                <div class="position-relative " >
-                                                    <img class="img-fluid w-100 article-container" src="/assets/img/mit 4.webp" style="height: 330px; object-fit: cover;">
-                                                    <div class="overlay position-relative bg-light">
-                                                        <div class="mb-2" style="font-size: 13px;">
-                                                            <a class="a-moi" href="{{route('fst.fstmaster-common-page') }}">Past exams</a>
-                                                            <span class="px-1">/</span>
-                                                            <span>2019 - 2024</span>
-                                                        </div>
-                                                        <p class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Encore</p>
-                                                    </div>
-                                                </div>
-                                        
-                                        </div>
-                         
-                        </div>
-                </div>
+                                </tr>
+                            @endforeach
+                        @empty
+                            <tr>
+                                <td colspan="3" class="px-6 py-4 text-center text-sm text-gray-500">No data found.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
         </div>
     </div>
     <!-- Master Fst Section Slider End -->

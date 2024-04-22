@@ -9,6 +9,7 @@ use App\Http\Middleware\EnsureAdminRole;
 use App\Http\Middleware\EnsureLecturerRole;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\PastExamController;
+use App\Http\Controllers\DashboardController;
 //
 
 
@@ -17,19 +18,12 @@ Route::get('/', function () {
     return view('welcome');
 })->name('welcome');
 
-Route::get('/fst/fstmaster', function () {
-    return view('fst.fstmaster');
-})->name('fst.fstmaster');
-
 Route::get('/fst/fstmaster-common-page', function () {
     return view('fst.fstmaster-common-page');
 })->name('fst.fstmaster-common-page');
 
 
 
-Route::get('/fst/fstbachelor', function () {
-    return view('fst.fstbachelor');
-})->name('fst.fstbachelor');
 
 // 
 Route::get('/fst/fstbachelor-common-page', function () {
@@ -38,9 +32,6 @@ Route::get('/fst/fstbachelor-common-page', function () {
 
 
 
-Route::get('/fst/fstdiploma', function () {
-    return view('fst.fstdiploma');
-})->name('fst.fstdiploma');
 
 // 
 
@@ -79,9 +70,11 @@ Route::post('/download-exam', [UploadExamsController::class, 'generatePdf'])
     ->name('download.exam');
 
 
-Route::get('/admin/dashboard', function () {
-    return view('admin.dashboard');
-})->middleware(EnsureAdminRole::class)->name('admin.dashboard');
+
+Route::get('/admin/dashboard', [DashboardController::class,'adminDashboard'])
+    ->middleware(EnsureAdminRole::class)
+    ->name('admin.dashboard');
+
 
 Route::get('/admin/add-courses', function () {
     return view('admin.add-courses');
@@ -130,7 +123,7 @@ Route::put('/admin/edit-courses/{id}', [CourseController::class, 'updateCourse']
 
 
 
-// -- Lecturer 
+// -- Lecturer routing
 
 Route::post('/upload-exam', [UploadExamsController::class, 'uploadExam'])
      ->name('upload.exam');
@@ -139,12 +132,18 @@ Route::get('/lecturer/l-dashboard', function () {
     return view('lecturer.l-dashboard');
 })->middleware(EnsureLecturerRole::class)->name('lecturer.l-dashboard');
 
+Route::put('/exams/{courseUnit}/{sectionName}/{questionIndex}/update', [CourseController::class, 'updateQuestion'])
+->name('update.question');
 
+Route::delete('/exams/{courseUnit}/{sectionName}/{questionIndex}/delete', [CourseController::class, 'deleteQuestion'])
+->name('delete.question');
+
+Route::post('/exams/{courseUnit}/questions/add', [CourseController::class, 'addQuestion'])
+->name('add.question');
+
+Route::get('/delete-past-exam/{id}', [PastExamController::class, 'delete'])->name('delete-past-exam');
 
 ///////
-
-
-
 Route::get('/lecturer/l-dashboard', [CourseController::class, 'fetchCourses'])
     ->middleware(EnsureLecturerRole::class)
     ->name('lecturer.l-dashboard');
@@ -171,7 +170,7 @@ Route::get('/lecturer/lecturer.l-upload-questions', [CourseController::class, 'C
 
 Route::get('/superadmin/super-adm-dashboard', function () {
     return view('superadmin.super-adm-dashboard');
-})->middleware(EnsureSuperAdminRole::class)->name('superadmin.super-adm-dashboard');
+})->middleware(EnsureSuperAdminRole::class)->name('superadmin.super-admin-dashboard');
 
 Route::get('/superadmin/add-lecturer', function () {
     return view('superadmin.add-lecturer');
@@ -199,3 +198,31 @@ Route::get('/superadmin/add-lecturer', [CourseController::class, 'AllCourses'])
 
 
 
+// -- USERS NORMAL ROUTINGS 
+
+Route::get('/fetch-mit-exams', [PastExamController::class, 'fetchMITExams'])
+    ->name('fst.fstmaster');
+
+Route::get('/fetch-bachelor-exams', [PastExamController::class, 'fetchBachelorExams'])
+    ->name('fst.fstbachelor');
+
+Route::get('/fetch-dcs-diploma-exams', [PastExamController::class, 'fetchDiplomaDCSExams'])
+    ->name('fst.fstdiploma');
+
+Route::get('/fetch-fbm-bachelor-exams', [PastExamController::class, 'fetchFBMBachelorExams'])
+    ->name('fbm.bachelor');
+
+Route::get('/fetch-diploma-business-public-exams', [PastExamController::class, 'fetchDiplomaBusinessAndPublicExams'])
+    ->name('fetch.diploma.business.public.exams');
+
+Route::get('/fetch-foe-bachelor-exams', [PastExamController::class, 'fetchFOEBachelorExams'])
+    ->name('fetch.foe.bachelor.exams');
+
+Route::get('/fetch-foe-diploma-exams', [PastExamController::class, 'fetchFOEDiplomaExams'])
+    ->name('fetch.foe.diploma.exams');
+
+Route::get('/fetch-law-bachelor-exams', [PastExamController::class, 'fetchLawBachelorExams'])
+    ->name('fetch.law.bachelor.exams');
+
+Route::get('/fetch-hec-exams', [PastExamController::class, 'fetchHECExams'])
+    ->name('fetch.hec.exams');

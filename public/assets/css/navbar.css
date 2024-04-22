@@ -19,6 +19,11 @@ a, .navbar-toggler-icon {
     color: black !important;
 }
 
+        .a-moi:hover {
+            color: rgb(128, 3, 3) !important;
+            /* Color change on hover for interactivity */
+        }
+
 .navbar-toggler {
     border-color: rgba(255, 255, 255, 0.1); /* Make toggler border slightly visible or adjust as needed */
 }
@@ -39,6 +44,9 @@ a, .navbar-toggler-icon {
     border-color: black;
 }
 
+
+
+/* footer code below */
 
 
   .footer {

@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class CourseController extends Controller
+
 {
     public function CoursesList()
     {
@@ -46,39 +48,62 @@ class CourseController extends Controller
         }
     }
 
-    public function fetchCourses() // Method used to display the courses which the exam has been uploaded 
+    public function fetchCourses()
     {
         \Log::info('Fetching courses for dashboard');
 
         try {
             $firestore = app('firebase.firestore')->database();
-            $examsRef = $firestore->collection('Exams');
-            $examsSnapshot = $examsRef->documents();
+            $lecturerEmail = session()->get('user_email');
+            \Log::info('Current user email: ' . $lecturerEmail);
 
+            // Query the Users collection to find the lecturer's document by email
+            $usersRef = $firestore->collection('Users');
+            $query = $usersRef->where('email', '=', $lecturerEmail);
+            $snapshot = $query->documents();
+
+            $lecturerCourses = [];
+
+            foreach ($snapshot as $doc) {
+                if ($doc->exists() && $doc['email'] === $lecturerEmail) {
+                    $lecturerCourses = $doc['courses'];
+                    break; // Assuming one match, we can break the loop once found
+                }
+            }
+
+            if (empty($lecturerCourses)) {
+                \Log::error("Lecturer not found or no courses assigned");
+                return back()->withErrors(['fetch_error' => 'Lecturer not found or no courses assigned.']);
+            }
+
+            $examsRef = $firestore->collection('Exams');
             $courses = [];
 
-            foreach ($examsSnapshot as $document) {
-                if ($document->exists()) {
-                    $data = $document->data();
-                    $courseUnit = $data['courseUnit'] ?? 'Unknown Course';
-
-                    // Aggregate exams under the same course unit
-                    if (!isset($courses[$courseUnit])) {
-                        $courses[$courseUnit] = [];
+            foreach ($lecturerCourses as $courseUnit) {
+                $courseExams = $examsRef->where('courseUnit', '=', $courseUnit)->documents();
+                foreach ($courseExams as $document) {
+                    if ($document->exists()) {
+                        $data = $document->data();
+                        if (!isset($courses[$courseUnit])) {
+                            $courses[$courseUnit] = [];
+                        }
+                        $courses[$courseUnit][] = $data;
                     }
-
-                    $courses[$courseUnit][] = $data;
                 }
             }
 
             return view('lecturer.l-dashboard', ['courses' => $courses]);
+
         } catch (\Throwable $e) {
             \Log::error("Error fetching courses: " . $e->getMessage());
             return back()->withErrors(['fetch_error' => 'Error fetching courses.'])->with('message', 'Error fetching courses: ' . $e->getMessage());
         }
     }
 
-    public function courseDetails($courseUnit)
+
+
+
+    public function courseDetails($courseUnit) // Display exam content based on course unit for lecturers to view questions
     {
         \Log::info("Fetching details for course unit: $courseUnit");
 
@@ -346,7 +371,123 @@ class CourseController extends Controller
     }
 
 
+    public function updateQuestion(Request $request, $courseUnit, $sectionName, $questionIndex)
+    {
+        Log::info("Entering updateQuestion with parameters: Course Unit - {$courseUnit}, Section Name - {$sectionName}, Question Index - {$questionIndex}");
 
+        $request->validate([
+            'question' => 'required|string',
+        ]);
+
+        $firestore = app('firebase.firestore')->database();
+        $examsRef = $firestore->collection('Exams');
+        $query = $examsRef->where('courseUnit', '==', $courseUnit);
+        $examsSnapshot = $query->documents();
+
+        if (count($examsSnapshot->rows()) == 0) {
+            Log::error("No documents found for Course Unit: {$courseUnit}");
+            return back()->withErrors(['error' => 'No exams found.']);
+        }
+
+        foreach ($examsSnapshot as $document) {
+            if ($document->exists()) {
+                $examRef = $document->reference();
+                $examData = $document->data();
+                Log::info("Document found, processing update...", ['Exam Data' => $examData]);
+
+                if (isset($examData['sections'][$sectionName][$questionIndex])) {
+                    $oldQuestion = $examData['sections'][$sectionName][$questionIndex]; // Capture old question for logging
+                    $examData['sections'][$sectionName][$questionIndex] = $request->question;
+
+                    // Update the Firestore document
+                    $examRef->update([
+                        ['path' => 'sections.' . $sectionName, 'value' => $examData['sections'][$sectionName]]
+                    ]);
+
+                    Log::info("Successfully updated question. Course Unit: {$courseUnit}, Section: {$sectionName}, Index: {$questionIndex}, Old Question: {$oldQuestion}, New Question: {$request->question}");
+                    return back()->with('success', 'Question updated successfully.');
+                } else {
+                    Log::warning("Question index $questionIndex not found in section $sectionName");
+                }
+            } else {
+                Log::error("Document does not exist for the specified ID.");
+            }
+        }
+
+        Log::error("Failed to update question for Course Unit: {$courseUnit}");
+        return back()->withErrors(['error' => 'Question update failed.']);
+    }
+
+
+    public function deleteQuestion($courseUnit, $sectionName, $questionIndex)
+    {
+        Log::info("Entering deleteQuestion with parameters: Course Unit - {$courseUnit}, Section Name - {$sectionName}, Question Index - {$questionIndex}");
+
+        $firestore = app('firebase.firestore')->database();
+        $examsRef = $firestore->collection('Exams');
+        $query = $examsRef->where('courseUnit', '==', $courseUnit);
+        $examsSnapshot = $query->documents();
+
+        foreach ($examsSnapshot as $document) {
+            if ($document->exists()) {
+                $examRef = $document->reference();
+                $examData = $document->data();
+
+                if (isset($examData['sections'][$sectionName][$questionIndex])) {
+                    $questionToRemove = $examData['sections'][$sectionName][$questionIndex]; // Capture question for logging
+                    array_splice($examData['sections'][$sectionName], $questionIndex, 1);
+
+                    // Update the Firestore document
+                    $examRef->update([
+                        ['path' => 'sections.' . $sectionName, 'value' => $examData['sections'][$sectionName]]
+                    ]);
+
+                    Log::info("Successfully deleted question. Course Unit: {$courseUnit}, Section: {$sectionName}, Index: {$questionIndex}, Removed Question: {$questionToRemove}");
+                    return back()->with('success', 'Question deleted successfully.');
+                } else {
+                    Log::warning("Question not found for deletion. Course Unit: {$courseUnit}, Section: {$sectionName}, Index: {$questionIndex}");
+                }
+            }
+        }
+
+        Log::error("Exam not found for deletion. Course Unit: {$courseUnit}");
+        return back()->withErrors(['error' => 'Exam or question not found.']);
+    }
+
+    public function addQuestion(Request $request, $courseUnit)
+    {
+        $request->validate([
+            'section' => 'required|string',
+            'newQuestion' => 'required|string',
+        ]);
+
+        $firestore = app('firebase.firestore')->database();
+        $examsRef = $firestore->collection('Exams');
+        $query = $examsRef->where('courseUnit', '==', $courseUnit);
+        $examsSnapshot = $query->documents();
+
+        foreach ($examsSnapshot as $document) {
+            if ($document->exists()) {
+                $examRef = $document->reference();
+                $examData = $document->data();
+
+                // Add the new question to the specified section
+                $examData['sections'][$request->section][] = $request->newQuestion;
+
+                // Update the Firestore document
+                $examRef->update([
+                    ['path' => 'sections.' . $request->section, 'value' => $examData['sections'][$request->section]]
+                ]);
+
+
+                Log::info("Added new question to section: {$request->section} of course unit: {$courseUnit}");
+                return back()->with('success', 'New question added successfully.');
+            }
+        }
+
+        Log::error("Exam not found for course unit: {$courseUnit}");
+        return back()->withErrors(['error' => 'Exam not found.']);
+    }
 
 
 }

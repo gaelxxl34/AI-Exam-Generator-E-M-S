@@ -21,7 +21,8 @@
     @include('partials.lecturer-navbar')
 
 <div class="p-4 sm:ml-64 mt-20 flex justify-center">
-    <form action="{{ route('upload.exam') }}" method="post" class="w-3/5 p-2 border border-gray-300 rounded-md">
+    <!-- Set w-full for small screens and w-3/5 for medium screens and up -->
+    <form action="{{ route('upload.exam') }}" method="post" class="w-full sm:w-3/5 p-2 border border-gray-300 rounded-md">
         @csrf <!-- Laravel CSRF token -->
 
         <input type="hidden" name="faculty" value="fst"> <!-- Set faculty as 'fst' -->

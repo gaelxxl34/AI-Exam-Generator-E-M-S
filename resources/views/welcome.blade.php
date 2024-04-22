@@ -58,9 +58,8 @@
                                                         <div class="mb-2" style="font-size: 13px;">
                                                             <a class="a-moi" href="{{route('fst.fstmaster') }}">Master past exams</a>
                                                             <span class="px-1">/</span>
-                                                            <span>2015 - 2024</span>
+                                                            <span>2023 - 2024</span>
                                                         </div>
-                                                        <a class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Nouveau</a>
                                                     </div>
                                                 </div>
                                         
@@ -82,7 +81,7 @@
                                                             <span class="px-1">/</span>
                                                             <span>2015 - 2024</span>
                                                         </div>
-                                                        <a class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Encore</a>
+                                                        
                                                     </div>
                                                 </div>
                                         
@@ -104,7 +103,7 @@
                                                             <span class="px-1">/</span>
                                                             <span>2015 - 2024</span>
                                                         </div>
-                                                        <a class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Encore</a>
+                                                        
                                                     </div>
                                                 </div>
                                         
@@ -144,7 +143,7 @@
                                                             <span class="px-1">/</span>
                                                             <span>2015 - 2024</span>
                                                         </div>
-                                                        <a class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Nouveau</a>
+                                                        
                                                     </div>
                                                 </div>
                                         
@@ -162,11 +161,11 @@
                                                     <img class="img-fluid w-100 article-container" src="/assets/img/business 2.webp" style="height: 300px; object-fit: cover;">
                                                     <div class="overlay position-relative bg-light">
                                                         <div class="mb-2" style="font-size: 13px;">
-                                                            <a class="a-moi" href="">Bachelor past exams</a>
+                                                            <a class="a-moi" href="{{route('fbm.bachelor')}}">Bachelor past exams</a>
                                                             <span class="px-1">/</span>
                                                             <span>2015 - 2024</span>
                                                         </div>
-                                                        <a class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Encore</a>
+                                                        
                                                     </div>
                                                 </div>
                                         
@@ -184,11 +183,11 @@
                                                     <img class="img-fluid w-100 article-container" src="/assets/img/business 3.webp" style="height: 300px; object-fit: cover;">
                                                     <div class="overlay position-relative bg-light">
                                                         <div class="mb-2" style="font-size: 13px;">
-                                                            <a class="a-moi" href="">Diploma past exams</a>
+                                                            <a class="a-moi" href="{{route('fetch.diploma.business.public.exams')}}">Diploma past exams</a>
                                                             <span class="px-1">/</span>
                                                             <span>2015 - 2024</span>
                                                         </div>
-                                                        <a class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Encore</a>
+                                                        
                                                     </div>
                                                 </div>
                                         
@@ -226,11 +225,11 @@
                                                     <img class="img-fluid w-100 article-container" src="/assets/img/engineering 1.webp" style="height: 330px; object-fit: cover;">
                                                     <div class="overlay position-relative bg-light">
                                                         <div class="mb-2" style="font-size: 13px;">
-                                                            <a class="a-moi" href="">Bachelor past exams</a>
+                                                            <a class="a-moi" href="{{route('fetch.foe.bachelor.exams')}}">Bachelor past exams</a>
                                                             <span class="px-1">/</span>
                                                             <span>2015 - 2024</span>
                                                         </div>
-                                                        <a class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Encore</a>
+                                                        
                                                     </div>
                                                 </div>
                                         
@@ -248,11 +247,11 @@
                                                     <img class="img-fluid w-100 article-container" src="/assets/img/engineering 2.webp" style="height: 330px; object-fit: cover;">
                                                     <div class="overlay position-relative bg-light">
                                                         <div class="mb-2" style="font-size: 13px;">
-                                                            <a class="a-moi" href="">Diploma past exams</a>
+                                                            <a class="a-moi" href="{{route('fetch.foe.diploma.exams')}}">Diploma past exams</a>
                                                             <span class="px-1">/</span>
                                                             <span>2015 - 2024</span>
                                                         </div>
-                                                        <a class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Encore</a>
+                                                        
                                                     </div>
                                                 </div>
                                         
@@ -288,11 +287,11 @@
                                                     <img class="img-fluid w-100 article-container" src="/assets/img/law.webp" style="height: 330px; object-fit: cover;">
                                                     <div class="overlay position-relative bg-light">
                                                         <div class="mb-2" style="font-size: 13px;">
-                                                            <a class="a-moi" href="">Bachelor past exams</a>
+                                                            <a class="a-moi" href="{{route('fetch.law.bachelor.exams')}}">Bachelor past exams</a>
                                                             <span class="px-1">/</span>
                                                             <span>2015 - 2024</span>
                                                         </div>
-                                                        <a class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Encore</a>
+                                                        
                                                     </div>
                                                 </div>
                                         
@@ -330,11 +329,11 @@
                                                     <img class="img-fluid w-100 article-container" src="/assets/img/art.webp" style="height: 330px; object-fit: cover;">
                                                     <div class="overlay position-relative bg-light">
                                                         <div class="mb-2" style="font-size: 13px;">
-                                                            <a class="a-moi" href="">Higher Education past exams</a>
+                                                            <a class="a-moi" href="{{route('fetch.hec.exams')}}">Higher Education past exams</a>
                                                             <span class="px-1">/</span>
                                                             <span>2015 - 2024</span>
                                                         </div>
-                                                        <a class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Encore</a>
+                                                        
                                                     </div>
                                                 </div>
                                         
@@ -352,11 +351,11 @@
                                                     <img class="img-fluid w-100 article-container" src="/assets/img/science.webp" style="height: 330px; object-fit: cover;">
                                                     <div class="overlay position-relative bg-light">
                                                         <div class="mb-2" style="font-size: 13px;">
-                                                            <a class="a-moi" href="">Higher Education past exams</a>
+                                                            <a class="a-moi" href="{{route('fetch.hec.exams')}}">Higher Education past exams</a>
                                                             <span class="px-1">/</span>
                                                             <span>2015 - 2024</span>
                                                         </div>
-                                                        <a class="a-moi m-0 " href="" style="font-family: 'Montserrat';">Encore</a>
+                                                        
                                                     </div>
                                                 </div>
                                         

@@ -18,7 +18,7 @@ class EnsureSuperAdminRole
         // Check if the user is an admin
         if (session()->get('user_role') !== 'superadmin') {
             // Redirect if not an admin
-            return redirect('/login')->withErrors(['login_error' => 'Access denied please login']);
+            return redirect('/login')->withErrors(['login_error' => 'Please login']);
         }
 
         return $next($request);

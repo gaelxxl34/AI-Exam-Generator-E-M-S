@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fst Diploma</title>
+    <title>HEC</title>
 
         <!-- Google Web Fonts -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -45,7 +45,7 @@
         <div class="container">
                <center>
                <div class="align-items-center justify-content-center bg-light py-2 px-4 mt-3">
-                    <h2 class="m-0">Diploma in Computer Science</h2>
+                    <h2 class="m-0">International Foundation Programme HEC</h2>
                 </div>
                </center>
 

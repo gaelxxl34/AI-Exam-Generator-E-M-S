@@ -25,7 +25,7 @@
                             @foreach ($questions as $questionIndex => $question)
                                 <div class="mt-2">
                                     <p>Question {{ $questionIndex + 1 }}:</p>
-                                    <div class="p-4 bg-gray-100 rounded">{!! $question !!}</div>
+                                    <div class="p-4 rounded" style="font-size: 16px;">{!! $question !!}</div>
                                 </div>
                             @endforeach
                         </div>

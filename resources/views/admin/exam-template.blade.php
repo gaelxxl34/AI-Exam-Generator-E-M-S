@@ -5,7 +5,7 @@
     <title>Exam - {{ $courseUnit }}</title>
     <style>
         body {
-            font-family: 'Helvetica', sans-serif;
+            font-family: "Times New Roman", Times, serif;
             font-size: 14px;
             margin: 15px;
         }
@@ -17,7 +17,7 @@
         .exam-cover img {
             margin: 0 auto;
             display: block;
-            width: 200px;
+            width: 220px;
             height: 70px;
         }
         .faculty-name,{
@@ -51,19 +51,12 @@
             clear: both;
         }
        
-        .section {
-            margin-top: 20px;
-            border-top: 1px solid #ccc;
-            padding-top: 15px;
-        }
         .question {
             margin-top: 10px;
         }
         .question-content {
-            background-color: #f4f4f4;
-            padding: 10px;
             border-radius: 5px;
-            margin-top: 5px;
+            margin-top: -10px;
             font-size: 16px;
         }
       
@@ -93,15 +86,15 @@
 <body>
    
 
-    <div class="exam-cover">
+<div class="exam-cover">
     <img src="https://iuea.ac.ug/sitepad-data/uploads//2020/11/Website-Logo.png" alt="University Logo">
 
     <div class="faculty-name">FACULTY OF {{ $facultyOf }}</div>
-    <div class="exam-date">END OF SEMESTER EXAMINATIONS - {{ $examPeriod }}</div>
+    <div class="exam-date uppercase">END OF SEMESTER EXAMINATIONS - {{ $examPeriod }}</div>
 
     <div class="info-left">
         <p>PROGRAMME: {{ $program }}</p>
-        <p >YEAR/SEM: {{ $yearSem }}</p>
+        <p class="uppercase">YEAR/SEM: {{ $yearSem }}</p>
         <p>COURSE CODE: {{ $code }}</p>
         <p class="uppercase"> NAME: {{ $courseUnit }}</p>
     </div>
@@ -109,7 +102,7 @@
 
     <div class="info-right">
         <p>DATE: {{ $date }}</p>
-        <p>TIME: {{ $time }}</p>
+        <p class="uppercase">TIME: {{ $time }}</p>
     </div>
 
     <div class="clear"></div>
@@ -127,7 +120,7 @@
             <h2>Section {{ $sectionName }}</h2>
             @foreach ($questions as $questionIndex => $question)
                 <div class="question">
-                    <p>Question {{ $questionIndex + 1 }}:</p>
+                    <p style="font-weight: bold;">Question {{ $questionIndex + 1 }}:</p>
                     <div class="question-content">{!! $question !!}</div>
                 </div>
             @endforeach

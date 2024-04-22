@@ -279,7 +279,7 @@ class RegisterLecturerController extends Controller
             $auth->deleteUser($id);
 
             // Redirect to the lecturer list with a success message
-            return redirect()->route('admin.lecturer-list')->with('success', 'Lecturer deleted successfully.');
+            return redirect()->route('superadmin.lecturer-list')->with('success', 'Lecturer deleted successfully.');
         } catch (\Exception $e) {
             // Redirect back with an error message if something goes wrong
             return back()->with('error', 'Error deleting lecturer: ' . $e->getMessage());

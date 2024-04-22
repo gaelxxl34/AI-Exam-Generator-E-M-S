@@ -23,7 +23,7 @@
                     <select id="courseDropdown" name="course" class="block w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" required>
                         <option value="">Select a course</option> 
                     @foreach($courseNames as $course)
-                        <option value="{{ $course['id'] }}">{{ $course['name'] }}</option>
+                        <option value="{{ $course['name'] }}">{{ $course['name'] }}</option>
                     @endforeach
 
                     </select>
