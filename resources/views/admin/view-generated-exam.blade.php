@@ -19,16 +19,26 @@
             @if (!empty($sections))
                 <div class="mt-8 bg-white rounded-lg shadow-md">
                     <h1 class="text-xl font-bold p-4 border-b text-center">{{ "Exam - " . $courseUnit }}</h1>
-                    @foreach ($sections as $sectionName => $questions)
-                        <div class="mt-4 p-4 border-t">
-                            <h2 class="text-lg font-semibold">{{ "Section " . $sectionName }}</h2>
-                            @foreach ($questions as $questionIndex => $question)
-                                <div class="mt-2">
-                                    <p>Question {{ $questionIndex + 1 }}:</p>
-                                    <div class="p-4 rounded" style="font-size: 16px;">{!! $question !!}</div>
-                                </div>
-                            @endforeach
-                        </div>
+                    @php
+                        $sortedSections = ['A' => null, 'B' => null];
+                        foreach ($sections as $sectionName => $questions) {
+                            if (array_key_exists($sectionName, $sortedSections)) {
+                                $sortedSections[$sectionName] = $questions;
+                            }
+                        }
+                    @endphp
+                    @foreach ($sortedSections as $sectionName => $questions)
+                        @if (!is_null($questions))
+                            <div class="mt-4 p-4 border-t">
+                                <h2 class="text-lg font-semibold">{{ "Section " . $sectionName }}</h2>
+                                @foreach ($questions as $questionIndex => $question)
+                                    <div class="mt-2">
+                                        <p>Question {{ $questionIndex + 1 }}:</p>
+                                        <div class="p-4 rounded" style="font-size: 16px;">{!! $question !!}</div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
                     @endforeach
                 </div>
             @else

@@ -97,7 +97,7 @@
 
     <div class="mt-8 bg-white rounded-lg shadow-md p-4">
         <h2 class="text-lg font-semibold flex justify-center">Add New Question</h2>
-        <form action="{{ route('add.question', ['courseUnit' => $exam['courseUnit']]) }}" method="POST">
+        <form enctype="multipart/form-data" action="{{ route('add.question', ['courseUnit' => $exam['courseUnit']]) }}" method="POST">
             @csrf
             <!-- Dropdown for selecting the section -->
             <div class="mb-4">

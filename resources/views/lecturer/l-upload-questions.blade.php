@@ -22,10 +22,8 @@
 
 <div class="p-4 sm:ml-64 mt-20 flex justify-center">
     <!-- Set w-full for small screens and w-3/5 for medium screens and up -->
-    <form action="{{ route('upload.exam') }}" method="post" class="w-full sm:w-3/5 p-2 border border-gray-300 rounded-md">
+    <form id="uploadForm" enctype="multipart/form-data" action="{{ route('upload.exam') }}" method="post" class="w-full sm:w-3/5 p-2 border border-gray-300 rounded-md">
         @csrf <!-- Laravel CSRF token -->
-
-        <input type="hidden" name="faculty" value="fst"> <!-- Set faculty as 'fst' -->
 
         <div>
             <label for="courseUnit" class="block text-sm font-medium text-gray-700">Course Unit</label>
@@ -47,14 +45,16 @@
             </select>
         </div>
 
+
+
+
         <div id="practicalOptions" class="hidden mt-5">
             <label for="practicalSectionCount" class="block text-sm font-medium text-gray-700">Number of Sections for Practical Exam</label>
             <select id="practicalSectionCount" class="block w-full p-2 border border-gray-300 rounded-md mb-4">
-                <option value="">Select number of sections</option>
                 <option value="A">Only Section A</option>
-                <option value="AB">Sections A and B</option>
             </select>
         </div>
+
 
 
         <div id="sectionA" class="hidden mt-5">
@@ -75,13 +75,14 @@
             <div id="inputFieldsB"></div>
         </div>
 
-        <div id="sectionC" class="hidden mt-5">
-            <label for="dropdownC" class="block text-sm font-medium text-gray-700">Section C</label>
-            <select id="dropdownC" class="block w-full p-2 border border-gray-300 rounded-md mb-4">
-                <option value="">Select number of fields for section C</option>
-                <!-- Populate with JavaScript -->
-            </select>
-            <div id="inputFieldsC"></div>
+   <div id="instructionsContainer" class="hidden mt-5">
+            <!-- Instructions fields populated by JavaScript -->
+        </div>
+
+
+        <div class="mb-4">
+            <label for="fileUpload" class="block text-sm font-medium text-gray-900 dark:text-gray-500">Upload marking guide</label>
+            <input type="file" id="fileUpload" name="fileUpload" accept=".pdf" class="block w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 cursor-pointer dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400" required>
         </div>
 
         <div class="flex justify-center">
@@ -102,18 +103,14 @@
             const value = this.value;
             
             // Toggle visibility based on selected format
-            document.getElementById('sectionA').classList.toggle('hidden', value !== 'AB' && value !== 'ABC' && value !== 'Practical');
-            document.getElementById('sectionB').classList.toggle('hidden', value !== 'AB' && value !== 'ABC');
-            document.getElementById('sectionC').classList.toggle('hidden', value !== 'ABC');
+            document.getElementById('sectionA').classList.toggle('hidden', value !== 'AB' && value !== 'Practical');
+            document.getElementById('sectionB').classList.toggle('hidden', value !== 'AB');
             document.getElementById('practicalOptions').classList.toggle('hidden', value !== 'Practical');
 
             populateDropdown('dropdownA', 20); // Max 20 for Section A
 
-            if (value === 'AB' || value === 'ABC' || value === 'Practical') {
-                populateDropdown('dropdownB', 5);  // Max 5 for Section B
-            }
-            if (value === 'ABC') {
-                populateDropdown('dropdownC', 5);  // Max 5 for Section C
+            if (value === 'AB' || value === 'Practical') {
+                populateDropdown('dropdownB', 5); // Max 5 for Section B
             }
         });
 
@@ -123,7 +120,7 @@
             document.getElementById('sectionA').classList.remove('hidden');
             document.getElementById('sectionB').classList.toggle('hidden', sectionCount !== 'AB');
 
-            populateDropdown('dropdownA', 10); // Adjust if needed
+            populateDropdown('dropdownA', 20); // Adjust if needed
             if (sectionCount === 'AB') {
                 populateDropdown('dropdownB', 5);
             }
@@ -138,14 +135,13 @@
                 dropdown.add(option);
             }
 
-            // Remove any existing event listener to avoid duplicates
-            dropdown.removeEventListener('change', handleDropdownChange);
+            dropdown.removeEventListener('change', handleDropdownChange); // Remove any existing event listener
             dropdown.addEventListener('change', handleDropdownChange);
         }
 
         function handleDropdownChange() {
-            const dropdownId = this.id;
-            createInputFields(dropdownId.replace('dropdown', 'inputFields'), this.value);
+            const section = this.id.charAt(this.id.length - 1);
+            createInputFields(`inputFields${section}`, this.value);
         }
 
         function createInputFields(containerId, numberOfFields) {
@@ -197,6 +193,70 @@
 
 </script>
 
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const formSelect = document.getElementById('formSelect');
+        const instructionsContainer = document.getElementById('instructionsContainer');
+
+        formSelect.addEventListener('change', function() {
+            const format = this.value;
+            updateInstructions(format);
+        });
+
+        function updateInstructions(format) {
+            instructionsContainer.innerHTML = ''; // Clear previous fields
+            instructionsContainer.classList.remove('hidden');
+
+            let fieldsInfo;
+            if (format === 'AB') {
+                fieldsInfo = ['General Instructions', 'Section A Instructions', 'Section B Instructions'];
+            } else if (format === 'Practical') {
+                fieldsInfo = ['General Instructions', 'Section A Instructions'];
+            } else {
+                instructionsContainer.classList.add('hidden');
+                return;
+            }
+
+            fieldsInfo.forEach((info, index) => {
+                const inputGroup = document.createElement('div');
+                const label = document.createElement('label');
+                const input = document.createElement('textarea'); // Changed to textarea for Summernote
+
+                label.textContent = info;
+                label.setAttribute('for', `instructions${index}`);
+                label.className = 'block text-sm font-medium text-gray-700';
+
+                input.id = `instructions${index}`;
+                input.name = `instructions[${index}]`;
+                input.className = 'block w-full p-2 border border-gray-300 rounded-md mb-4';
+
+                inputGroup.appendChild(label);
+                inputGroup.appendChild(input);
+                instructionsContainer.appendChild(inputGroup);
+
+                // Initialize Summernote only for General Instructions
+                if (info === 'General Instructions') {
+                    $(`#instructions${index}`).summernote({
+                        placeholder: info,
+                        tabsize: 2,
+                        height: 120,
+                        toolbar: [
+                            ['style', ['style']],
+                            ['font', ['bold', 'underline', 'clear']],
+                            ['color', ['color']],
+                            ['para', ['ul', 'ol', 'paragraph']],
+                            ['table', ['table']],
+                            ['insert', ['link', 'picture', 'video']],
+                            ['view', ['codeview', 'help']]
+                        ]
+                    });
+                }
+            });
+        }
+    });
+</script>
 
 </body>
 </html>

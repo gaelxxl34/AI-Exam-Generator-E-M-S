@@ -16,9 +16,8 @@ class UploadExamsController extends Controller
     {
         Log::info('uploadExam method called');
 
-        // Enhanced validation to include practical exams
+        // Enhanced validation to include practical exams and instruction fields
         $validatedData = $request->validate([
-            'faculty' => 'required|string',
             'courseUnit' => 'required|string',
             'format' => 'required|string',
             'sectionA' => 'required|array|min:1',
@@ -27,19 +26,50 @@ class UploadExamsController extends Controller
             'sectionA.*' => 'required|string',
             'sectionB.*' => 'sometimes|required|string',
             'sectionC.*' => 'sometimes|required|string',
+            'fileUpload' => 'required|file|mimes:pdf',
+            'instructions.0' => 'required|string', // General Instructions
+            'instructions.1' => 'required|string', // Section A Instructions
+            'instructions.2' => 'sometimes|string', // Section B Instructions
         ]);
 
         try {
+            $file = $request->file('fileUpload');
+            $base64File = base64_encode(file_get_contents($file));
+
             $firestore = app('firebase.firestore')->database();
             $examsRef = $firestore->collection('Exams');
 
+            $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
+            Log::info("Current user email: $currentUserEmail");
+
+            // Fetch the current user's faculty from Firestore
+            $usersRef = $firestore->collection('Users');
+            $query = $usersRef->where('email', '==', $currentUserEmail);
+            $currentUserSnapshots = $query->documents();
+
+            if ($currentUserSnapshots->isEmpty()) {
+                Log::error("Firestore user not found with email: $currentUserEmail");
+                throw new \Exception('Current user not found in Firestore.');
+            }
+
+            $currentUserDocument = iterator_to_array($currentUserSnapshots)[0];
+            $currentUserData = $currentUserDocument->data();
+            $facultyField = $currentUserData['faculty'] ?? 'default_faculty';
+            Log::info("Faculty fetched: $facultyField");
+
             $examData = [
-                'faculty' => $validatedData['faculty'],
                 'courseUnit' => $validatedData['courseUnit'],
                 'format' => $validatedData['format'],
-                'created_at' => new \DateTime(),
-                'sections' => []
+                'sections' => [],
+                'marking_guide' => $base64File,
+                'faculty' => $facultyField,  // Include the faculty field
+                'general_instructions' => $validatedData['instructions'][0],
+                'sectionA_instructions' => $validatedData['instructions'][1],
             ];
+
+            if (isset($validatedData['instructions'][2])) {
+                $examData['sectionB_instructions'] = $validatedData['instructions'][2];
+            }
 
             // Process sections based on format
             foreach (['A', 'B', 'C'] as $section) {
@@ -57,6 +87,7 @@ class UploadExamsController extends Controller
             return back()->withErrors(['upload_error' => 'Error uploading exam.'])->with('message', 'Error uploading exam: ' . $e->getMessage());
         }
     }
+
 
 
 

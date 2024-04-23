@@ -47,6 +47,7 @@ class PastExamController extends Controller
             'year' => $validatedData['year'],
             'program' => $validatedData['program'],  // Include the program field
             'file' => $base64File,
+            'created_at' => new \DateTime(),
             'faculty' => $facultyField  // Include the faculty field
         ];
 
