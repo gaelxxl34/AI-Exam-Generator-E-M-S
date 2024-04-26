@@ -84,13 +84,14 @@ class RegisterLecturerController extends Controller
                 'lastName' => $validatedData['lastName'],
                 'email' => $validatedData['email'],
                 'profile_picture' => $imagePath,
+                'created_at' => new \DateTime(),
                 'role' => 'lecturer',
                 'faculty' => $validatedData['faculty'], // Use the faculty from the validated data
                 'courses' => $validatedData['courses'],
             ]);
             \Log::info('Lecturer data added to Firestore with courses');
 
-            return redirect()->intended('/superadmin/lecturer-list')->with('success', 'Lecturer registered successfully.');
+            return redirect()->intended('/admin/lecturer-list')->with('success', 'Lecturer registered successfully.');
         } catch (\Throwable $e) {
             \Log::error('Error registering lecturer: ' . $e->getMessage());
             return back()->withErrors(['upload_error' => 'Error registering lecturer.'])->with('message', 'Error registering lecturer: ' . $e->getMessage());
@@ -133,11 +134,12 @@ class RegisterLecturerController extends Controller
                     'lastName' => $lecturerData['lastName'] ?? 'N/A',
                     'email' => $lecturerData['email'] ?? 'N/A',
                     'profile_picture' => $profilePictureUrl,
+                    
                 ];
             }
 
             \Log::info('Lecturers fetched by faculty with image URLs.');
-            return view('superadmin.lecturer-list', ['lecturersByFaculty' => $lecturersByFaculty]);
+            return view('admin.lecturer-list', ['lecturersByFaculty' => $lecturersByFaculty]);
         } catch (\Exception $e) {
             \Log::error('Error in lecturerList: ' . $e->getMessage());
             return 'Error: ' . $e->getMessage();
@@ -175,7 +177,7 @@ class RegisterLecturerController extends Controller
                     'profile_picture' => $profilePictureUrl,
                 ];
 
-                return view('superadmin.edit-lecturer', ['lecturer' => $lecturerData]);
+                return view('admin.edit-lecturer', ['lecturer' => $lecturerData]);
             } else {
                 return 'lecturer not found';
             }
@@ -279,7 +281,7 @@ class RegisterLecturerController extends Controller
             $auth->deleteUser($id);
 
             // Redirect to the lecturer list with a success message
-            return redirect()->route('superadmin.lecturer-list')->with('success', 'Lecturer deleted successfully.');
+            return redirect()->route('admin.lecturer-list')->with('success', 'Lecturer deleted successfully.');
         } catch (\Exception $e) {
             // Redirect back with an error message if something goes wrong
             return back()->with('error', 'Error deleting lecturer: ' . $e->getMessage());

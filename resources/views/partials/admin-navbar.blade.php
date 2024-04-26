@@ -117,18 +117,6 @@
                 </li>
 
                           
-                <li>
-                    <a href="{{route('admin.ai-exam-generator')}}"
-                        class="flex items-center p-2 text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
-                        <svg class="flex-shrink-0 w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white"
-                            aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor"
-                            viewBox="0 0 20 20">
-                            <!-- Icon representing AI Generator, like a brain or circuit with a gear -->
-                            <path d="M11 2a1 1 0 00-1 1v1H8V3a1 1 0 10-2 0v1H5V3a1 1 0 10-2 0v1a5 5 0 00-.995 9.9A3 3 0 005 18h10a3 3 0 002.995-3.1A5 5 0 0015 4h-1V3a1 1 0 10-2 0v1h-1V3a1 1 0 00-1-1zm1 4v1h-1V6h1zm-4 0h1v1H8V6zm1 2h1v1h-1V8zm2 0h1v1h-1V8zm-3 1h1v1H8v-1zm4 0v1h-1v-1h1zm-5 2H6v1h1v-1zm6 0v1h-1v-1h1zm-7 1H6v1h1v-1zm6 0v1h-1v-1h1zM4.5 5A3.5 3.5 0 018 1.5V0a4.5 4.5 0 100 9V7.5A3.5 3.5 0 014.5 5zm11 0A3.5 3.5 0 0012 1.5V0a4.5 4.5 0 110 9V7.5a3.5 3.5 0 003.5-2.5zM8 12v1H5a1 1 0 00-.993.883L4 14v1a1 1 0 00.883.993L5 16h3v-1H5v-1h3zm7 0H12v1h3v1h-3v1h3a1 1 0 00.993-.883L16 15v-1a1 1 0 00-.883-.993L15 13z" />
-                        </svg>
-                        <span class="flex-1 ms-3 whitespace-nowrap">AI Generator</span>
-                    </a>
-                </li>
 
                 <li>
                     <a href="{{route('admin.add-courses')}}" class="flex items-center p-2 text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
@@ -155,6 +143,32 @@
                             <path d="M4 2a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V4a2 2 0 00-2-2H4zm0 2h12v12H4V4zm2 1v2h8V5H6zm0 3v2h8V8H6zm0 3v2h8v-2H6z"/>
                         </svg>
                         <span class="flex-1 ms-3 whitespace-nowrap">Courses list </span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{{route('admin.add-lecturer')}}" class="flex items-center p-2 text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
+                        <svg class="flex-shrink-0 w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                            <!-- Podium or lectern symbol -->
+                            <path d="M2 10h2v7H2v-7zm3 0h2v7H5v-7zm3 0h2v7H8v-7zm10 0h2v7h-2v-7zm-3 0h2v7h-2v-7zM9 9V8h1V7h1V6h-1V5h-1V4H8v1H7v1H6v1h1v1h1v1h1zm1-1h1V7h-1v1z"/>
+                            <!-- Plus sign for 'add' -->
+                            <path d="M17 9h-3V6h-2v3H9v2h3v3h2v-3h3V9z"/>
+                        </svg>
+                        <span class="flex-1 ms-3 whitespace-nowrap">Add Lecturer</span>
+                    </a>
+                </li>
+
+
+                <li>
+                    <a href="{{route('admin.lecturer-list')}}"
+                        class="flex items-center p-2 text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
+                        <svg class="flex-shrink-0 w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white"
+                            aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor"
+                            viewBox="0 0 20 18">
+                            <path
+                                d="M14 2a3.963 3.963 0 0 0-1.4.267 6.439 6.439 0 0 1-1.331 6.638A4 4 0 1 0 14 2Zm1 9h-1.264A6.957 6.957 0 0 1 15 15v2a2.97 2.97 0 0 1-.184 1H19a1 1 0 0 0 1-1v-1a5.006 5.006 0 0 0-5-5ZM6.5 9a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9ZM8 10H5a5.006 5.006 0 0 0-5 5v2a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-2a5.006 5.006 0 0 0-5-5Z" />
+                        </svg>
+                        <span class="flex-1 ms-3 whitespace-nowrap">Lecturer list </span>
                     </a>
                 </li>
 

@@ -40,12 +40,23 @@
             <option value="2022">2022</option>
             <option value="2023">2023</option>
             <option value="2024">2024</option>
-            
+            <option value="2025">2025</option>
+            <option value="2026">2026</option>
+            <option value="2027">2027</option>
+            <option value="2028">2028</option>
+            <option value="2029">2029</option>
+            <option value="2030">2030</option>
         </select>
 
         <div class="mb-4">
-            <label for="fileUpload" class="block text-sm font-medium text-gray-900 dark:text-gray-300">Upload file</label>
+            <label for="fileUpload" class="block text-sm font-medium text-gray-900 dark:text-gray-500">Upload file</label>
             <input type="file" id="fileUpload" name="fileUpload" accept=".pdf" class="block w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 cursor-pointer dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400" required>
+            
+            @if ($errors->has('fileUpload'))
+                <div class="text-red-500 mt-2 text-sm">
+                    {{ $errors->first('fileUpload') }}
+                </div>
+            @endif
         </div>
 
         <div class="flex justify-center mt-4">

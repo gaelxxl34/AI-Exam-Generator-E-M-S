@@ -83,7 +83,14 @@
         <div class="mb-4">
             <label for="fileUpload" class="block text-sm font-medium text-gray-900 dark:text-gray-500">Upload marking guide</label>
             <input type="file" id="fileUpload" name="fileUpload" accept=".pdf" class="block w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 cursor-pointer dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400" required>
+            
+            @if ($errors->has('fileUpload'))
+                <div class="text-red-500 mt-2 text-sm">
+                    {{ $errors->first('fileUpload') }}
+                </div>
+            @endif
         </div>
+
 
         <div class="flex justify-center">
             <button type="submit" class="px-4 py-2 bg-gray-800 hover:bg-red-700 text-white rounded-md">

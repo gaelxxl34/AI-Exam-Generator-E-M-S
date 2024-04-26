@@ -351,24 +351,63 @@ class CourseController extends Controller
         $firestore = app('firebase.firestore');
         $database = $firestore->database();
 
-        // Fetch all courses
-        $coursesRef = $database->collection('Courses');
-        $coursesSnapshots = $coursesRef->documents();
+        try {
+            // Fetch the current user's email and faculty
+            $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
+            $usersRef = $database->collection('Users');
+            $userQuery = $usersRef->where('email', '==', $currentUserEmail);
+            $currentUserSnapshots = $userQuery->documents();
 
-        $courses = [];
-        foreach ($coursesSnapshots as $document) {
-            if ($document->exists()) {
-                $data = $document->data();
-                $courses[] = [
-                    'id' => $document->id(),
-                    'name' => $data['name'] ?? 'Unknown Course' // Ensuring there is a default name
-                ];
+            if ($currentUserSnapshots->isEmpty()) {
+                \Log::error("Firestore user not found with email: $currentUserEmail");
+                throw new \Exception('Current user not found in Firestore.');
             }
-        }
 
-        // Pass the courses to the view
-        return view('superadmin/add-lecturer', ['courses' => $courses]);
+            $currentUserDocument = iterator_to_array($currentUserSnapshots)[0];
+            $currentUserData = $currentUserDocument->data();
+            $userFaculty = $currentUserData['faculty'] ?? 'default_faculty';
+            \Log::info("Current user faculty: $userFaculty");
+
+            $containsComma = strpos($userFaculty, ',') !== false;
+            \Log::info("Faculty field contains comma: " . ($containsComma ? 'Yes' : 'No'));
+
+            $courses = [];
+            $coursesRef = $database->collection('Courses');
+
+            // If faculty contains a comma, fetch all courses; otherwise, fetch by specific faculty
+            if ($containsComma) {
+                $coursesQuery = $coursesRef; // Fetch all courses
+                \Log::info("Fetching all courses due to multiple faculty entries");
+            } else {
+                $coursesQuery = $coursesRef->where('faculty', '==', $userFaculty);
+                \Log::info("Fetching courses for specific faculty: $userFaculty");
+            }
+
+            $coursesSnapshots = $coursesQuery->documents();
+
+            foreach ($coursesSnapshots as $document) {
+                if ($document->exists()) {
+                    $data = $document->data();
+                    $courses[] = [
+                        'id' => $document->id(),
+                        'name' => $data['name'] ?? 'Unknown Course'
+                    ];
+                }
+            }
+
+            \Log::info("Number of courses fetched: " . count($courses));
+
+            // Pass the courses to the view
+            return view('genadmin.ai-exam-generator', ['courses' => $courses]);
+        } catch (\Exception $e) {
+            \Log::error("Error fetching courses: " . $e->getMessage());
+            return view('genadmin.ai-exam-generator', ['courses' => [], 'error' => 'Failed to fetch courses.']);
+        }
     }
+
+
+
+
 
 
     public function updateQuestion(Request $request, $courseUnit, $sectionName, $questionIndex)

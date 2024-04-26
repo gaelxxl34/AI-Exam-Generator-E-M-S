@@ -17,7 +17,11 @@ class UploadExamsController extends Controller
         Log::info('uploadExam method called');
 
         // Enhanced validation to include practical exams and instruction fields
+        $messages = [
+            'fileUpload.max' => 'The file should not be greater than 2MB.',
+        ];
         $validatedData = $request->validate([
+
             'courseUnit' => 'required|string',
             'format' => 'required|string',
             'sectionA' => 'required|array|min:1',
@@ -26,15 +30,17 @@ class UploadExamsController extends Controller
             'sectionA.*' => 'required|string',
             'sectionB.*' => 'sometimes|required|string',
             'sectionC.*' => 'sometimes|required|string',
-            'fileUpload' => 'required|file|mimes:pdf',
+            'fileUpload' => 'required|file|mimes:pdf|max:2048',
             'instructions.0' => 'required|string', // General Instructions
             'instructions.1' => 'required|string', // Section A Instructions
             'instructions.2' => 'sometimes|string', // Section B Instructions
-        ]);
+        ], $messages);
 
         try {
             $file = $request->file('fileUpload');
             $base64File = base64_encode(file_get_contents($file));
+
+            Log::info("This is : $base64File");
 
             $firestore = app('firebase.firestore')->database();
             $examsRef = $firestore->collection('Exams');
@@ -58,6 +64,7 @@ class UploadExamsController extends Controller
             Log::info("Faculty fetched: $facultyField");
 
             $examData = [
+                'created_at' => new \DateTime(),
                 'courseUnit' => $validatedData['courseUnit'],
                 'format' => $validatedData['format'],
                 'sections' => [],
@@ -171,7 +178,7 @@ class UploadExamsController extends Controller
                 'year_sem' => $year_sem,
             ]);
 
-            return view('admin.view-generated-exam', [
+            return view('genadmin.view-generated-exam', [
                 'courseUnit' => $selectedCourse,
                 'sections' => $sections
             ]);

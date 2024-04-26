@@ -11,12 +11,18 @@ class PastExamController extends Controller
     // The function below is used to upload past exams into firestore 
     public function store(Request $request)
     {
+
+        $messages = [
+            'fileUpload.max' => 'The file should not be greater than 2MB.',
+        ];
+        
         $validatedData = $request->validate([
             'courseUnit' => 'required',
             'year' => 'required',
             'program' => 'required|string',  // Validate the new field
-            'fileUpload' => 'required|file|mimes:pdf'
-        ]);
+            'fileUpload' => 'required|file|mimes:pdf|max:2048',
+            'created_at' => new \DateTime(),
+        ], $messages);
 
         $file = $request->file('fileUpload');
         $base64File = base64_encode(file_get_contents($file));

@@ -21,7 +21,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        View::composer(['admin.add-past-exams', 'admin.ai-exam-generator'], function ($view) {
+        View::composer(['admin.add-past-exams','admin.add-lecturer'], function ($view) {
             
                 $courseController = new CourseController;
                 $courseNames = $courseController->fetchCoursesForFaculty(); // This should return just the array

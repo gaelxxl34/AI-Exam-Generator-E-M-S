@@ -106,6 +106,8 @@ class AuthController extends Controller
                     return redirect('/lecturer/lecturer.l-upload-questions');
                 case 'superadmin':
                     return redirect('/superadmin/super-adm-dashboard');
+                case 'genadmin':
+                    return redirect('/genadmin/gen-dashboard');
                 default:
                     return redirect('/login')->withErrors(['login_error' => 'No valid role assigned to this user.']);
             }

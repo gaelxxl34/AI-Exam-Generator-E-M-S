@@ -44,4 +44,54 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function genAdminDashboard()
+    {
+        $firestore = app('firebase.firestore');
+        $database = $firestore->database();
+
+        // Fetch the current user's email and faculty
+        $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
+
+        // Fetch current user's data to get their faculty
+        $userRef = $database->collection('Users')->where('email', '==', $currentUserEmail);
+        $currentUserSnapshots = $userRef->documents();
+
+        if ($currentUserSnapshots->isEmpty()) {
+            \Log::error("User not found with email: $currentUserEmail");
+            throw new \Exception('User not found.');
+        }
+
+        $currentUserDocument = iterator_to_array($currentUserSnapshots)[0];
+        $currentUserFaculty = $currentUserDocument->data()['faculty'] ?? 'No faculty assigned';
+        \Log::info("Current user faculty: $currentUserFaculty");
+
+        $containsComma = strpos($currentUserFaculty, ',') !== false;
+        \Log::info("Faculty field contains comma: " . ($containsComma ? 'Yes' : 'No'));
+
+        if ($containsComma) {
+            // If faculty field contains a comma, fetch counts without faculty filters
+            $lecturerCount = $database->collection('Users')->where('role', '==', 'lecturer')->documents()->size();
+            $pastExamsCount = $database->collection('pastExams')->documents()->size();
+            $coursesCount = $database->collection('Courses')->documents()->size();
+            \Log::info("Fetching counts for all faculties.");
+        } else {
+            // Filter and count documents based on a specific faculty
+            $lecturerCount = $database->collection('Users')->where('role', '==', 'lecturer')->where('faculty', '==', $currentUserFaculty)->documents()->size();
+            $pastExamsCount = $database->collection('pastExams')->where('faculty', '==', $currentUserFaculty)->documents()->size();
+            $coursesCount = $database->collection('Courses')->where('faculty', '==', $currentUserFaculty)->documents()->size();
+            \Log::info("Fetching counts for specific faculty: $currentUserFaculty");
+        }
+
+        \Log::info("Counts - Lecturers: $lecturerCount, Past Exams: $pastExamsCount, Courses: $coursesCount");
+
+        // Pass the counts to the view
+        return view('genadmin.gen-dashboard', [
+            'lecturerCount' => $lecturerCount,
+            'pastExamsCount' => $pastExamsCount,
+            'coursesCount' => $coursesCount,
+            'faculty' => $currentUserFaculty  // Optional, to display on dashboard if needed
+        ]);
+    }
+
+
 }
