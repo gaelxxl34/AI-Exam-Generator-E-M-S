@@ -79,7 +79,7 @@ class UploadExamsController extends Controller
             }
 
             // Process sections based on format
-            foreach (['A', 'B', 'C'] as $section) {
+            foreach (['A', 'B'] as $section) {
                 if ($request->has("section$section")) {
                     $content = $request->input("section$section");
                     $examData['sections'][$section] = $content;
@@ -136,6 +136,11 @@ class UploadExamsController extends Controller
             $year_sem = $courseData['year_sem'] ?? 'default_year_sem';
             \Log::info("Course details fetched: Code: $code, Program: $program, Year/Sem: $year_sem");
 
+            // Initialize arrays to hold instructions
+            $generalInstructions = '';
+            $sectionAInstructions = '';
+            $sectionBInstructions = '';  // Initialize as empty string
+
             // Fetch exams based on the course code
             $examsQuery = $firestore->collection('Exams')->where('courseUnit', '==', $selectedCourse);
             $examsSnapshot = $examsQuery->documents();
@@ -146,6 +151,11 @@ class UploadExamsController extends Controller
                 if ($exam->exists()) {
                     $data = $exam->data();
 
+                    $generalInstructions = $data['general_instructions'] ?? '';
+                    $sectionAInstructions = $data['sectionA_instructions'] ?? '';
+                    if (isset($data['sectionB_instructions'])) {
+                        $sectionBInstructions = $data['sectionB_instructions'];
+                    }
                     foreach ($data['sections'] as $section => $contents) {
                         if (!isset($sections[$section])) {
                             $sections[$section] = [];
@@ -169,7 +179,14 @@ class UploadExamsController extends Controller
             }
 
             // Store the sections data in the session
-            session(['sections' => $sections]);
+            session([
+                'sections' => $sections,
+                'general_instructions' => $generalInstructions,
+                'sectionA_instructions' => $sectionAInstructions,
+                'sectionB_instructions' => $sectionBInstructions,
+                // ... existing session data ...
+            ]);
+
 
             session([
                 'faculty' => $courseData['faculty'] ?? 'default_faculty',
@@ -201,7 +218,7 @@ class UploadExamsController extends Controller
         $examPeriod = $request->input('examPeriod');
         $date = $request->input('date');
         $time = $request->input('time');
-        $examInstructions = $request->input('examInstructions');
+        // $examInstructions = $request->input('examInstructions');
 
 
         // Retrieve additional session data
@@ -209,6 +226,9 @@ class UploadExamsController extends Controller
         $code = session('code');
         $program = session('program');
         $yearSem = session('year_sem');
+        $generalInstructions = session('general_instructions');
+        $sectionAInstructions = session('sectionA_instructions');
+        $sectionBInstructions = session('sectionB_instructions');
 
         \Log::info('PDF generation started with courseUnit: ' . $courseUnit);
 
@@ -225,7 +245,10 @@ class UploadExamsController extends Controller
             'examPeriod' => $examPeriod,
             'date' => $date,
             'time' => $time,
-            'examInstructions' => $examInstructions
+            'generalInstructions' => $generalInstructions,
+            'sectionAInstructions' => $sectionAInstructions,
+            'sectionBInstructions' => $sectionBInstructions,
+            // 'examInstructions' => $examInstructions
         ]);
 
         // Set paper size to A4 and orientation to portrait

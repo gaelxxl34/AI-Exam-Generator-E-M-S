@@ -9,7 +9,7 @@
             font-size: 14px;
             margin: 15px;
         }
-        .exam-cover {
+   .exam-cover {
             text-align: center;
             page-break-after: always;
             
@@ -23,8 +23,12 @@
         .faculty-name,{
             margin-bottom: 10px;
             margin-top: 40px;
+            text-transform: uppercase;
             font-weight: bold;
         } 
+        .uppercase {
+            text-transform: uppercase;
+        }
         .exam-date {
             margin-bottom: 30px;
             margin-top: 10px;
@@ -40,26 +44,34 @@
         }
         .instructions {
             font-weight: bold;
-            text-align: left;
+            
             margin-top: 20px;
             text-transform: uppercase;
+            text-decoration: underline;
         }
         .instructions p:first-child {
-            text-decoration: underline;
+            
         }
         .clear {
             clear: both;
         }
-       
+        .section {
+            padding: 8px; /* Increased padding for questions */
+        }
         .question {
-            margin-top: 10px;
+            margin-top: 6px; /* Increased margin above each question for readability */
+            margin-bottom: 10px; /* Added margin below each question */
+        }
+        .question p {
+            font-weight: normal; /* Only the question number should be bold */
+            margin: 0; /* Keep margins tight around text */
         }
         .question-content {
-            border-radius: 5px;
-            margin-top: -10px;
-            font-size: 16px;
+            padding: 12px; /* Small padding around content for visual separation */
         }
-      
+        h2 {
+            font-weight: bold; /* Ensure section headers are bold */
+        }
         .table {
             width: 100%;
             border-collapse: collapse;
@@ -78,53 +90,54 @@
             padding: .75rem;
             vertical-align: top;
         }
-        .uppercase {
-            text-transform: uppercase;
-        }
     </style>
 </head>
 <body>
-   
-
 <div class="exam-cover">
     <img src="https://iuea.ac.ug/sitepad-data/uploads//2020/11/Website-Logo.png" alt="University Logo">
-
     <div class="faculty-name">FACULTY OF {{ $facultyOf }}</div>
     <div class="exam-date uppercase">END OF SEMESTER EXAMINATIONS - {{ $examPeriod }}</div>
-
     <div class="info-left">
         <p>PROGRAMME: {{ $program }}</p>
         <p class="uppercase">YEAR/SEM: {{ $yearSem }}</p>
         <p>COURSE CODE: {{ $code }}</p>
         <p class="uppercase"> NAME: {{ $courseUnit }}</p>
     </div>
-
-
     <div class="info-right">
         <p>DATE: {{ $date }}</p>
         <p class="uppercase">TIME: {{ $time }}</p>
     </div>
-
     <div class="clear"></div>
-
-    <div class="instructions">
-        <p>INSTRUCTIONS TO CANDIDATES:</p>
-        {!! nl2br(e($examInstructions)) !!}
+    <div style="text-align: left;">
+        <p class="instructions">INSTRUCTIONS TO CANDIDATES:</p>
+        {!! $generalInstructions !!}
     </div>
 </div>
 
+{{-- Ensure sections are sorted by name --}}
+@php
+    ksort($sections);
+@endphp
 
-   
-    @foreach ($sections as $sectionName => $questions)
-        <div class="section">
-            <h2>Section {{ $sectionName }}</h2>
-            @foreach ($questions as $questionIndex => $question)
-                <div class="question">
-                    <p style="font-weight: bold;">Question {{ $questionIndex + 1 }}:</p>
-                    <div class="question-content">{!! $question !!}</div>
-                </div>
-            @endforeach
-        </div>
-    @endforeach
+@foreach ($sections as $sectionName => $questions)
+    <div class="section">
+        <h2>
+            Section {{ $sectionName }}
+            {{-- Inline instructions for each section --}}
+            @if ($sectionName == 'A' && isset($sectionAInstructions))
+                <span>{!! $sectionAInstructions !!}</span>
+            @elseif ($sectionName == 'B' && isset($sectionBInstructions))
+                <span>{!! $sectionBInstructions !!}</span>
+            @endif
+        </h2>
+        @foreach ($questions as $questionIndex => $question)
+            <div class="question">
+                <p style="font-weight: bold; font-size: 16px">Question {{ $questionIndex + 1 }}:</p>
+                <div class="question-content p-4 rounded">{!! $question !!}</div>
+            </div>
+        @endforeach
+    </div>
+@endforeach
+
 </body>
 </html>

@@ -58,9 +58,19 @@
             @csrf
             <input type="hidden" name="courseUnit" value="{{ $courseUnit }}">
 
-            <div>
-                <input type="text" name="facultyOf" placeholder="FACULTY OF" required class="w-full px-3 py-2 border rounded shadow-sm">
+            <div class="mb-5"> <!-- increased bottom margin -->
+                <label for="facultyOf" class="block text-sm font-medium text-gray-700">Select Faculty:</label>
+                <div class="relative">
+                    <select id="facultyOf" name="facultyOf" class="block w-full p-2 border border-gray-300 rounded-md shadow-sm text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" required>
+                        <option value="">Please choose</option>
+                        <option value="Faculty of Science and Technology">Faculty of Science and Technology (FST)</option>
+                        <option value="Faculty of Business Management">Faculty of Business Management (FBM)</option>
+                        <option value="Faculty of Engineering">Faculty of Engineering (FOE)</option>
+                        <option value="Faculty of Law ">Faculty of Law (FOL)</option>
+                    </select>
+                </div>
             </div>
+
             <div>
                 <input type="text" name="examPeriod" placeholder="EXAM PERIOD" required class="w-full px-3 py-2 border rounded shadow-sm">
             </div>
@@ -70,9 +80,7 @@
             <div>
                 <input type="text" name="time" placeholder="TIME" required class="w-full px-3 py-2 border rounded shadow-sm">
             </div>
-            <div>
-                <textarea name="examInstructions" placeholder="EXAM INSTRUCTIONS" rows="4" required class="w-full px-3 py-2 border rounded shadow-sm"></textarea>
-            </div>
+
             
             <div class="flex justify-center mt-8">
                 <button type="submit" class="inline-block px-6 py-2 border border-transparent text-base font-medium rounded-md text-white bg-black hover:bg-red-700">
