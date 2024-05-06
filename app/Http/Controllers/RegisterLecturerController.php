@@ -110,10 +110,25 @@ class RegisterLecturerController extends Controller
         try {
             $firestore = app('firebase.firestore');
             $database = $firestore->database();
-            $usersRef = $database->collection('Users');
 
-            // Query for all lecturers regardless of faculty
-            $lecturerQuery = $usersRef->where('role', '=', 'lecturer');
+            // Fetch the current user's email and faculty
+            $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
+
+            // Fetch current user's data to get their faculty
+            $userRef = $database->collection('Users')->where('email', '==', $currentUserEmail);
+            $currentUserSnapshots = $userRef->documents();
+
+            if ($currentUserSnapshots->isEmpty()) {
+                \Log::error("User not found with email: $currentUserEmail");
+                throw new \Exception('User not found.');
+            }
+
+            $currentUserDocument = iterator_to_array($currentUserSnapshots)[0];
+            $currentUserData = $currentUserDocument->data();
+            $facultyField = $currentUserData['faculty'] ?? 'default_faculty';
+
+            // Query for lecturers only from the current user's faculty
+            $lecturerQuery = $database->collection('Users')->where('role', '=', 'lecturer')->where('faculty', '=', $facultyField);
             $lecturerSnapshot = $lecturerQuery->documents();
 
             $lecturersByFaculty = [];
@@ -134,7 +149,6 @@ class RegisterLecturerController extends Controller
                     'lastName' => $lecturerData['lastName'] ?? 'N/A',
                     'email' => $lecturerData['email'] ?? 'N/A',
                     'profile_picture' => $profilePictureUrl,
-                    
                 ];
             }
 
@@ -145,6 +159,7 @@ class RegisterLecturerController extends Controller
             return 'Error: ' . $e->getMessage();
         }
     }
+
 
 
 

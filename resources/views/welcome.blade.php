@@ -3,7 +3,17 @@
 
 <head>
     <meta charset="utf-8">
-    <title>Past Exams</title>
+    <title>Past Exams Management System</title>
+    <meta name="description" content="Past Exams Management System provides easy access to a comprehensive library of past examination papers for students of the International University of East Africa (IUEA). Explore various courses to better prepare for your exams.">
+    <meta name="keywords" content="IUEA, past exams, exam library, student resources, exam preparation">
+    <meta name="author" content="International University of East Africa">
+
+    <!-- Social Media -->
+    <meta property="og:title" content="Past Exams Management System">
+    <meta property="og:description" content="Access past examination papers at IUEA to enhance your preparation for upcoming tests. Explore a variety of subjects and courses through our user-friendly online platform.">
+    <meta property="og:image" content="/assets/img/meta.webp">
+    <meta property="og:url" content="https://ems.iuea.ac.ug/">
+    <meta property="og:type" content="website">
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
     <meta content="Free HTML Templates" name="keywords">
     <meta content="Free HTML Templates" name="description">
