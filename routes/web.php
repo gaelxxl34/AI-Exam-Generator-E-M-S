@@ -63,10 +63,6 @@ Route::get('/forget-password', [AuthController::class, 'showForgetPasswordForm']
 Route::get('/genadmin/gen-dashboard', [DashboardController::class, 'genAdminDashboard'])
     ->middleware(EnsureGenAdminRole::class)
     ->name('genadmin.gen-dashboard');
-// Route::get('/genadmin/ai-exam-generator', function () {
-//     return view('genadmin.ai-exam-generator');
-// })->middleware(EnsureGenAdminRole::class)
-//     ->name('genadmin.ai-exam-generator');
 Route::get('/genadmin/ai-exam-generator', [CourseController::class, 'AllCourses'])
     ->name('genadmin.ai-exam-generator');
 
@@ -233,9 +229,7 @@ Route::delete('/admin/{adminId}', [SuperAdminController::class, 'deleteAdmin'])
 
 
 
-
-
-
+    
 // -- USERS NORMAL ROUTINGS 
 
 Route::get('/fetch-mit-exams', [PastExamController::class, 'fetchMITExams'])

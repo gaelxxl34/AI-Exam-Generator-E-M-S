@@ -17,7 +17,7 @@
         <div class="container mx-auto mt-3 mb-3 text-center">
             <div class="flex justify-center items-center">
                 <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-                    <form action="{{ route('admin.update-lecturer-data', ['lecturerId' => $lecturer['id']]) }}" enctype="multipart/form-data" method="POST" class="space-y-4">
+                    <form action="{{ route('admin.update-lecturer-data', ['lecturerId' => $lecturer['id']] ) }}" enctype="multipart/form-data" method="POST" class="space-y-4">
                         @csrf
                         @method('PUT')
 

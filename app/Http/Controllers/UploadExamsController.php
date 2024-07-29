@@ -30,8 +30,8 @@ class UploadExamsController extends Controller
             'sectionA.*' => 'required|string',
             'sectionB.*' => 'sometimes|required|string',
             'sectionC.*' => 'sometimes|required|string',
-            'fileUpload' => 'required|file|mimes:pdf|max:2048',
-            'instructions.0' => 'required|string', // General Instructions
+            'fileUpload' => 'required|file|max:2048',
+            // 'instructions.0' => 'required|string', // General Instructions
             'instructions.1' => 'required|string', // Section A Instructions
             'instructions.2' => 'sometimes|string', // Section B Instructions
         ], $messages);
@@ -70,7 +70,7 @@ class UploadExamsController extends Controller
                 'sections' => [],
                 'marking_guide' => $base64File,
                 'faculty' => $facultyField,  // Include the faculty field
-                'general_instructions' => $validatedData['instructions'][0],
+                // 'general_instructions' => $validatedData['instructions'][0],
                 'sectionA_instructions' => $validatedData['instructions'][1],
             ];
 
@@ -137,7 +137,7 @@ class UploadExamsController extends Controller
             \Log::info("Course details fetched: Code: $code, Program: $program, Year/Sem: $year_sem");
 
             // Initialize arrays to hold instructions
-            $generalInstructions = '';
+            // $generalInstructions = '';
             $sectionAInstructions = '';
             $sectionBInstructions = '';  // Initialize as empty string
 
@@ -151,7 +151,7 @@ class UploadExamsController extends Controller
                 if ($exam->exists()) {
                     $data = $exam->data();
 
-                    $generalInstructions = $data['general_instructions'] ?? '';
+                    // $generalInstructions = $data['general_instructions'] ?? '';
                     $sectionAInstructions = $data['sectionA_instructions'] ?? '';
                     if (isset($data['sectionB_instructions'])) {
                         $sectionBInstructions = $data['sectionB_instructions'];
@@ -181,7 +181,7 @@ class UploadExamsController extends Controller
             // Store the sections data in the session
             session([
                 'sections' => $sections,
-                'general_instructions' => $generalInstructions,
+                // 'general_instructions' => $generalInstructions,
                 'sectionA_instructions' => $sectionAInstructions,
                 'sectionB_instructions' => $sectionBInstructions,
                 // ... existing session data ...
@@ -218,6 +218,7 @@ class UploadExamsController extends Controller
         $examPeriod = $request->input('examPeriod');
         $date = $request->input('date');
         $time = $request->input('time');
+        $generalInstructions = $request->input('generalInstructions');
         // $examInstructions = $request->input('examInstructions');
 
 
@@ -226,7 +227,6 @@ class UploadExamsController extends Controller
         $code = session('code');
         $program = session('program');
         $yearSem = session('year_sem');
-        $generalInstructions = session('general_instructions');
         $sectionAInstructions = session('sectionA_instructions');
         $sectionBInstructions = session('sectionB_instructions');
 

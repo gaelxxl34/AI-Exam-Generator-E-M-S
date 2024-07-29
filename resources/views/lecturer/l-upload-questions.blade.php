@@ -82,8 +82,8 @@
 
         <div class="mb-4">
             <label for="fileUpload" class="block text-sm font-medium text-gray-900 dark:text-gray-500">Upload marking guide</label>
-            <input type="file" id="fileUpload" name="fileUpload" accept=".pdf" class="block w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 cursor-pointer dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400" required>
-            
+            <input type="file" id="fileUpload" name="fileUpload" class="block w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 cursor-pointer dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400" required>
+
             @if ($errors->has('fileUpload'))
                 <div class="text-red-500 mt-2 text-sm">
                     {{ $errors->first('fileUpload') }}
@@ -117,7 +117,7 @@
             populateDropdown('dropdownA', 20); // Max 20 for Section A
 
             if (value === 'AB' || value === 'Practical') {
-                populateDropdown('dropdownB', 5); // Max 5 for Section B
+                populateDropdown('dropdownB', 10); // Max 5 for Section B
             }
         });
 
@@ -129,7 +129,7 @@
 
             populateDropdown('dropdownA', 20); // Adjust if needed
             if (sectionCount === 'AB') {
-                populateDropdown('dropdownB', 5);
+                populateDropdown('dropdownB', 10);
             }
         });
 
@@ -218,9 +218,9 @@
 
             let fieldsInfo;
             if (format === 'AB') {
-                fieldsInfo = ['General Instructions', 'Section A Instructions', 'Section B Instructions'];
+                fieldsInfo = [ 'Section A Instructions', 'Section B Instructions'];
             } else if (format === 'Practical') {
-                fieldsInfo = ['General Instructions', 'Section A Instructions'];
+                fieldsInfo = [ 'Section A Instructions'];
             } else {
                 instructionsContainer.classList.add('hidden');
                 return;
@@ -244,22 +244,7 @@
                 instructionsContainer.appendChild(inputGroup);
 
                 // Initialize Summernote only for General Instructions
-                if (info === 'General Instructions') {
-                    $(`#instructions${index}`).summernote({
-                        placeholder: info,
-                        tabsize: 2,
-                        height: 120,
-                        toolbar: [
-                            ['style', ['style']],
-                            ['font', ['bold', 'underline', 'clear']],
-                            ['color', ['color']],
-                            ['para', ['ul', 'ol', 'paragraph']],
-                            ['table', ['table']],
-                            ['insert', ['link', 'picture', 'video']],
-                            ['view', ['codeview', 'help']]
-                        ]
-                    });
-                }
+             
             });
         }
     });

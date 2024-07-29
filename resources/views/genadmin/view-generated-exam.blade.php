@@ -8,6 +8,10 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.js"></script>
 
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.js"></script>
 </head>
 <body>
     
@@ -81,13 +85,18 @@
                 <input type="text" name="time" placeholder="TIME" required class="w-full px-3 py-2 border rounded shadow-sm">
             </div>
 
-            
+            <div class="mb-5">
+                <label for="generalInstructions" class="block text-sm font-medium text-gray-700">General Instructions:</label>
+                <textarea id="generalInstructions" name="generalInstructions"></textarea>
+            </div>
+
             <div class="flex justify-center mt-8">
                 <button type="submit" class="inline-block px-6 py-2 border border-transparent text-base font-medium rounded-md text-white bg-black hover:bg-red-700">
                     Download Exam
                 </button>
             </div>
         </form>
+
     </div>
 </div>
 
@@ -97,6 +106,28 @@
 </div>
 
 
+<script>
+$(document).ready(function() {
+    var initialContent = `<p>1. Read the instructions very carefully</p><p>2. The time allowed for this examination is STRICTLY three hours&nbsp;&nbsp;</p><p>3. Read each question carefully before you attempt and allocate your time equally between all the Sections</p><p>4. Write clearly and legibly. Illegible handwriting cannot be marked</p><p>5. Number the questions you have attempted</p><p>6. Use of appropriate workplace examples to illustrate your answers will earn you bonus marks</p><p>7. Any examination malpractice detected will lead to automatic disqualification.&nbsp;</p><p><br></p><p style="text-align: center; "><u><b>DO NOT WRITE ANYTHING ON THE QUESTION PAPER</b></u></p>`;
+    
+    $('#generalInstructions').summernote({
+        placeholder: 'General Instructions',
+        tabsize: 2,
+        height: 120,
+        toolbar: [
+            ['style', ['style']],
+            ['font', ['bold', 'underline', 'clear']],
+            ['color', ['color']],
+            ['para', ['ul', 'ol', 'paragraph']],
+            ['table', ['table']],
+            ['insert', ['link', 'picture', 'video']],
+            ['view', ['codeview', 'help']]
+        ]
+    });
+
+    $('#generalInstructions').summernote('code', initialContent);
+});
+</script>
 
 </body>
 </html>
