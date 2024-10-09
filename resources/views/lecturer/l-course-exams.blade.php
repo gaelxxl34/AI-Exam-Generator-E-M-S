@@ -46,7 +46,7 @@
     <div class="container mx-auto px-4">
         @forelse ($exams as $index => $exam)
             <div class="mt-8 bg-white rounded-lg shadow-md">
-                <h1 class="text-xl font-bold p-4 border-b text-center">{{ "Exam " . ($index + 1) . " - " . $exam['courseUnit'] }}</h1>
+                <h1 class="text-xl font-bold p-4 border-b text-center">{{$exam['courseUnit'] }}</h1>
                 @php
                     $sections = $exam['sections'];
                     ksort($sections); // Sorts the sections by their keys
@@ -165,9 +165,6 @@
 
 
 </script>
-
-
-
 
 
     

@@ -12,43 +12,32 @@ use Kreait\Firebase\Contract\Storage;
 // use Barryvdh\DomPDF\Facade\Pdf;
 class UploadExamsController extends Controller
 {
-    public function uploadExam(Request $request, Storage $storage)
+    public function uploadExam(Request $request)
     {
         Log::info('uploadExam method called');
 
-        // Enhanced validation to include practical exams and instruction fields
-        $messages = [
-            'fileUpload.max' => 'The file should not be greater than 2MB.',
-        ];
+        // Validation for all fields, assuming format is always "AB"
         $validatedData = $request->validate([
-
             'courseUnit' => 'required|string',
             'format' => 'required|string',
             'sectionA' => 'required|array|min:1',
-            'sectionB' => 'sometimes|required|array|min:1',
-            'sectionC' => 'sometimes|required|array|min:1',
             'sectionA.*' => 'required|string',
-            'sectionB.*' => 'sometimes|required|string',
-            'sectionC.*' => 'sometimes|required|string',
-            'fileUpload' => 'required|file|max:2048',
-            // 'instructions.0' => 'required|string', // General Instructions
-            'instructions.1' => 'required|string', // Section A Instructions
-            'instructions.2' => 'sometimes|string', // Section B Instructions
-        ], $messages);
+            'sectionB' => 'required|array|min:1',
+            'sectionB.*' => 'required|string',
+            'instructions.1' => 'required|string', // Section A Instructions are mandatory
+            'instructions.2' => 'required|string', // Section B Instructions are mandatory
+        ]);
 
         try {
-            $file = $request->file('fileUpload');
-            $base64File = base64_encode(file_get_contents($file));
-
-            Log::info("This is : $base64File");
-
+            // Firestore references
             $firestore = app('firebase.firestore')->database();
             $examsRef = $firestore->collection('Exams');
 
+            // Fetch the current user's email
             $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
             Log::info("Current user email: $currentUserEmail");
 
-            // Fetch the current user's faculty from Firestore
+            // Fetch user details from Firestore
             $usersRef = $firestore->collection('Users');
             $query = $usersRef->where('email', '==', $currentUserEmail);
             $currentUserSnapshots = $query->documents();
@@ -63,29 +52,33 @@ class UploadExamsController extends Controller
             $facultyField = $currentUserData['faculty'] ?? 'default_faculty';
             Log::info("Faculty fetched: $facultyField");
 
+            // Check if an exam with the same courseUnit already exists
+            $existingExamQuery = $examsRef->where('courseUnit', '==', $validatedData['courseUnit']);
+            $existingExamSnapshots = $existingExamQuery->documents();
+
+            if (!$existingExamSnapshots->isEmpty()) {
+                // If an exam with the same course unit exists, return back with an error message
+                return back()->with('error', 'An exam with this course unit already exists. Please review the existing exam.');
+            }
+
+            // Prepare exam data for Firestore
             $examData = [
                 'created_at' => new \DateTime(),
                 'courseUnit' => $validatedData['courseUnit'],
                 'format' => $validatedData['format'],
                 'sections' => [],
-                'marking_guide' => $base64File,
-                'faculty' => $facultyField,  // Include the faculty field
-                // 'general_instructions' => $validatedData['instructions'][0],
+                'faculty' => $facultyField,
                 'sectionA_instructions' => $validatedData['instructions'][1],
+                'sectionB_instructions' => $validatedData['instructions'][2],
             ];
 
-            if (isset($validatedData['instructions'][2])) {
-                $examData['sectionB_instructions'] = $validatedData['instructions'][2];
-            }
-
-            // Process sections based on format
+            // Process sections and store them in examData
             foreach (['A', 'B'] as $section) {
-                if ($request->has("section$section")) {
-                    $content = $request->input("section$section");
-                    $examData['sections'][$section] = $content;
-                }
+                $content = $request->input("section$section");
+                $examData['sections'][$section] = $content;
             }
 
+            // Save exam data to Firestore
             $examsRef->add($examData);
 
             return redirect()->route('lecturer.l-dashboard')->with('success', 'Exam uploaded successfully.');
@@ -94,6 +87,11 @@ class UploadExamsController extends Controller
             return back()->withErrors(['upload_error' => 'Error uploading exam.'])->with('message', 'Error uploading exam: ' . $e->getMessage());
         }
     }
+
+
+
+
+
 
 
 
