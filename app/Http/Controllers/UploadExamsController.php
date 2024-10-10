@@ -72,10 +72,13 @@ class UploadExamsController extends Controller
                 'sectionB_instructions' => $validatedData['instructions'][2],
             ];
 
-            // Process sections and store them in examData
+            // Base64 encode sections before storing
             foreach (['A', 'B'] as $section) {
                 $content = $request->input("section$section");
-                $examData['sections'][$section] = $content;
+                $encodedContent = array_map(function ($question) {
+                    return base64_encode($question); // Encode each question in the section
+                }, $content);
+                $examData['sections'][$section] = $encodedContent;
             }
 
             // Save exam data to Firestore
@@ -87,10 +90,6 @@ class UploadExamsController extends Controller
             return back()->withErrors(['upload_error' => 'Error uploading exam.'])->with('message', 'Error uploading exam: ' . $e->getMessage());
         }
     }
-
-
-
-
 
 
 

@@ -4,7 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-
+// use PDF;
+use Barryvdh\DomPDF\Facade\Pdf;
 class CourseController extends Controller
 
 {
@@ -113,36 +114,24 @@ class CourseController extends Controller
             $query = $examsRef->where('courseUnit', '==', $courseUnit);
             $examsSnapshot = $query->documents();
 
-            $storage = app('firebase.storage')->getBucket();
             $exams = [];
 
             foreach ($examsSnapshot as $document) {
                 if ($document->exists()) {
                     $data = $document->data();
 
-                    // Process each section's content to update image URLs
+                    // Process each section's content by decoding Base64
                     foreach ($data['sections'] as $section => $contents) {
                         foreach ($contents as $index => $content) {
-                            $doc = new \DOMDocument();
-                            @$doc->loadHTML($content, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+                            // Step 1: Base64 decode the content
+                            $decodedContent = base64_decode($content);
 
-                            $images = $doc->getElementsByTagName('img');
-                            foreach ($images as $img) {
-                                $src = $img->getAttribute('src');
-                                // Check if the image src is from summernote_images directory
-                                if (strpos($src, 'summernote_images/') === 0) {
-                                    // Generate a signed URL for the image
-                                    $imagePath = $src;
-                                    $signedUrl = $storage->object($imagePath)->signedUrl(new \DateTime('+1 hour'));
-                                    $img->setAttribute('src', $signedUrl);
-                                }
-                            }
-
-                            // Update the content with new image URLs
-                            $data['sections'][$section][$index] = $doc->saveHTML();
+                            // Step 2: Store the decoded content back
+                            $data['sections'][$section][$index] = $decodedContent;
                         }
                     }
 
+                    // Add the exam data to the exams array
                     $exams[] = $data;
                 }
             }
@@ -153,6 +142,7 @@ class CourseController extends Controller
             return back()->withErrors(['fetch_error' => 'Error fetching course details.'])->with('message', 'Error fetching course details: ' . $e->getMessage());
         }
     }
+
 
 
 
@@ -410,54 +400,6 @@ class CourseController extends Controller
 
 
 
-    public function updateQuestion(Request $request, $courseUnit, $sectionName, $questionIndex)
-    {
-        Log::info("Entering updateQuestion with parameters: Course Unit - {$courseUnit}, Section Name - {$sectionName}, Question Index - {$questionIndex}");
-
-        $request->validate([
-            'question' => 'required|string',
-        ]);
-
-        $firestore = app('firebase.firestore')->database();
-        $examsRef = $firestore->collection('Exams');
-        $query = $examsRef->where('courseUnit', '==', $courseUnit);
-        $examsSnapshot = $query->documents();
-
-        if (count($examsSnapshot->rows()) == 0) {
-            Log::error("No documents found for Course Unit: {$courseUnit}");
-            return back()->withErrors(['error' => 'No exams found.']);
-        }
-
-        foreach ($examsSnapshot as $document) {
-            if ($document->exists()) {
-                $examRef = $document->reference();
-                $examData = $document->data();
-                Log::info("Document found, processing update...", ['Exam Data' => $examData]);
-
-                if (isset($examData['sections'][$sectionName][$questionIndex])) {
-                    $oldQuestion = $examData['sections'][$sectionName][$questionIndex]; // Capture old question for logging
-                    $examData['sections'][$sectionName][$questionIndex] = $request->question;
-
-                    // Update the Firestore document
-                    $examRef->update([
-                        ['path' => 'sections.' . $sectionName, 'value' => $examData['sections'][$sectionName]]
-                    ]);
-
-                    Log::info("Successfully updated question. Course Unit: {$courseUnit}, Section: {$sectionName}, Index: {$questionIndex}, Old Question: {$oldQuestion}, New Question: {$request->question}");
-                    return back()->with('success', 'Question updated successfully.');
-                } else {
-                    Log::warning("Question index $questionIndex not found in section $sectionName");
-                }
-            } else {
-                Log::error("Document does not exist for the specified ID.");
-            }
-        }
-
-        Log::error("Failed to update question for Course Unit: {$courseUnit}");
-        return back()->withErrors(['error' => 'Question update failed.']);
-    }
-
-
     public function deleteQuestion($courseUnit, $sectionName, $questionIndex)
     {
         Log::info("Entering deleteQuestion with parameters: Course Unit - {$courseUnit}, Section Name - {$sectionName}, Question Index - {$questionIndex}");
@@ -493,6 +435,56 @@ class CourseController extends Controller
         return back()->withErrors(['error' => 'Exam or question not found.']);
     }
 
+    public function updateQuestion(Request $request, $courseUnit, $sectionName, $questionIndex)
+    {
+        Log::info("Entering updateQuestion with parameters: Course Unit - {$courseUnit}, Section Name - {$sectionName}, Question Index - {$questionIndex}");
+
+        $request->validate([
+            'question' => 'required|string',
+        ]);
+
+        $firestore = app('firebase.firestore')->database();
+        $examsRef = $firestore->collection('Exams');
+        $query = $examsRef->where('courseUnit', '==', $courseUnit);
+        $examsSnapshot = $query->documents();
+
+        if (count($examsSnapshot->rows()) == 0) {
+            Log::error("No documents found for Course Unit: {$courseUnit}");
+            return back()->withErrors(['error' => 'No exams found.']);
+        }
+
+        foreach ($examsSnapshot as $document) {
+            if ($document->exists()) {
+                $examRef = $document->reference();
+                $examData = $document->data();
+                Log::info("Document found, processing update...", ['Exam Data' => $examData]);
+
+                if (isset($examData['sections'][$sectionName][$questionIndex])) {
+                    $oldQuestion = $examData['sections'][$sectionName][$questionIndex]; // Capture old question for logging
+
+                    // Base64 encode the new question before saving it
+                    $encodedQuestion = base64_encode($request->question);
+                    $examData['sections'][$sectionName][$questionIndex] = $encodedQuestion;
+
+                    // Update the Firestore document
+                    $examRef->update([
+                        ['path' => 'sections.' . $sectionName, 'value' => $examData['sections'][$sectionName]]
+                    ]);
+
+                    Log::info("Successfully updated question. Course Unit: {$courseUnit}, Section: {$sectionName}, Index: {$questionIndex}, Old Question: {$oldQuestion}, New Question: {$request->question}");
+                    return back()->with('success', 'Question updated successfully.');
+                } else {
+                    Log::warning("Question index $questionIndex not found in section $sectionName");
+                }
+            } else {
+                Log::error("Document does not exist for the specified ID.");
+            }
+        }
+
+        Log::error("Failed to update question for Course Unit: {$courseUnit}");
+        return back()->withErrors(['error' => 'Question update failed.']);
+    }
+
     public function addQuestion(Request $request, $courseUnit)
     {
         $request->validate([
@@ -510,14 +502,16 @@ class CourseController extends Controller
                 $examRef = $document->reference();
                 $examData = $document->data();
 
-                // Add the new question to the specified section
-                $examData['sections'][$request->section][] = $request->newQuestion;
+                // Base64 encode the new question before adding it
+                $encodedQuestion = base64_encode($request->newQuestion);
+
+                // Add the new encoded question to the specified section
+                $examData['sections'][$request->section][] = $encodedQuestion;
 
                 // Update the Firestore document
                 $examRef->update([
                     ['path' => 'sections.' . $request->section, 'value' => $examData['sections'][$request->section]]
                 ]);
-
 
                 Log::info("Added new question to section: {$request->section} of course unit: {$courseUnit}");
                 return back()->with('success', 'New question added successfully.');
@@ -527,6 +521,90 @@ class CourseController extends Controller
         Log::error("Exam not found for course unit: {$courseUnit}");
         return back()->withErrors(['error' => 'Exam not found.']);
     }
+
+    public function updateInstruction(Request $request, $courseUnit)
+    {
+        $request->validate([
+            'sectionA_instructions' => 'required|string',
+            'sectionB_instructions' => 'required|string',
+        ]);
+
+        $firestore = app('firebase.firestore')->database();
+        $examsRef = $firestore->collection('Exams');
+        $query = $examsRef->where('courseUnit', '==', $courseUnit);
+        $examsSnapshot = $query->documents();
+
+        foreach ($examsSnapshot as $document) {
+            if ($document->exists()) {
+                $examRef = $document->reference();
+                $examData = $document->data();
+
+                // Update instructions for Section A and Section B
+                $examData['sectionA_instructions'] = $request->sectionA_instructions;
+                $examData['sectionB_instructions'] = $request->sectionB_instructions;
+
+                // Update the Firestore document
+                $examRef->update([
+                    ['path' => 'sectionA_instructions', 'value' => $examData['sectionA_instructions']],
+                    ['path' => 'sectionB_instructions', 'value' => $examData['sectionB_instructions']]
+                ]);
+
+                return back()->with('success', 'Instructions updated successfully.');
+            }
+        }
+
+        return back()->withErrors(['error' => 'Exam not found.']);
+    }
+
+
+    public function previewPdf($courseUnit)
+    {
+        // Fetch the exam details based on the course unit
+        $firestore = app('firebase.firestore')->database();
+        $examsRef = $firestore->collection('Exams');
+        $query = $examsRef->where('courseUnit', '==', $courseUnit);
+        $examsSnapshot = $query->documents();
+
+        if ($examsSnapshot->isEmpty()) {
+            return back()->withErrors(['error' => 'No exam found for this course unit.']);
+        }
+
+        // Get the first document (since Firestore can return multiple documents)
+        $examData = null;
+        foreach ($examsSnapshot as $document) {
+            if ($document->exists()) {
+                $examData = $document->data(); // Fetch the exam data
+                break; // Exit the loop after getting the first document
+            }
+        }
+
+        if (!$examData) {
+            return back()->withErrors(['error' => 'No exam data found for this course unit.']);
+        }
+
+        // Base64 decode only the questions
+        foreach ($examData['sections'] as $sectionName => $questions) {
+            foreach ($questions as $index => $question) {
+                // Base64 decode each question before passing it to the template
+                $examData['sections'][$sectionName][$index] = base64_decode($question);
+            }
+        }
+
+        // Generate the PDF using the available data (course unit, sections, instructions, and questions)
+        $pdf = PDF::loadView('lecturer.preview', [
+            'courseUnit' => $examData['courseUnit'],
+            'sections' => $examData['sections'],
+            'sectionAInstructions' => $examData['sectionA_instructions'], // Pass as is
+            'sectionBInstructions' => $examData['sectionB_instructions'], // Pass as is
+        ]);
+
+        // Set paper size to A4 and orientation to portrait
+        $pdf->setPaper('A4', 'portrait');
+
+        // Stream the PDF to the browser where it can be printed or saved
+        return $pdf->stream("Preview_{$courseUnit}.pdf");
+    }
+
 
 
 }

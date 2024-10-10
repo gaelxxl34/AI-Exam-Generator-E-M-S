@@ -108,114 +108,113 @@
 
 <!-- JavaScript for populating fields -->
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Populate the dropdowns for Section A and B
-        populateDropdown('dropdownA', 20); // Max 20 for Section A
-        populateDropdown('dropdownB', 10); // Max 10 for Section B
+document.addEventListener('DOMContentLoaded', function() {
+    // Populate the dropdowns for Section A and B
+    populateDropdown('dropdownA', 20);
+    populateDropdown('dropdownB', 10);
 
-        function populateDropdown(dropdownId, maxFields) {
-            const dropdown = document.getElementById(dropdownId);
-            dropdown.innerHTML = '<option value="">Select number of questions</option>';
+    function populateDropdown(dropdownId, maxFields) {
+        const dropdown = document.getElementById(dropdownId);
+        dropdown.innerHTML = '<option value="">Select number of questions</option>';
 
-            for (let i = 1; i <= maxFields; i++) {
-                const option = new Option(i, i);
-                dropdown.add(option);
-            }
-
-            dropdown.addEventListener('change', handleDropdownChange);
+        for (let i = 1; i <= maxFields; i++) {
+            const option = new Option(i, i);
+            dropdown.add(option);
         }
 
-        function handleDropdownChange() {
-            const section = this.id.charAt(this.id.length - 1); // Get section A or B
-            createInputFields(`inputFields${section}`, this.value); // Create corresponding input fields
-        }
+        dropdown.addEventListener('change', handleDropdownChange);
+    }
 
-        function createInputFields(containerId, numberOfFields) {
-            const container = document.getElementById(containerId);
-            container.innerHTML = ''; // Clear previous fields
+    function handleDropdownChange() {
+        const section = this.id.charAt(this.id.length - 1); // Get section A or B
+        createInputFields(`inputFields${section}`, this.value);
+    }
 
-            for (let i = 1; i <= numberOfFields; i++) {
-                const sectionId = containerId.charAt(containerId.length - 1);
-                const editorId = `${containerId}Editor${i}`;
+    function createInputFields(containerId, numberOfFields) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = ''; // Clear previous fields
 
-                const fieldContainer = document.createElement('div');
-                fieldContainer.className = 'mb-4';
+        for (let i = 1; i <= numberOfFields; i++) {
+            const sectionId = containerId.charAt(containerId.length - 1);
+            const editorId = `${containerId}Editor${i}`;
 
-                const label = document.createElement('label');
-                label.setAttribute('for', editorId);
-                label.className = 'block text-sm font-medium text-gray-700';
-                label.textContent = `Field ${sectionId}${i}`;
+            const fieldContainer = document.createElement('div');
+            fieldContainer.className = 'mb-4';
 
-                const hiddenInput = document.createElement('input');
-                hiddenInput.type = 'hidden';
-                hiddenInput.name = `section${sectionId}[]`;
+            const label = document.createElement('label');
+            label.setAttribute('for', editorId);
+            label.className = 'block text-sm font-medium text-gray-700';
+            label.textContent = `Field ${sectionId}${i}`;
 
-                const editorDiv = document.createElement('div');
-                editorDiv.id = editorId;
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = `section${sectionId}[]`;
 
-                fieldContainer.appendChild(label);
-                fieldContainer.appendChild(editorDiv);
-                fieldContainer.appendChild(hiddenInput);
-                container.appendChild(fieldContainer);
+            const editorDiv = document.createElement('div');
+            editorDiv.id = editorId;
 
-                // Initialize Summernote on each field for section A and B
-                $(`#${editorId}`).summernote({
-                    placeholder: `Field ${sectionId}${i}`,
-                    tabsize: 2,
-                    height: 120,
-                    toolbar: [
-                        ['style', ['style']],
-                        ['font', ['bold', 'underline', 'clear']],
-                        ['color', ['color']],
-                        ['para', ['ul', 'ol', 'paragraph']],
-                        ['table', ['table']],
-                        ['insert', ['link', 'picture', 'video']],
-                        ['view', ['codeview', 'help']]
-                    ],
-                    callbacks: {
-                        onChange: function(contents, $editable) {
-                            hiddenInput.value = contents; // Set Summernote content to hidden input field
-                        }
-                    }
-                });
-            }
-        }
+            fieldContainer.appendChild(label);
+            fieldContainer.appendChild(editorDiv);
+            fieldContainer.appendChild(hiddenInput);
+            container.appendChild(fieldContainer);
 
-        // Automatically create instructions for Section A and B (using simple input fields)
-        updateInstructions();
-
-        function updateInstructions() {
-            const instructionsContainer = document.getElementById('instructionsContainer');
-            instructionsContainer.innerHTML = ''; // Clear previous fields
-
-            const fieldsInfo = ['Section A Instructions', 'Section B Instructions'];
-            
-            fieldsInfo.forEach((info, index) => {
-                const inputGroup = document.createElement('div');
-                const label = document.createElement('label');
-                const input = document.createElement('input'); // Simple input field for instructions
-
-                label.textContent = info;
-                label.setAttribute('for', `instructions${index}`);
-                label.className = 'block text-sm font-bold text-gray-900';
-
-                input.id = `instructions${index}`;
-                input.name = `instructions[${index + 1}]`; // Match backend naming convention
-                input.type = 'text';
-                input.required = true; // Make this field required
-                input.className = 'block w-full p-2 border border-gray-300 rounded-md mb-4';
-
-                inputGroup.appendChild(label);
-                inputGroup.appendChild(input);
-                instructionsContainer.appendChild(inputGroup);
+            // Initialize TinyMCE with MathType plugin and local image upload support
+            tinymce.init({
+                selector: `#${editorId}`,
+                plugins: 'table link image code charmap preview fullscreen anchor MathType lists', // Added lists plugin for ordered/unordered lists
+                toolbar: 'undo redo | formatselect | bold italic underline strikethrough | alignleft aligncenter alignright | bullist numlist outdent indent | link image charmap MathType | fullscreen preview code',
+                menubar: 'file edit view insert format tools table help',
+                height: 200,
+               
+                setup: function(editor) {
+                    editor.on('change', function() {
+                        hiddenInput.value = editor.getContent(); // Set TinyMCE content to hidden input field
+                    });
+                }
             });
         }
-    });
+    }
+
+    // Automatically create instructions for Section A and B
+    updateInstructions();
+
+    function updateInstructions() {
+        const instructionsContainer = document.getElementById('instructionsContainer');
+        instructionsContainer.innerHTML = ''; // Clear previous fields
+
+        const fieldsInfo = ['Section A Instructions', 'Section B Instructions'];
+
+        fieldsInfo.forEach((info, index) => {
+            const inputGroup = document.createElement('div');
+            const label = document.createElement('label');
+            const input = document.createElement('input'); // Simple input field for instructions
+
+            label.textContent = info;
+            label.setAttribute('for', `instructions${index}`);
+            label.className = 'block text-sm font-bold text-gray-900';
+
+            input.id = `instructions${index}`;
+            input.name = `instructions[${index + 1}]`;
+            input.type = 'text';
+            input.required = true;
+            input.className = 'block w-full p-2 border border-gray-300 rounded-md mb-4';
+
+            inputGroup.appendChild(label);
+            inputGroup.appendChild(input);
+            instructionsContainer.appendChild(inputGroup);
+        });
+    }
+});
 </script>
 
 
-<!-- Include Summernote CSS/JS -->
-<link href="https://cdnjs.cloudflare.com/ajax/libs/summernote/0.8.18/summernote-lite.min.css" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/summernote/0.8.18/summernote-lite.min.js"></script>
+
+
+
+<!-- Include TinyMCE -->
+<script src="https://cdn.tiny.cloud/1/cki11o3g6ocbwr1fqf96g0nwe9ffi5ifrbriqohku5ki0jbh/tinymce/5/tinymce.min.js" referrerpolicy="origin"></script>
+<!-- Include MathJax -->
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
 </body>
 </html>

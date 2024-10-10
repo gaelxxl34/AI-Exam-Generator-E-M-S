@@ -162,6 +162,13 @@ Route::get('/lecturer/l-dashboard', function () {
 Route::put('/exams/{courseUnit}/{sectionName}/{questionIndex}/update', [CourseController::class, 'updateQuestion'])
 ->name('update.question');
 
+Route::put('/exams/{courseUnit}/update-instructions', [CourseController::class, 'updateInstruction'])
+    ->name('update.instructions');
+    
+Route::get('/preview-pdf/{courseUnit}', [CourseController::class, 'previewPdf'])->name('preview.pdf');
+
+
+
 Route::delete('/exams/{courseUnit}/{sectionName}/{questionIndex}/delete', [CourseController::class, 'deleteQuestion'])
 ->name('delete.question');
 
