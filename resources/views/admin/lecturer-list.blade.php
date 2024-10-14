@@ -25,9 +25,7 @@
                         <table class="min-w-full table-auto leading-normal">
                             <thead class="bg-gray-800 text-white">
                                 <tr>
-                                    <th scope="col" class="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold uppercase tracking-wider">
-                                        Picture
-                                    </th>
+                                   
                                     <th scope="col" class="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold uppercase tracking-wider">
                                         First Name
                                     </th>
@@ -42,13 +40,7 @@
                             <tbody>
                                 @forelse ($lecturers as $lecturer)
                                 <tr>
-                                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                        @if ($lecturer['profile_picture'])
-                                            <img src="{{ $lecturer['profile_picture'] }}" alt="User" class="rounded-full" style="width: 55px; height: 55px; object-fit: cover;">
-                                        @else
-                                            <span>No Picture</span>
-                                        @endif
-                                    </td>
+                                  
                                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
                                         {{ $lecturer['firstName'] }}
                                     </td>

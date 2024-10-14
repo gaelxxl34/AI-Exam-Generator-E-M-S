@@ -144,6 +144,8 @@ Route::get('/admin/edit-courses/{id}', [CourseController::class, 'editCourse'])-
 
 Route::put('/admin/edit-courses/{id}', [CourseController::class, 'updateCourse'])->name('update.course');
 
+Route::delete('/admin/edit-courses/{id}', [CourseController::class, 'deleteCourse'])->name('course.delete');
+
 /// -- END OF COURSES BY FACULTY LIST 
 
 
@@ -164,7 +166,7 @@ Route::put('/exams/{courseUnit}/{sectionName}/{questionIndex}/update', [CourseCo
 
 Route::put('/exams/{courseUnit}/update-instructions', [CourseController::class, 'updateInstruction'])
     ->name('update.instructions');
-    
+
 Route::get('/preview-pdf/{courseUnit}', [CourseController::class, 'previewPdf'])->name('preview.pdf');
 
 

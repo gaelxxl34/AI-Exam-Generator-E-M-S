@@ -52,7 +52,6 @@ class RegisterLecturerController extends Controller
             'lastName' => 'required|string',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6',
-            'image' => 'required|image|mimes:jpeg,png,jpg,gif,svg',
             'faculty' => 'required|string', // Ensure faculty is a required input
             'courses' => 'required|array', // Validate that courses are provided and is an array
         ]);
@@ -69,11 +68,6 @@ class RegisterLecturerController extends Controller
             $createdUser = $auth->createUser($userProperties);
             \Log::info('Firebase user created with UID: ' . $createdUser->uid);
 
-            $storage = app('firebase.storage')->getBucket();
-            $imagePath = 'lecturer_images/' . uniqid() . '_' . $request->file('image')->getClientOriginalName();
-            $uploadedFile = fopen($request->file('image')->path(), 'r');
-            $storage->upload($uploadedFile, ['name' => $imagePath]);
-            \Log::info('Image uploaded to Firebase Storage: ' . $imagePath);
 
             $firestore = app('firebase.firestore');
             $database = $firestore->database();
@@ -83,7 +77,6 @@ class RegisterLecturerController extends Controller
                 'firstName' => $validatedData['firstName'],
                 'lastName' => $validatedData['lastName'],
                 'email' => $validatedData['email'],
-                'profile_picture' => $imagePath,
                 'created_at' => new \DateTime(),
                 'role' => 'lecturer',
                 'faculty' => $validatedData['faculty'], // Use the faculty from the validated data
@@ -97,7 +90,6 @@ class RegisterLecturerController extends Controller
             return back()->withErrors(['upload_error' => 'Error registering lecturer.'])->with('message', 'Error registering lecturer: ' . $e->getMessage());
         }
     }
-
 
 
 
@@ -132,23 +124,17 @@ class RegisterLecturerController extends Controller
             $lecturerSnapshot = $lecturerQuery->documents();
 
             $lecturersByFaculty = [];
-            $storage = app('firebase.storage');
-            $bucket = $storage->getBucket();
 
             foreach ($lecturerSnapshot as $lecturer) {
                 $lecturerData = $lecturer->data();
                 $faculty = $lecturerData['faculty'] ?? 'Other';
-                $imageReference = $bucket->object($lecturerData['profile_picture']);
 
-                // Generate a signed URL for the image
-                $profilePictureUrl = $imageReference->exists() ? $imageReference->signedUrl(new \DateTime('+5 minutes')) : null;
-
+            
                 $lecturersByFaculty[$faculty][] = [
                     'id' => $lecturer->id(),
                     'firstName' => $lecturerData['firstName'] ?? 'N/A',
                     'lastName' => $lecturerData['lastName'] ?? 'N/A',
                     'email' => $lecturerData['email'] ?? 'N/A',
-                    'profile_picture' => $profilePictureUrl,
                 ];
             }
 
@@ -167,39 +153,52 @@ class RegisterLecturerController extends Controller
     public function editLecturer($id)
     {
         try {
-            // Get a reference to the Firestore database
-            $database = app('firebase.firestore')->database();
+            $firestore = app('firebase.firestore')->database();
 
-            // Query Firestore to get the lecturer by ID
-            $lecturerRef = $database->collection('Users')->document($id);
+            // Fetch lecturer data by ID
+            $lecturerRef = $firestore->collection('Users')->document($id);
             $lecturerSnapshot = $lecturerRef->snapshot();
 
-            if ($lecturerSnapshot->exists()) {
-                // Initialize Firebase Storage
-                $storage = app('firebase.storage');
-                $bucket = $storage->getBucket();
-
-                // Fetch profile picture URL
-                $imageReference = $bucket->object($lecturerSnapshot->data()['profile_picture']);
-                $profilePictureUrl = $imageReference->exists() ? $imageReference->signedUrl(now()->addMinutes(5)) : null;
-
-                // Prepare lecturer data
-                $lecturerData = [
-                    'id' => $lecturerSnapshot->id(),
-                    'firstName' => $lecturerSnapshot->data()['firstName'] ?? 'N/A',
-                    'lastName' => $lecturerSnapshot->data()['lastName'] ?? 'N/A',
-                    'email' => $lecturerSnapshot->data()['email'] ?? 'N/A',
-                    'profile_picture' => $profilePictureUrl,
-                ];
-
-                return view('admin.edit-lecturer', ['lecturer' => $lecturerData]);
-            } else {
-                return 'lecturer not found';
+            if (!$lecturerSnapshot->exists()) {
+                return 'Lecturer not found';
             }
+
+            // Prepare lecturer data
+            $lecturerData = [
+                'id' => $lecturerSnapshot->id(),
+                'firstName' => $lecturerSnapshot->data()['firstName'] ?? 'N/A',
+                'lastName' => $lecturerSnapshot->data()['lastName'] ?? 'N/A',
+                'email' => $lecturerSnapshot->data()['email'] ?? 'N/A',
+                'faculty' => $lecturerSnapshot->data()['faculty'] ?? 'N/A',
+                'courses' => $lecturerSnapshot->data()['courses'] ?? [], // Fetch the courses array
+            ];
+
+            // Fetch available courses based on lecturer's faculty
+            $faculty = $lecturerSnapshot->data()['faculty'];
+            $coursesRef = $firestore->collection('Courses')->where('faculty', '==', $faculty);
+            $coursesSnapshot = $coursesRef->documents();
+
+            $courseNames = [];
+            foreach ($coursesSnapshot as $course) {
+                if ($course->exists()) {
+                    $courseNames[] = [
+                        'name' => $course->data()['name'], // Assuming course name is stored in 'name'
+                        'id' => $course->id() // Document ID
+                    ];
+                }
+            }
+
+            // Pass lecturer data and course names to the view
+            return view('admin.edit-lecturer', [
+                'lecturer' => $lecturerData,
+                'courseNames' => $courseNames // All available courses for the faculty
+            ]);
         } catch (\Exception $e) {
             return 'Error: ' . $e->getMessage();
         }
     }
+
+
 
     public function updateLecturer(Request $request, $id)
     {
@@ -209,64 +208,36 @@ class RegisterLecturerController extends Controller
                 'firstName' => 'required',
                 'lastName' => 'required',
                 'email' => 'required|email',
-                'profilePicture' => 'nullable|image|mimes:jpeg,png,jpg,gif', // Adjusted validation rule
+                'courses' => 'required|array', // Validate that courses are passed as an array
             ]);
 
             // Initialize Firebase services
             $firestore = app('firebase.firestore')->database();
             $auth = app('firebase.auth');
-            $storage = app('firebase.storage')->getBucket();
 
-            // Update Firestore Data
+            // Update Firestore Data for the lecturer
             $lecturerRef = $firestore->collection('Users')->document($id);
+
+            // Update the necessary fields (First Name, Last Name, Email, and Courses)
             $lecturerRef->update([
                 ['path' => 'firstName', 'value' => $validatedData['firstName']],
                 ['path' => 'lastName', 'value' => $validatedData['lastName']],
                 ['path' => 'email', 'value' => $validatedData['email']], // Update email in Firestore
-                // ... other non-image fields ...
+                ['path' => 'courses', 'value' => $validatedData['courses']], // Update the courses field
             ]);
 
-            // Update Firestore Data
-            $lecturerRef = $firestore->collection('Users')->document($id);
-            $lecturerSnapshot = $lecturerRef->snapshot();
-
-            // Update Profile Picture in Firebase Storage if provided
-            if ($request->hasFile('profilePicture')) { // Make sure the field name matches
-                // Retrieve the old image path from Firestore
-                $oldImagePath = $lecturerSnapshot->data()['profile_picture']; // Corrected access to Firestore snapshot data
-
-                // Delete the old image from Firebase Storage, if it exists
-                if ($oldImagePath) {
-                    $storage->object($oldImagePath)->delete();
-                }
-
-                // Upload the new image
-                $image = $request->file('profilePicture'); // Adjusted field name
-                $newImageName = 'lecturer_images/' . time() . '.' . $image->getClientOriginalExtension();
-                $storage->upload(
-                    file_get_contents($image->getRealPath()),
-                    ['name' => $newImageName]
-                );
-
-                // Update Firestore with new image path
-                $lecturerRef->update([
-                    ['path' => 'profile_picture', 'value' => $newImageName],
-                ]);
-            }
-
-           
             // Update Firebase Authentication Email
             $user = $auth->getUser($id);
             if ($validatedData['email'] != $user->email) {
                 $auth->changeUserEmail($id, $validatedData['email']);
             }
 
-            return back()->with('success', 'lecturer updated successfully.');
-
+            return back()->with('success', 'Lecturer updated successfully.');
         } catch (\Exception $e) {
             return back()->with('error', 'Error updating lecturer: ' . $e->getMessage());
         }
     }
+
 
 
     public function deleteLecturer($id)
@@ -279,15 +250,6 @@ class RegisterLecturerController extends Controller
 
             // Get the Firestore document reference
             $lecturerRef = $firestore->collection('Users')->document($id);
-            $lecturerSnapshot = $lecturerRef->snapshot();
-
-            // Delete profile picture from Firebase Storage if it exists
-            if ($lecturerSnapshot->exists() && isset($lecturerSnapshot['profile_picture'])) {
-                $profilePicturePath = $lecturerSnapshot->data()['profile_picture'];
-                if ($storage->object($profilePicturePath)->exists()) {
-                    $storage->object($profilePicturePath)->delete();
-                }
-            }
 
             // Delete the Firestore document
             $lecturerRef->delete();

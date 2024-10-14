@@ -192,7 +192,7 @@ class CourseController extends Controller
         }
 
         // Redirect to the courses list view with all courses data
-        return redirect()->intended('admin/courses-list')->with('success', 'Exam uploaded successfully!');
+        return redirect()->intended('admin/courses-list')->with('success', 'uploaded successfully!');
         
     }
 
@@ -275,13 +275,28 @@ class CourseController extends Controller
         }
     }
 
+    public function deleteCourse($id)
+    {
+        $firestore = app('firebase.firestore');
+        $database = $firestore->database();
+        $courseRef = $database->collection('Courses')->document($id);
+
+        try {
+            // Delete the course document
+            $courseRef->delete();
+
+            return redirect()->intended('admin/courses-list')->with('success', ' Deleted successfully!');;
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Error deleting course: ' . $e->getMessage());
+        }
+    }
 
     // -- END of the list 
 
 
 
 
-    // TRIAL 
+    // COURSES BY FACULTY
     public function fetchCoursesForFaculty()
     {
         \Log::info('Entering fetchCoursesForFaculty method');

@@ -20,16 +20,6 @@
                     <form action="{{ route('admin.update-lecturer-data', ['lecturerId' => $lecturer['id']] ) }}" enctype="multipart/form-data" method="POST" class="space-y-4">
                         @csrf
                         @method('PUT')
-
-                        <!-- Profile Picture URL -->
-                        <div>
-                            <label for="profilePicture" class="block text-sm font-medium text-gray-700">Profile Picture</label>
-                            <input type="file" id="profilePicture" name="profilePicture" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:border file:border-gray-300 file:rounded-md file:text-sm file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100">
-                            @if ($lecturer['profile_picture'])
-                                <img src="{{ $lecturer['profile_picture'] }}" alt="Current Image" class="mt-2 max-h-52 w-auto">
-                            @endif
-                        </div>
-                        
                         <!-- First Name -->
                         <div>
                             <label for="firstName" class="block text-sm font-medium text-gray-700">First Name</label>
@@ -48,6 +38,26 @@
                             <input type="email" id="email" name="email" value="{{ $lecturer['email'] }}" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                         </div>
 
+                    <!-- Courses Dropdown (with checkboxes) -->
+<div class="mb-4">
+    <label for="courseDropdown" class="block text-sm font-medium text-gray-700">Teaching Courses</label>
+    <div id="courseDropdown" class="relative">
+        <button type="button" class="block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 text-left" onclick="toggleDropdown()">
+            Current Courses
+        </button>
+        <div id="courseList" class="hidden absolute z-10 w-full bg-white mt-1 border border-gray-300 rounded-md shadow-lg">
+            @foreach($courseNames as $course)
+                <label class="block px-4 py-2 text-sm text-gray-700 text-left"> <!-- Aligned to left -->
+                    <input type="checkbox" name="courses[]" value="{{ $course['name'] }}" 
+                        @if(in_array($course['name'], $lecturer['courses'])) checked @endif> 
+                    {{ $course['name'] }}
+                </label>
+            @endforeach
+        </div>
+    </div>
+    <div class="text-red-500 mt-1 hidden" id="courseError">Please select at least one course.</div>
+</div>
+
                         <!-- Update Button -->
                         <div class="flex justify-center">
                             <button type="submit" class="inline-block w-full px-6 py-2 border border-transparent text-base font-medium rounded-md text-white bg-gray-800 hover:bg-gray-900" onclick="return confirm('Are you sure you want to update the lecturer data?')">Update</button>
@@ -58,7 +68,7 @@
 
                     <!-- Success Message -->
                     @if (session('success'))
-                        <div class="mt-2 p-4 bg-green-100 border border-green-400 text-green-700">
+                        <div class="mt-2 p-1 bg-green-100 border border-green-400 text-green-700">
                             {{ session('success') }}
                         </div>
                     @endif
@@ -83,39 +93,24 @@
         </div>
     </div>
 
-<script>
-    function previewImage() {
-        var preview = document.getElementById('imagePreview');
-        var fileInput = document.getElementById('imageInput');
-        var file = fileInput.files[0];
-        var reader = new FileReader();
 
-        reader.onloadend = function () {
-            preview.src = reader.result;
-            preview.style.display = 'block';
-        }
-
-        if (file) {
-            reader.readAsDataURL(file);
-            truncateFileName(fileInput);
-        } else {
-            preview.src = "";
-            preview.style.display = 'none';
-        }
+    <script>
+    function toggleDropdown() {
+        const courseList = document.getElementById('courseList');
+        courseList.classList.toggle('hidden');
     }
 
-    function truncateFileName(input) {
-        var fileName = input.files[0].name;
-        var maxFileNameLength = Math.floor(input.offsetWidth / 10); // Assuming average character width
-        if (fileName.length > maxFileNameLength) {
-            var truncatedFileName = fileName.substring(0, maxFileNameLength - 3) + '...';
-            input.nextElementSibling.textContent = truncatedFileName;
+    document.getElementById('lecturerForm').addEventListener('submit', function(e) {
+        const checkboxes = document.querySelectorAll('#courseList input[type="checkbox"]');
+        const isChecked = Array.from(checkboxes).some(checkbox => checkbox.checked);
+
+        if (!isChecked) {
+            e.preventDefault(); // Stop form submission
+            document.getElementById('courseError').classList.remove('hidden');
         } else {
-            input.nextElementSibling.textContent = fileName;
+            document.getElementById('courseError').classList.add('hidden');
         }
-    }
-
-
+    });
 </script>
 </body>
 </html>
