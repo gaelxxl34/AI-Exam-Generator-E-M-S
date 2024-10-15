@@ -131,10 +131,10 @@ class UploadExamsController extends Controller
             $code = $courseData['code'] ?? 'default_code';
             $program = $courseData['program'] ?? 'default_program';
             $year_sem = $courseData['year_sem'] ?? 'default_year_sem';
-            \Log::info("Course details fetched: Code: $code, Program: $program, Year/Sem: $year_sem");
+            $faculty = $courseData['faculty'] ?? 'default_faculty'; // Get faculty field
+            \Log::info("Course details fetched: Code: $code, Program: $program, Year/Sem: $year_sem, Faculty: $faculty");
 
             // Initialize arrays to hold instructions
-            // $generalInstructions = '';
             $sectionAInstructions = '';
             $sectionBInstructions = '';  // Initialize as empty string
 
@@ -148,45 +148,63 @@ class UploadExamsController extends Controller
                 if ($exam->exists()) {
                     $data = $exam->data();
 
-                    // $generalInstructions = $data['general_instructions'] ?? '';
+                    // Get section instructions
                     $sectionAInstructions = $data['sectionA_instructions'] ?? '';
                     if (isset($data['sectionB_instructions'])) {
                         $sectionBInstructions = $data['sectionB_instructions'];
                     }
+
+                    // Get the sections data
                     foreach ($data['sections'] as $section => $contents) {
                         if (!isset($sections[$section])) {
                             $sections[$section] = [];
                         }
 
                         foreach ($contents as $index => $content) {
-                            $doc = new \DOMDocument();
-                            @$doc->loadHTML($content, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+                            // Base64 decode the content before storing
+                            $decodedContent = base64_decode($content); // Decode the base64 content
 
+                            // Load the decoded content into DOMDocument
+                            $doc = new \DOMDocument();
+                            @$doc->loadHTML($decodedContent, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+
+                            // Save the decoded HTML
                             $sections[$section][] = $doc->saveHTML();
                         }
                     }
                 }
             }
 
-            // Shuffle and slice questions for each section
+            // Shuffle and slice questions based on faculty logic
             foreach ($sections as $section => $questions) {
                 shuffle($questions);
-                $count = ($section == 'A') ? 4 : 6; // Adjust based on your needs
+
+                // Determine the number of questions to pick based on faculty and section
+                if ($faculty == 'FST' || $faculty == 'FBM') {
+                    // FST and FBM: 1 question for Section A, 6 questions for Section B
+                    $count = ($section == 'A') ? 1 : 6;
+                } elseif ($faculty == 'FOE') {
+                    // FOE: 4 questions for both Section A and Section B
+                    $count = 4;
+                } else {
+                    // Default behavior if faculty is not one of the defined options
+                    $count = ($section == 'A') ? 4 : 6; // Adjust based on your default logic
+                }
+
+                // Slice the questions to the desired count
                 $sections[$section] = array_slice($questions, 0, $count);
             }
 
             // Store the sections data in the session
             session([
                 'sections' => $sections,
-                // 'general_instructions' => $generalInstructions,
                 'sectionA_instructions' => $sectionAInstructions,
                 'sectionB_instructions' => $sectionBInstructions,
-                // ... existing session data ...
             ]);
 
-
+            // Store additional course data in the session
             session([
-                'faculty' => $courseData['faculty'] ?? 'default_faculty',
+                'faculty' => $faculty,
                 'code' => $code,
                 'program' => $program,
                 'year_sem' => $year_sem,
@@ -202,6 +220,8 @@ class UploadExamsController extends Controller
             return 'Error: ' . $e->getMessage();
         }
     }
+
+
 
 
 
