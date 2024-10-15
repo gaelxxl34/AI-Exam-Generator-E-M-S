@@ -572,6 +572,106 @@ class CourseController extends Controller
     }
 
 
+    public function uploadFile(Request $request, $courseUnit)
+    {
+        // Validate the file input
+        $request->validate([
+            'attached_file' => 'required|mimes:pdf,doc,docx,xls,xlsx|max:3072', // Max size 3MB (3072 KB)
+        ]);
+
+        $firestore = app('firebase.firestore')->database();
+        $examsRef = $firestore->collection('Exams');
+        $query = $examsRef->where('courseUnit', '==', $courseUnit);
+        $examsSnapshot = $query->documents();
+
+        foreach ($examsSnapshot as $document) {
+            if ($document->exists()) {
+                $examRef = $document->reference();
+                $examData = $document->data();
+
+                // Handle file upload and conversion to base64
+                $file = $request->file('attached_file');
+                $fileContents = file_get_contents($file->getRealPath());
+                $base64File = base64_encode($fileContents); // Convert file to base64
+
+                // Get the file's original extension to store its type
+                $fileType = $file->getClientOriginalExtension();
+
+                // Update Firestore document with the base64-encoded file and its type
+                $examRef->update([
+                    ['path' => 'marking_guide', 'value' => $base64File],
+                    ['path' => 'attached_file_type', 'value' => $fileType],
+                ]);
+
+                return back()->with('success_file', 'File uploaded and saved successfully.');
+            }
+        }
+
+        return back()->withErrors(['error_file' => 'Exam not found.']);
+    }
+
+
+    public function downloadMarkingGuide($courseUnit)
+    {
+
+        \Log::info("Download Marking Guide method hit for course: " . $courseUnit);
+
+        $firestore = app('firebase.firestore')->database();
+        $examsRef = $firestore->collection('Exams');
+        $query = $examsRef->where('courseUnit', '==', $courseUnit);
+        $examsSnapshot = $query->documents();
+
+        foreach ($examsSnapshot as $document) {
+            if ($document->exists()) {
+                $examData = $document->data();
+                // Make sure to check for the correct field name: 'marking_guide'
+                if (isset($examData['marking_guide']) && isset($examData['attached_file_type'])) {
+                    // Retrieve the base64 file and its type
+                    $base64File = $examData['marking_guide'];
+                    $fileType = $examData['attached_file_type'];
+
+                    // Decode the base64 file
+                    $fileContents = base64_decode($base64File);
+
+                    // Manually set the MIME type based on the file extension
+                    $mimeType = '';
+                    switch (strtolower($fileType)) {
+                        case 'pdf':
+                            $mimeType = 'application/pdf';
+                            break;
+                        case 'doc':
+                            $mimeType = 'application/msword';
+                            break;
+                        case 'docx':
+                            $mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+                            break;
+                        case 'xls':
+                            $mimeType = 'application/vnd.ms-excel';
+                            break;
+                        case 'xlsx':
+                            $mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+                            break;
+                        default:
+                            return back()->withErrors(['error_file' => 'Unsupported file type.']);
+                    }
+
+                    // Set file name based on the file type (e.g., marking_guide.pdf)
+                    $fileName = "marking_guide." . $fileType;
+
+                    // Return the file as a download
+                    return response($fileContents)
+                        ->header('Content-Type', $mimeType)
+                        ->header('Content-Disposition', 'attachment; filename=' . $fileName);
+                } else {
+                    return back()->withErrors(['error_file' => 'No marking guide file found.']);
+                }
+            }
+        }
+
+        return back()->withErrors(['error_file' => 'Exam not found.']);
+    }
+
+
     public function previewPdf($courseUnit)
     {
         // Fetch the exam details based on the course unit

@@ -44,6 +44,7 @@
     @include('partials.lecturer-navbar')
 
 <div class="p-4 sm:ml-64 mt-20">
+
     <div class="container mx-auto px-4">
         @forelse ($exams as $index => $exam)
             <div class="mt-8 bg-white rounded-lg shadow-md">
@@ -58,11 +59,13 @@
 
                 @php
                     $sections = $exam['sections'];
-                    ksort($sections); // Sorts the sections by their keys
+                    ksort($sections); // Sort the sections by their keys
                 @endphp
                 @foreach ($sections as $sectionName => $questions)
                     <div class="mt-4 p-4 border-t">
                         <h2 class="text-lg font-semibold">{{ "Section " . $sectionName }}</h2>
+
+                        <!-- Display the questions -->
                         @foreach ($questions as $questionIndex => $question)
                             <div class="mt-2">
                                 <p>Question {{ $questionIndex + 1 }}:</p>
@@ -73,36 +76,64 @@
                                     <div class="flex justify-end mt-2">
                                         <button type="submit" class="bg-gray-500 hover:bg-green-500 text-white font-bold py-1 px-2 text-xs rounded">Update</button>
                                     </div>
+
+                                    <!-- Check for success message for adding/updating only -->
+                                    @if (session('success') && session('updatedQuestion') == $sectionName . "_" . $questionIndex)
+                                        <div class="text-sm text-green-600 mt-1 flex justify-end">
+                                            {{ session('success') }}
+                                        </div>
+                                    @endif
+
+                                    <!-- Check for error message on the updated/added question only -->
+                                    @if (session('error') && session('updatedQuestion') == $sectionName . "_" . $questionIndex)
+                                        <div class="text-sm text-red-600 mt-1 flex justify-end">
+                                            {{ session('error') }}
+                                        </div>
+                                    @endif
                                 </form>
+
+                                <!-- Form to delete a question -->
                                 <form action="{{ route('delete.question', ['courseUnit' => $exam['courseUnit'], 'sectionName' => $sectionName, 'questionIndex' => $questionIndex]) }}" method="POST" class="flex justify-end">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 text-xs rounded">Delete</button>
                                 </form>
-                                <!-- Check for success message -->
-                                @if (session('success'))
-                                    <div class="text-sm text-green-600 mt-1 flex justify-end">
-                                        {{ session('success') }}
-                                    </div>
-                                @endif
-                                <!-- Check for error message -->
-                                @if (session('error'))
-                                    <div class="text-sm text-red-600 mt-1 flex justify-end">
-                                        {{ session('error') }}
-                                    </div>
-                                @endif
                             </div>
                         @endforeach
+
+                        <!-- Error message for number of questions in the section (below questions) -->
+                        @php
+                            $questionCount = count($questions);
+                            $errorMessage = '';
+
+                            // Determine error message based on section and question count
+                            if ($sectionName == 'A') {
+                                if ($exam['format'] == 'Case Study' && $questionCount < 6) {
+                                    $errorMessage = 'Minimum required 6 questions for case studies in Section A';
+                                } elseif ($questionCount < 10) {
+                                    $errorMessage = 'Minimum required 10 questions for Section A or 6 Case Studies';
+                                }
+                            } elseif ($sectionName == 'B' && $questionCount < 10) {
+                                $errorMessage = 'Minimum required 10 questions for Section B';
+                            }
+                        @endphp
+
+                        <!-- Display error message if applicable -->
+                        @if ($errorMessage)
+                            <p class="text-red-500 text-sm">{{ $errorMessage }}</p>
+                        @endif
                     </div>
                 @endforeach
             </div>
         @empty
-            <div class="mt-8 flex flex-col items-center justify-center ">
+            <div class="mt-8 flex flex-col items-center justify-center">
                 <img src="/assets/img/404.jpeg" alt="No Data Available" class="w-1/2 max-w-sm mx-auto">
                 <p class="mt-4 text-lg font-semibold text-gray-600">No course details available.</p>
             </div>
         @endforelse
     </div>
+
+
 
     <div class="mt-8 bg-white rounded-lg shadow-md p-4">
         <h2 class="text-lg font-semibold flex justify-center">Add New Question</h2>
@@ -156,6 +187,47 @@
                     Update Instructions
                 </button>
             </div>
+        </form>
+    </div>
+
+
+<!-- Separate form for file picker -->
+    <div class="mt-8 bg-white rounded-lg shadow-md p-4">
+        <h2 class="text-lg font-semibold flex justify-center">Add Marking Guide</h2>
+
+        <form action="{{ route('upload.file', ['courseUnit' => $courseUnit]) }}" method="POST" enctype="multipart/form-data" class="mb-6">
+            @csrf
+
+            <!-- File Picker for Upload -->
+            <div class="mb-4">
+                <label for="attached_file" class="block text-sm font-bold text-gray-700">Attach a Document (Word, PDF, Excel)</label>
+                <input type="file" name="attached_file" id="attached_file" accept=".pdf,.doc,.docx,.xls,.xlsx" class="block w-full p-2 border border-gray-300 rounded-md" required>
+                <small class="text-gray-500">Max file size: 3MB</small>
+            </div>
+
+            <!-- Submit Button for file upload -->
+            <div class="flex justify-center space-x-4">
+                <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Upload File</button>
+
+                <!-- Download Marking Guide Button -->
+                <a href="{{ route('download.markingGuide', ['courseUnit' => $courseUnit]) }}" class="bg-gray-500 hover:bg-black text-white font-bold py-2 px-4 rounded">
+                    Download Marking Guide
+                </a>
+            </div>
+
+            {{-- Display success message --}}
+            @if (session('success_file'))
+                <div class="text-sm text-green-600 mt-1 flex justify-center">
+                    {{ session('success_file') }}
+                </div>
+            @endif
+
+            {{-- Display error message --}}
+            @if (session('error_file'))
+                <div class="text-sm text-red-600 mt-1 flex justify-center">
+                    {{ session('error_file') }}
+                </div>
+            @endif
         </form>
     </div>
 

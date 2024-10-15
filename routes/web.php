@@ -167,6 +167,13 @@ Route::put('/exams/{courseUnit}/{sectionName}/{questionIndex}/update', [CourseCo
 Route::put('/exams/{courseUnit}/update-instructions', [CourseController::class, 'updateInstruction'])
     ->name('update.instructions');
 
+// Route for uploading files
+Route::post('/exams/{courseUnit}/file/upload', [CourseController::class, 'uploadFile'])->name('upload.file');
+
+// Route for downloading the marking guide
+Route::get('/exams/{courseUnit}/marking-guide/download', [CourseController::class, 'downloadMarkingGuide'])->name('download.markingGuide');
+
+
 Route::get('/preview-pdf/{courseUnit}', [CourseController::class, 'previewPdf'])->name('preview.pdf');
 
 
