@@ -110,7 +110,7 @@
                         if (in_array($exam['faculty'], ['FST', 'FBM'])) {
                             // FST and FBM requirements
                             if ($sectionName == 'A' && $questionCount < 2) {
-                                $errorMessage = 'Minimum required 2 questions for Section A';
+                                $errorMessage = 'Minimum required 2 Case Studies for Section A';
                             } elseif ($sectionName == 'B' && $questionCount < 12) {
                                 $errorMessage = 'Minimum required 12 questions for Section B';
                             }

@@ -43,7 +43,7 @@ class SuperAdminController extends Controller
             'lastName' => 'required|string',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6',
-            'image' => 'required|image|mimes:jpeg,png,jpg,gif,svg',
+            // 'image' => 'required|image|mimes:jpeg,png,jpg,gif,svg',
             'faculty' => 'required|string', // Ensure faculty is a required input
             'role' => 'required|string'
         ]);
@@ -60,11 +60,6 @@ class SuperAdminController extends Controller
             $createdUser = $auth->createUser($userProperties);
             \Log::info('Firebase user created with UID: ' . $createdUser->uid);
 
-            $storage = app('firebase.storage')->getBucket();
-            $imagePath = 'lecturer_images/' . uniqid() . '_' . $request->file('image')->getClientOriginalName();
-            $uploadedFile = fopen($request->file('image')->path(), 'r');
-            $storage->upload($uploadedFile, ['name' => $imagePath]);
-            \Log::info('Image uploaded to Firebase Storage: ' . $imagePath);
 
             $firestore = app('firebase.firestore');
             $database = $firestore->database();
@@ -74,7 +69,7 @@ class SuperAdminController extends Controller
                 'firstName' => $validatedData['firstName'],
                 'lastName' => $validatedData['lastName'],
                 'email' => $validatedData['email'],
-                'profile_picture' => $imagePath,
+                // 'profile_picture' => $imagePath,
                 'created_at' => new \DateTime(),
                 'faculty' => $validatedData['faculty'], // Use the faculty from the validated data
                 'role' => $validatedData['role']
@@ -108,10 +103,10 @@ class SuperAdminController extends Controller
             foreach ($adminSnapshot as $admin) {
                 $adminData = $admin->data();
                 $role = $adminData['role'] ?? 'Other';
-                $imageReference = $bucket->object($adminData['profile_picture']);
+                // $imageReference = $bucket->object($adminData['profile_picture']);
 
                 // Generate a signed URL for the image
-                $profilePictureUrl = $imageReference->exists() ? $imageReference->signedUrl(new \DateTime('+5 minutes')) : null;
+                // $profilePictureUrl = $imageReference->exists() ? $imageReference->signedUrl(new \DateTime('+5 minutes')) : null;
 
                 $adminsByRole[$role][] = [
                     'id' => $admin->id(),
@@ -119,7 +114,7 @@ class SuperAdminController extends Controller
                     'lastName' => $adminData['lastName'] ?? 'N/A',
                     'email' => $adminData['email'] ?? 'N/A',
                     'role' => $adminData['role'] ?? 'N/A',
-                    'profile_picture' => $profilePictureUrl,
+                    // 'profile_picture' => $profilePictureUrl,
                 ];
             }
 

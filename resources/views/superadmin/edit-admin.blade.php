@@ -20,15 +20,6 @@
                     <form action="{{ route('admin.update-admin-data', ['adminId' => $admin['id']]) }}" enctype="multipart/form-data" method="POST" class="space-y-4">
                         @csrf
                         @method('PUT')
-
-                        <!-- Profile Picture URL -->
-                        <div>
-                            <label for="profilePicture" class="block text-sm font-medium text-gray-700">Profile Picture</label>
-                            <input type="file" id="profilePicture" name="profilePicture" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:border file:border-gray-300 file:rounded-md file:text-sm file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100">
-                            @if ($admin['profile_picture'])
-                                <img src="{{ $admin['profile_picture'] }}" alt="Current Image" class="mt-2 max-h-52 w-auto">
-                            @endif
-                        </div>
                         
                         <!-- First Name -->
                         <div>

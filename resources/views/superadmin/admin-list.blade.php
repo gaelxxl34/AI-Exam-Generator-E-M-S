@@ -25,9 +25,6 @@
                             <thead class="bg-gray-800 text-white">
                                 <tr>
                                     <th scope="col" class="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold uppercase tracking-wider">
-                                        Picture
-                                    </th>
-                                    <th scope="col" class="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold uppercase tracking-wider">
                                         First Name
                                     </th>
                                     <th scope="col" class="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold uppercase tracking-wider">
@@ -41,13 +38,6 @@
                             <tbody>
                                 @forelse ($admins as $admin)
                                 <tr>
-                                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                        @if ($admin['profile_picture'])
-                                            <img src="{{ $admin['profile_picture'] }}" alt="User" class="rounded-full" style="width: 55px; height: 55px; object-fit: cover;">
-                                        @else
-                                            <span>No Picture</span>
-                                        @endif
-                                    </td>
                                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
                                         {{ $admin['firstName'] }}
                                     </td>
