@@ -212,7 +212,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 <!-- Include TinyMCE -->
-<script src="https://cdn.tiny.cloud/1/cki11o3g6ocbwr1fqf96g0nwe9ffi5ifrbriqohku5ki0jbh/tinymce/5/tinymce.min.js" referrerpolicy="origin"></script>
+<script src="https://cdn.tiny.cloud/1/hs23eqphwt8todsqyrkfui7bvhc29664dxr64fj9h09r460f/tinymce/5/tinymce.min.js" referrerpolicy="origin"></script>
 <!-- Include MathJax -->
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
