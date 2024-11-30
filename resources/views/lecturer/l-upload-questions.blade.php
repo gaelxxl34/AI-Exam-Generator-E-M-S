@@ -9,6 +9,8 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.js"></script>
 
+        <script src="https://cdn.ckeditor.com/ckeditor5/36.0.1/classic/ckeditor.js"></script>
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.js"></script>
@@ -108,7 +110,7 @@
 
 <!-- JavaScript for populating fields -->
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // Populate the dropdowns for Section A and B
     populateDropdown('dropdownA', 20);
     populateDropdown('dropdownB', 10);
@@ -158,19 +160,57 @@ document.addEventListener('DOMContentLoaded', function() {
             fieldContainer.appendChild(hiddenInput);
             container.appendChild(fieldContainer);
 
-            // Initialize TinyMCE with MathType plugin and local image upload support
+            // Initialize TinyMCE with the custom image picker functionality
             tinymce.init({
                 selector: `#${editorId}`,
-                plugins: 'table link image code charmap preview fullscreen anchor MathType lists', // Added lists plugin for ordered/unordered lists
-                toolbar: 'undo redo | formatselect | bold italic underline strikethrough | alignleft aligncenter alignright | bullist numlist outdent indent | link image charmap MathType | fullscreen preview code',
+                plugins: 'image table link code charmap preview fullscreen anchor lists',
+                toolbar: 'undo redo | formatselect | bold italic underline strikethrough | alignleft aligncenter alignright | bullist numlist outdent indent | link image charmap | fullscreen preview code',
                 menubar: 'file edit view insert format tools table help',
                 height: 200,
-               
-                setup: function(editor) {
-                    editor.on('change', function() {
+
+                // Enable title field in the Image dialog
+                image_title: true,
+
+                // Enable automatic uploads for blob or data URIs
+                automatic_uploads: true,
+
+                // Specify file types for the file picker
+                file_picker_types: 'image',
+
+                // Custom file picker for images
+                file_picker_callback: (cb, value, meta) => {
+                    const input = document.createElement('input');
+                    input.setAttribute('type', 'file');
+                    input.setAttribute('accept', 'image/*');
+
+                    input.addEventListener('change', (e) => {
+                        const file = e.target.files[0];
+
+                        const reader = new FileReader();
+                        reader.addEventListener('load', () => {
+                            const id = 'blobid' + new Date().getTime();
+                            const blobCache = tinymce.activeEditor.editorUpload.blobCache;
+                            const base64 = reader.result.split(',')[1];
+                            const blobInfo = blobCache.create(id, file, base64);
+                            blobCache.add(blobInfo);
+
+                            // Call the callback with the blob URI and populate the title field with the file name
+                            cb(blobInfo.blobUri(), { title: file.name });
+                        });
+                        reader.readAsDataURL(file);
+                    });
+
+                    input.click();
+                },
+
+                // Update hidden input on change
+                setup: function (editor) {
+                    editor.on('change', function () {
                         hiddenInput.value = editor.getContent(); // Set TinyMCE content to hidden input field
                     });
-                }
+                },
+
+                content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:16px }'
             });
         }
     }
@@ -205,6 +245,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
 </script>
 
 

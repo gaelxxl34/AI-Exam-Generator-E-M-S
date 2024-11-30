@@ -243,19 +243,58 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize TinyMCE on all textareas with the class 'tinyMCEEditor'
-    tinymce.init({
-        selector: 'textarea.tinyMCEEditor',
-        plugins: 'table link image code charmap preview fullscreen anchor MathType lists', // Add MathType, lists, and image plugins
-        toolbar: 'undo redo | formatselect | bold italic underline strikethrough | alignleft aligncenter alignright | bullist numlist outdent indent | link image charmap MathType | fullscreen preview code',
-        menubar: 'file edit view insert format tools table help',
-        height: 200,
-        setup: function(editor) {
-            editor.on('change', function() {
-                let content = editor.getContent();
-                console.log('Editor content changed:', content);
+     tinymce.init({
+                selector: 'textarea.tinyMCEEditor',
+                plugins: 'image table link code charmap preview fullscreen anchor lists',
+                toolbar: 'undo redo | formatselect | bold italic underline strikethrough | alignleft aligncenter alignright | bullist numlist outdent indent | link image charmap | fullscreen preview code',
+                menubar: 'file edit view insert format tools table help',
+                height: 200,
+
+                // Enable title field in the Image dialog
+                image_title: true,
+
+                // Enable automatic uploads for blob or data URIs
+                automatic_uploads: true,
+
+                // Specify file types for the file picker
+                file_picker_types: 'image',
+
+                // Custom file picker for images
+                file_picker_callback: (cb, value, meta) => {
+                    const input = document.createElement('input');
+                    input.setAttribute('type', 'file');
+                    input.setAttribute('accept', 'image/*');
+
+                    input.addEventListener('change', (e) => {
+                        const file = e.target.files[0];
+
+                        const reader = new FileReader();
+                        reader.addEventListener('load', () => {
+                            const id = 'blobid' + new Date().getTime();
+                            const blobCache = tinymce.activeEditor.editorUpload.blobCache;
+                            const base64 = reader.result.split(',')[1];
+                            const blobInfo = blobCache.create(id, file, base64);
+                            blobCache.add(blobInfo);
+
+                            // Call the callback with the blob URI and populate the title field with the file name
+                            cb(blobInfo.blobUri(), { title: file.name });
+                        });
+                        reader.readAsDataURL(file);
+                    });
+
+                    input.click();
+                },
+
+                // Update hidden input on change
+                setup: function (editor) {
+                    editor.on('change', function () {
+                        hiddenInput.value = editor.getContent(); // Set TinyMCE content to hidden input field
+                    });
+                },
+
+                content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:16px }'
             });
-        }
-    });
+
 });
 </script>
 
