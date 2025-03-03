@@ -92,8 +92,8 @@ class SuperAdminController extends Controller
             $database = $firestore->database();
             $usersRef = $database->collection('Users');
 
-            // Query for users where role is 'admin' or 'genadmin'
-            $adminQuery = $usersRef->where('role', 'in', ['admin', 'genadmin']);
+            // Query for users where role is 'admin', 'dean' or 'genadmin'
+            $adminQuery = $usersRef->where('role', 'in', ['admin', 'genadmin', 'dean']);
             $adminSnapshot = $adminQuery->documents();
 
             $adminsByRole = [];

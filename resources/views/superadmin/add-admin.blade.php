@@ -41,8 +41,8 @@
                         <option value="FST">Faculty of Science and Technology (FST)</option>
                         <option value="FBM">Faculty of Business Management (FBM)</option>
                         <option value="FOE">Faculty of Engineering (FOE)</option>
-                        <option value="FOL">Faculty of Law (FOL)</option>
-                        <option value="FST,FBM,FOE,FOL">ALL</option>
+                        <option value="HEC">Higher Education Certificate</option>
+                        <option value="FST,FBM,FOE,HEC">ALL</option>
                     </select>
                 </div>
             </div>
@@ -54,6 +54,7 @@
                         <option value="">Please choose</option>
                         <option value="admin">Faculty Admin</option>
                         <option value="genadmin">Exam Generator</option>
+                        <option value="dean">Dean</option>
                     </select>
                 </div>
             </div>

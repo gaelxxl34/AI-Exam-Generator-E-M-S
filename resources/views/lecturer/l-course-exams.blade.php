@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
     <title>Course Details</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.css" rel="stylesheet" />
@@ -47,90 +49,95 @@
 
 <div class="container mx-auto px-4">
     @forelse ($exams as $index => $exam)
-        <div class="mt-8 bg-white rounded-lg shadow-md">
-            <div class="flex items-center justify-between">
-                <h1 class="text-xl font-bold p-4 border-b text-center">{{$exam['courseUnit'] }}</h1>
-                
-                <!-- Preview Button with Oil (Gear) Icon -->
-                <a href="{{ route('preview.pdf', ['courseUnit' => $exam['courseUnit']]) }}" class="inline-flex items-center px-4 py-2 bg-gray-500 text-white text-sm font-bold rounded-full hover:bg-black">
-                    <i class="fas fa-oil-can mr-2"></i> Preview
-                </a>
-            </div>
+                <div class="mt-8 bg-white rounded-lg shadow-md">
+                    <div class="flex items-center justify-between">
+                        <h1 class="text-xl font-bold p-4 border-b text-center">{{$exam['courseUnit'] }}</h1>
 
-            @php
-                $sections = $exam['sections'];
-                ksort($sections); // Sort the sections by their keys
-            @endphp
-            @foreach ($sections as $sectionName => $questions)
-                <div class="mt-4 p-4 border-t">
-                    <h2 class="text-lg font-semibold">{{ "Section " . $sectionName }}</h2>
+                        <!-- Preview Button with Oil (Gear) Icon -->
+                        <a href="{{ route('preview.pdf', ['courseUnit' => $exam['courseUnit']]) }}" class="inline-flex items-center px-4 py-2 bg-gray-500 text-white text-sm font-bold rounded-full hover:bg-black">
+                            <i class="fas fa-oil-can mr-2"></i> Preview
+                        </a>
+                    </div>
 
-                    <!-- Display the questions -->
-                    @foreach ($questions as $questionIndex => $question)
-                        <div class="mt-2">
-                            <p>Question {{ $questionIndex + 1 }}:</p>
-                            <form action="{{ route('update.question', ['courseUnit' => $exam['courseUnit'], 'sectionName' => $sectionName, 'questionIndex' => $questionIndex]) }}" method="POST" class="mb-1">
-                                @csrf
-                                @method('PUT') <!-- Method spoofing for PUT request -->
-                                <textarea id="questionEditor_{{ $sectionName }}_{{ $questionIndex }}" class="tinyMCEEditor" name="question">{!! $question !!}</textarea>
-                                <div class="flex justify-end mt-2">
-                                    <button type="submit" class="bg-gray-500 hover:bg-green-500 text-white font-bold py-1 px-2 text-xs rounded">Update</button>
-                                </div>
-
-                                <!-- Check for success message for adding/updating only -->
-                                @if (session('success') && session('updatedQuestion') == $sectionName . "_" . $questionIndex)
-                                    <div class="text-sm text-green-600 mt-1 flex justify-end">
-                                        {{ session('success') }}
-                                    </div>
-                                @endif
-
-                                <!-- Check for error message on the updated/added question only -->
-                                @if (session('error') && session('updatedQuestion') == $sectionName . "_" . $questionIndex)
-                                    <div class="text-sm text-red-600 mt-1 flex justify-end">
-                                        {{ session('error') }}
-                                    </div>
-                                @endif
-                            </form>
-
-                            <!-- Form to delete a question -->
-                            <form action="{{ route('delete.question', ['courseUnit' => $exam['courseUnit'], 'sectionName' => $sectionName, 'questionIndex' => $questionIndex]) }}" method="POST" class="flex justify-end">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 text-xs rounded">Delete</button>
-                            </form>
-                        </div>
-                    @endforeach
-
-                    <!-- Error message for number of questions in the section (below questions) -->
                     @php
-                        $questionCount = count($questions);
-                        $errorMessage = '';
-
-                        // Check faculty and determine error message based on section and question count
-                        if (in_array($exam['faculty'], ['FST', 'FBM'])) {
-                            // FST and FBM requirements
-                            if ($sectionName == 'A' && $questionCount < 2) {
-                                $errorMessage = 'Minimum required 2 Case Studies for Section A';
-                            } elseif ($sectionName == 'B' && $questionCount < 12) {
-                                $errorMessage = 'Minimum required 12 questions for Section B';
-                            }
-                        } elseif ($exam['faculty'] == 'FOE') {
-                            // FOE requirements - 6 questions for both sections A and B
-                            if ($sectionName == 'A' && $questionCount < 6) {
-                                $errorMessage = 'Minimum required 6 questions for Section A';
-                            } elseif ($sectionName == 'B' && $questionCount < 6) {
-                                $errorMessage = 'Minimum required 6 questions for Section B';
-                            }
-                        }
+    $sections = $exam['sections'];
+    ksort($sections); // Sort the sections by their keys
                     @endphp
+                    @foreach ($sections as $sectionName => $questions)
+                                            <div class="mt-4 p-4 border-t">
+                                                <h2 class="text-lg font-semibold">{{ "Section " . $sectionName }}</h2>
 
-                    <!-- Display error message if applicable -->
-                    @if ($errorMessage)
-                        <p class="text-red-700 font-semibold text-md">{{ $errorMessage }}</p>
-                    @endif
+                                                <!-- Display the questions -->
+                                                @foreach ($questions as $questionIndex => $question)
+                                                    <div class="mt-2">
+                                                        <p>Question {{ $questionIndex + 1 }}:</p>
+                                                        <form  class="update-question-form" action="{{ route('update.question', ['courseUnit' => $exam['courseUnit'], 'sectionName' => $sectionName, 'questionIndex' => $questionIndex]) }}" method="POST" class="mb-1">
+                                                            @csrf
+                                                            @method('PUT') <!-- Method spoofing for PUT request -->
+                                                            <textarea id="questionEditor_{{ $sectionName }}_{{ $questionIndex }}" class="tinyMCEEditor" name="question">{!! $question !!}</textarea>
+
+                                                            <!-- Hidden input to track previous content -->
+                                                            <input type="hidden" id="previousContent_{{ $sectionName }}_{{ $questionIndex }}" name="previous_question"
+                                                                value="{{ $question }}">
+
+                                                            <div class="flex justify-end mt-2">
+                                                                <button type="submit" class="bg-gray-500 hover:bg-green-500 text-white font-bold py-1 px-2 text-xs rounded">Update</button>
+                                                            </div>
+
+                                                            <!-- Check for success message for adding/updating only -->
+                                                            @if (session('success') && session('updatedQuestion') == $sectionName . "_" . $questionIndex)
+                                                                <div class="text-sm text-green-600 mt-1 flex justify-end">
+                                                                    {{ session('success') }}
+                                                                </div>
+                                                            @endif
+
+                                                            <!-- Check for error message on the updated/added question only -->
+                                                            @if (session('error') && session('updatedQuestion') == $sectionName . "_" . $questionIndex)
+                                                                <div class="text-sm text-red-600 mt-1 flex justify-end">
+                                                                    {{ session('error') }}
+                                                                </div>
+                                                            @endif
+                                                        </form>
+
+                                                        <!-- Form to delete a question -->
+                                                        <form action="{{ route('delete.question', ['courseUnit' => $exam['courseUnit'], 'sectionName' => $sectionName, 'questionIndex' => $questionIndex]) }}" method="POST" class="flex justify-end">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 text-xs rounded">Delete</button>
+                                                        </form>
+                                                    </div>
+                                                @endforeach
+
+                                                <!-- Error message for number of questions in the section (below questions) -->
+                                                @php
+        $questionCount = count($questions);
+        $errorMessage = '';
+
+        // Check faculty and determine error message based on section and question count
+        if (in_array($exam['faculty'], ['FST', 'FBM'])) {
+            // FST and FBM requirements
+            if ($sectionName == 'A' && $questionCount < 2) {
+                $errorMessage = 'Minimum required 2 Case Studies for Section A';
+            } elseif ($sectionName == 'B' && $questionCount < 12) {
+                $errorMessage = 'Minimum required 12 questions for Section B';
+            }
+        } elseif ($exam['faculty'] == 'FOE') {
+            // FOE requirements - 6 questions for both sections A and B
+            if ($sectionName == 'A' && $questionCount < 6) {
+                $errorMessage = 'Minimum required 6 questions for Section A';
+            } elseif ($sectionName == 'B' && $questionCount < 6) {
+                $errorMessage = 'Minimum required 6 questions for Section B';
+            }
+        }
+                                                @endphp
+
+                                                <!-- Display error message if applicable -->
+                                                @if ($errorMessage)
+                                                    <p class="text-red-700 font-semibold text-md">{{ $errorMessage }}</p>
+                                                @endif
+                                            </div>
+                    @endforeach
                 </div>
-            @endforeach
-        </div>
     @empty
         <div class="mt-8 flex flex-col items-center justify-center">
             <img src="/assets/img/404.jpeg" alt="No Data Available" class="w-1/2 max-w-sm mx-auto">
@@ -241,61 +248,108 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize TinyMCE on all textareas with the class 'tinyMCEEditor'
-     tinymce.init({
-                selector: 'textarea.tinyMCEEditor',
-                plugins: 'image table link code charmap preview fullscreen anchor lists',
-                toolbar: 'undo redo | formatselect | bold italic underline strikethrough | alignleft aligncenter alignright | bullist numlist outdent indent | link image charmap | fullscreen preview code',
-                menubar: 'file edit view insert format tools table help',
-                height: 200,
 
-                // Enable title field in the Image dialog
-                image_title: true,
+    document.addEventListener('DOMContentLoaded', function () {
+        let insertedImages = new Set(); // Track inserted images
 
-                // Enable automatic uploads for blob or data URIs
-                automatic_uploads: true,
+        tinymce.init({
+            selector: 'textarea.tinyMCEEditor',
+            plugins: 'image table link code charmap preview fullscreen anchor lists',
+            toolbar: 'undo redo | formatselect | bold italic underline strikethrough | alignleft aligncenter alignright | bullist numlist outdent indent | link image charmap | fullscreen preview code',
+            menubar: 'file edit view insert format tools table help',
+            height: 300,
+            image_title: true,
+            automatic_uploads: false,
 
-                // Specify file types for the file picker
-                file_picker_types: 'image',
+            file_picker_types: 'image',
+            file_picker_callback: function (cb, value, meta) {
+                let input = document.createElement('input');
+                input.setAttribute('type', 'file');
+                input.setAttribute('accept', 'image/*');
 
-                // Custom file picker for images
-                file_picker_callback: (cb, value, meta) => {
-                    const input = document.createElement('input');
-                    input.setAttribute('type', 'file');
-                    input.setAttribute('accept', 'image/*');
+                input.addEventListener('change', function (event) {
+                    let file = event.target.files[0];
+                    if (!file) {
+                        console.log("❌ No file selected.");
+                        return;
+                    }
 
-                    input.addEventListener('change', (e) => {
-                        const file = e.target.files[0];
+                    let formData = new FormData();
+                    formData.append('image', file);
 
-                        const reader = new FileReader();
-                        reader.addEventListener('load', () => {
-                            const id = 'blobid' + new Date().getTime();
-                            const blobCache = tinymce.activeEditor.editorUpload.blobCache;
-                            const base64 = reader.result.split(',')[1];
-                            const blobInfo = blobCache.create(id, file, base64);
-                            blobCache.add(blobInfo);
-
-                            // Call the callback with the blob URI and populate the title field with the file name
-                            cb(blobInfo.blobUri(), { title: file.name });
+                    console.log("📤 Uploading image...");
+                    fetch("{{ route('upload.image') }}", {
+                        method: "POST",
+                        body: formData,
+                        headers: {
+                            "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').getAttribute("content")
+                        }
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                console.log("✅ Image uploaded successfully:", data.imageUrl);
+                                cb(data.imageUrl, { title: file.name });
+                                insertedImages.add(data.imageUrl); // Add image to tracking set
+                            } else {
+                                console.error("❌ Failed to upload image:", data.error);
+                            }
+                        })
+                        .catch(error => {
+                            console.error("❌ Error during image upload:", error);
                         });
-                        reader.readAsDataURL(file);
-                    });
+                });
 
-                    input.click();
-                },
+                input.click();
+            }
+        });
 
-                // Update hidden input on change
-                setup: function (editor) {
-                    editor.on('change', function () {
-                        hiddenInput.value = editor.getContent(); // Set TinyMCE content to hidden input field
-                    });
-                },
+        // Attach event listener to all update question forms
+        document.querySelectorAll('.update-question-form').forEach(form => {
+            form.addEventListener('submit', function (event) {
+                event.preventDefault(); // Stop form submission
 
-                content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:16px }'
+                let editorContent = tinymce.activeEditor.getContent();
+                let currentImages = new Set(
+                    (editorContent.match(/<img.*?src=["'](.*?)["']/g) || [])
+                        .map(img => img.match(/src=["'](.*?)["']/)[1])
+                );
+
+                let removedImages = [...insertedImages].filter(img => !currentImages.has(img));
+
+                console.log("📝 Current images in editor:", currentImages);
+                console.log("🗑 Images to delete:", removedImages);
+
+                // Always update insertedImages before making API call
+                insertedImages = new Set([...currentImages]);
+
+                if (removedImages.length > 0) {
+                    console.log("🚀 Sending request to delete unused images...");
+                    fetch("{{ route('delete.image') }}", {
+                        method: "POST",
+                        body: JSON.stringify({ images: removedImages }),
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').getAttribute("content")
+                        }
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log("✅ Removed unused images successfully:", data);
+                            this.submit(); // Submit after successful deletion
+                        })
+                        .catch(error => {
+                            console.error("❌ Error removing images:", error);
+                            this.submit(); // Submit even if deletion fails
+                        });
+                } else {
+                    console.log("✅ No unused images to delete, submitting form.");
+                    this.submit();
+                }
             });
+        });
+    });
 
-});
 </script>
 
 

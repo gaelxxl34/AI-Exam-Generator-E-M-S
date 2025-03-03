@@ -47,13 +47,14 @@ class RegisterLecturerController extends Controller
     {
         \Log::info('Register lecturer method called');
 
+        // Validate input
         $validatedData = $request->validate([
             'firstName' => 'required|string',
             'lastName' => 'required|string',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6',
-            'faculty' => 'required|string', // Ensure faculty is a required input
-            'courses' => 'required|array', // Validate that courses are provided and is an array
+            'faculties' => 'required|array|min:1', // Ensure at least one faculty is selected
+            'courses' => 'required|array|min:1', // Ensure at least one course is selected
         ]);
 
         try {
@@ -68,7 +69,6 @@ class RegisterLecturerController extends Controller
             $createdUser = $auth->createUser($userProperties);
             \Log::info('Firebase user created with UID: ' . $createdUser->uid);
 
-
             $firestore = app('firebase.firestore');
             $database = $firestore->database();
             $usersRef = $database->collection('Users');
@@ -79,10 +79,11 @@ class RegisterLecturerController extends Controller
                 'email' => $validatedData['email'],
                 'created_at' => new \DateTime(),
                 'role' => 'lecturer',
-                'faculty' => $validatedData['faculty'], // Use the faculty from the validated data
-                'courses' => $validatedData['courses'],
+                'faculties' => $validatedData['faculties'], // Store as an array
+                'courses' => $validatedData['courses'], // Store courses as an array
             ]);
-            \Log::info('Lecturer data added to Firestore with courses');
+
+            \Log::info('Lecturer data added to Firestore with faculties and courses');
 
             return redirect()->intended('/admin/lecturer-list')->with('success', 'Lecturer registered successfully.');
         } catch (\Throwable $e) {
@@ -117,32 +118,34 @@ class RegisterLecturerController extends Controller
 
             $currentUserDocument = iterator_to_array($currentUserSnapshots)[0];
             $currentUserData = $currentUserDocument->data();
-            $facultyField = $currentUserData['faculty'] ?? 'default_faculty';
+            $userFaculty = $currentUserData['faculty'] ?? 'default_faculty';
 
-            // Query for lecturers only from the current user's faculty
-            $lecturerQuery = $database->collection('Users')->where('role', '=', 'lecturer')->where('faculty', '=', $facultyField);
+            // Query for all lecturers
+            $lecturerQuery = $database->collection('Users')->where('role', '=', 'lecturer');
             $lecturerSnapshot = $lecturerQuery->documents();
 
             $lecturersByFaculty = [];
 
             foreach ($lecturerSnapshot as $lecturer) {
                 $lecturerData = $lecturer->data();
-                $faculty = $lecturerData['faculty'] ?? 'Other';
+                $lecturerFaculties = $lecturerData['faculties'] ?? []; // Get faculties array
 
-            
-                $lecturersByFaculty[$faculty][] = [
-                    'id' => $lecturer->id(),
-                    'firstName' => $lecturerData['firstName'] ?? 'N/A',
-                    'lastName' => $lecturerData['lastName'] ?? 'N/A',
-                    'email' => $lecturerData['email'] ?? 'N/A',
-                ];
+                // Check if the lecturer is part of the user's faculty
+                if (in_array($userFaculty, $lecturerFaculties)) {
+                    $lecturersByFaculty[$userFaculty][] = [
+                        'id' => $lecturer->id(),
+                        'firstName' => $lecturerData['firstName'] ?? 'N/A',
+                        'lastName' => $lecturerData['lastName'] ?? 'N/A',
+                        'email' => $lecturerData['email'] ?? 'N/A',
+                    ];
+                }
             }
 
-            \Log::info('Lecturers fetched by faculty with image URLs.');
+            \Log::info('Lecturers fetched by faculty.');
             return view('admin.lecturer-list', ['lecturersByFaculty' => $lecturersByFaculty]);
         } catch (\Exception $e) {
             \Log::error('Error in lecturerList: ' . $e->getMessage());
-            return 'Error: ' . $e->getMessage();
+            return back()->withErrors(['error' => 'Failed to fetch lecturers.']);
         }
     }
 
@@ -160,7 +163,7 @@ class RegisterLecturerController extends Controller
             $lecturerSnapshot = $lecturerRef->snapshot();
 
             if (!$lecturerSnapshot->exists()) {
-                return 'Lecturer not found';
+                return back()->withErrors(['error' => 'Lecturer not found']);
             }
 
             // Prepare lecturer data
@@ -169,32 +172,34 @@ class RegisterLecturerController extends Controller
                 'firstName' => $lecturerSnapshot->data()['firstName'] ?? 'N/A',
                 'lastName' => $lecturerSnapshot->data()['lastName'] ?? 'N/A',
                 'email' => $lecturerSnapshot->data()['email'] ?? 'N/A',
-                'faculty' => $lecturerSnapshot->data()['faculty'] ?? 'N/A',
-                'courses' => $lecturerSnapshot->data()['courses'] ?? [], // Fetch the courses array
+                'faculties' => $lecturerSnapshot->data()['faculties'] ?? [], // Fetch faculties array
+                'courses' => $lecturerSnapshot->data()['courses'] ?? [], // Fetch courses array
             ];
 
-            // Fetch available courses based on lecturer's faculty
-            $faculty = $lecturerSnapshot->data()['faculty'];
-            $coursesRef = $firestore->collection('Courses')->where('faculty', '==', $faculty);
-            $coursesSnapshot = $coursesRef->documents();
+            // Fetch available faculties
+            $availableFaculties = ['FST', 'FBM', 'FOE', 'HEC']; // Static list
 
+            // Fetch available courses based on lecturer faculties
+            $coursesRef = $firestore->collection('Courses');
+            $coursesSnapshot = $coursesRef->documents();
             $courseNames = [];
+
             foreach ($coursesSnapshot as $course) {
                 if ($course->exists()) {
                     $courseNames[] = [
-                        'name' => $course->data()['name'], // Assuming course name is stored in 'name'
-                        'id' => $course->id() // Document ID
+                        'name' => $course->data()['name'], // Course name
+                        'id' => $course->id(), // Document ID
                     ];
                 }
             }
 
-            // Pass lecturer data and course names to the view
             return view('admin.edit-lecturer', [
                 'lecturer' => $lecturerData,
-                'courseNames' => $courseNames // All available courses for the faculty
+                'availableFaculties' => $availableFaculties,
+                'courseNames' => $courseNames, // Available courses
             ]);
         } catch (\Exception $e) {
-            return 'Error: ' . $e->getMessage();
+            return back()->withErrors(['error' => 'Error fetching lecturer: ' . $e->getMessage()]);
         }
     }
 
@@ -208,35 +213,37 @@ class RegisterLecturerController extends Controller
                 'firstName' => 'required',
                 'lastName' => 'required',
                 'email' => 'required|email',
-                'courses' => 'required|array', // Validate that courses are passed as an array
+                'faculties' => 'required|array|min:1', // Ensure at least one faculty is selected
+                'courses' => 'required|array|min:1', // Ensure at least one course is selected
             ]);
 
-            // Initialize Firebase services
             $firestore = app('firebase.firestore')->database();
             $auth = app('firebase.auth');
 
-            // Update Firestore Data for the lecturer
+            // Reference to Firestore document
             $lecturerRef = $firestore->collection('Users')->document($id);
 
-            // Update the necessary fields (First Name, Last Name, Email, and Courses)
+            // Update lecturer data
             $lecturerRef->update([
                 ['path' => 'firstName', 'value' => $validatedData['firstName']],
                 ['path' => 'lastName', 'value' => $validatedData['lastName']],
-                ['path' => 'email', 'value' => $validatedData['email']], // Update email in Firestore
-                ['path' => 'courses', 'value' => $validatedData['courses']], // Update the courses field
+                ['path' => 'email', 'value' => $validatedData['email']], // Update email
+                ['path' => 'faculties', 'value' => $validatedData['faculties']], // Update faculties
+                ['path' => 'courses', 'value' => $validatedData['courses']], // Update courses
             ]);
 
             // Update Firebase Authentication Email
             $user = $auth->getUser($id);
-            if ($validatedData['email'] != $user->email) {
+            if ($validatedData['email'] !== $user->email) {
                 $auth->changeUserEmail($id, $validatedData['email']);
             }
 
             return back()->with('success', 'Lecturer updated successfully.');
         } catch (\Exception $e) {
-            return back()->with('error', 'Error updating lecturer: ' . $e->getMessage());
+            return back()->withErrors(['error' => 'Error updating lecturer: ' . $e->getMessage()]);
         }
     }
+
 
 
 

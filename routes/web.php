@@ -9,9 +9,11 @@ use App\Http\Middleware\EnsureSuperAdminRole;
 use App\Http\Middleware\EnsureGenAdminRole;
 use App\Http\Middleware\EnsureAdminRole;
 use App\Http\Middleware\EnsureLecturerRole;
+use App\Http\Middleware\EnsureDeanRole;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\PastExamController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ImageUploadController;
 //
 
 
@@ -66,6 +68,18 @@ Route::get('/genadmin/gen-dashboard', [DashboardController::class, 'genAdminDash
 Route::get('/genadmin/ai-exam-generator', [CourseController::class, 'AllCourses'])
     ->name('genadmin.ai-exam-generator');
 
+// DEAN ROUTING
+
+
+Route::middleware([EnsureDeanRole::class])->group(function () {
+    Route::get('/deans/dean-dashboard', [DashboardController::class, 'index'])->name('dean.dashboard');
+});
+
+Route::post('/course/update-status/{id}', [DashboardController::class, 'updateStatus'])->name('course.updateStatus');
+Route::post('/deans/course/{id}/approve', [DashboardController::class, 'approve'])->name('course.approve');
+Route::post('/deans/course/{id}/decline', [DashboardController::class, 'decline'])->name('course.decline');
+// -- END OF DEAN ROUTING
+
 
 // -- ADMIN ROUTING 
 
@@ -111,6 +125,7 @@ Route::get('/edit-lecturer/{id}', [RegisterLecturerController::class, 'editLectu
 Route::delete('lecturer.delete/{lecturerId}', [RegisterLecturerController::class, 'deleteLecturer'])
     ->middleware(EnsureAdminRole::class)
     ->name('lecturer.delete');
+
 
 // --- PAST EXAMS ROUTING START 
 Route::get('/admin/add-past-exams', function () {
@@ -164,6 +179,13 @@ Route::get('/lecturer/l-dashboard', function () {
 Route::put('/exams/{courseUnit}/{sectionName}/{questionIndex}/update', [CourseController::class, 'updateQuestion'])
 ->name('update.question');
 
+// Route to upload an image to Firebase
+Route::post('/upload-image', [ImageUploadController::class, 'uploadImage'])->name('upload.image');
+
+// Route to delete unused images from Firebase
+Route::post('/delete-unused-images', [ImageUploadController::class, 'deleteImages'])->name('delete.image');
+
+
 Route::put('/exams/{courseUnit}/update-instructions', [CourseController::class, 'updateInstruction'])
     ->name('update.instructions');
 
@@ -203,10 +225,6 @@ Route::get('/lecturer/l-upload-questions', function () {
 Route::get('/lecturer/lecturer.l-upload-questions', [CourseController::class, 'CoursesList'])
     ->middleware(EnsureLecturerRole::class)
     ->name('lecturer.l-upload-questions');
-
-
-
-
 
 
 

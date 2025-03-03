@@ -70,7 +70,7 @@
                         <option value="Faculty of Science and Technology">Faculty of Science and Technology (FST)</option>
                         <option value="Faculty of Business Management">Faculty of Business Management (FBM)</option>
                         <option value="Faculty of Engineering">Faculty of Engineering (FOE)</option>
-                        <option value="Faculty of Law ">Faculty of Law (FOL)</option>
+                        <option value="Higher Education Certificate ">Higher Education Certificate (HEC)</option>
                     </select>
                 </div>
             </div>

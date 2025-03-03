@@ -11,17 +11,17 @@ class PastExamController extends Controller
     // The function below is used to upload past exams into firestore 
     public function store(Request $request)
     {
-
         $messages = [
             'fileUpload.max' => 'The file should not be greater than 2MB.',
         ];
-        
+
+        // ✅ Fix: Remove created_at from validation
         $validatedData = $request->validate([
             'courseUnit' => 'required',
             'year' => 'required',
-            'program' => 'required|string',  // Validate the new field
+            'program' => 'required|string',
+            'examPeriod' => 'required|string',  // Validate the new exam period field
             'fileUpload' => 'required|file|mimes:pdf|max:2048',
-            'created_at' => new \DateTime(),
         ], $messages);
 
         $file = $request->file('fileUpload');
@@ -33,7 +33,7 @@ class PastExamController extends Controller
         $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
         \Log::info("Current user email: $currentUserEmail");
 
-        // Fetch the current user's data from Firestore
+        // Fetch current user's faculty from Firestore
         $usersRef = $database->collection('Users');
         $query = $usersRef->where('email', '==', $currentUserEmail);
         $currentUserSnapshots = $query->documents();
@@ -48,20 +48,21 @@ class PastExamController extends Controller
         $facultyField = $currentUserData['faculty'] ?? 'default_faculty';
         \Log::info("Faculty fetched: $facultyField");
 
+        // ✅ Fix: Convert DateTime to string
         $data = [
             'courseUnit' => $validatedData['courseUnit'],
             'year' => $validatedData['year'],
-            'program' => $validatedData['program'],  // Include the program field
+            'program' => $validatedData['program'],
+            'examPeriod' => $validatedData['examPeriod'],  // Store exam period
             'file' => $base64File,
-            'created_at' => new \DateTime(),
-            'faculty' => $facultyField  // Include the faculty field
+            'created_at' => now()->toDateTimeString(), // Convert DateTime to string
+            'faculty' => $facultyField
         ];
 
         $database->collection('pastExams')->add($data);
 
         return redirect()->intended('admin.view-past-exams')->with('success', 'Exam uploaded successfully!');
     }
-
 
 
     public function fetchPastExams()
@@ -89,22 +90,40 @@ class PastExamController extends Controller
         $groupedData = [];
         foreach ($pastExams as $exam) {
             $data = $exam->data();
-            $program = $data['program'] ?? 'Unknown'; // Ensure there is a default for program
-            if (!isset($groupedData[$program])) {
-                $groupedData[$program] = [];
+            $year = $data['year'] ?? 'Unknown';
+            $examPeriod = $data['examPeriod'] ?? 'Unknown'; // April, August, December
+            $program = $data['program'] ?? 'Unknown';
+            $courseUnit = $data['courseUnit'] ?? 'Unknown';
+
+            if (!isset($groupedData[$year])) {
+                $groupedData[$year] = [
+                    'April' => [],
+                    'August' => [],
+                    'December' => [],
+                ];
             }
-            if (!isset($groupedData[$program][$data['courseUnit']])) {
-                $groupedData[$program][$data['courseUnit']] = [];
+
+            if (!isset($groupedData[$year][$examPeriod])) {
+                $groupedData[$year][$examPeriod] = [];
             }
-            $groupedData[$program][$data['courseUnit']][] = [
-                'id' => $exam->id(),  // Include the document ID
-                'year' => $data['year'],
-                'file' => $data['file'], // Base64 encoded PDF
+
+            $groupedData[$year][$examPeriod][] = [
+                'id' => $exam->id(),
+                'program' => $program,
+                'courseUnit' => $courseUnit,
+                'file' => $data['file'],
             ];
         }
 
+        // Sort by Year (Descending) for Most Recent First
+        krsort($groupedData);
+
         return view('admin.view-past-exams', ['examsData' => $groupedData]);
     }
+
+
+
+
 
     public function delete($id)
     {

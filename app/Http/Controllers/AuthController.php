@@ -82,6 +82,15 @@ class AuthController extends Controller
 
             $userData = $userSnapshot->data();
 
+            // Fetch faculty and store it
+            $faculty = $userData['faculty'] ?? null;
+            if (!$faculty) {
+                throw new \Exception("Faculty information is missing for user: {$uid}");
+            }
+
+            // Store faculty in session
+            session()->put('user_faculty', $faculty);
+
             // Fetch the profile picture URL from Firebase Storage
             $storage = app('firebase.storage');
             $bucket = $storage->getBucket();
@@ -97,6 +106,7 @@ class AuthController extends Controller
             session()->put('user_role', $userData['role']);
             session()->put('profile_picture', $profilePictureUrl);
             \Log::info('firstName: ' . session('user_firstName'));
+            \Log::info('faculty: ' . session('user_faculty')); // Log faculty
 
             // Check user role and redirect accordingly
             switch ($userData['role']) {
@@ -108,6 +118,8 @@ class AuthController extends Controller
                     return redirect('/superadmin/super-adm-dashboard');
                 case 'genadmin':
                     return redirect('/genadmin/gen-dashboard');
+                case 'dean':
+                    return redirect('/deans/dean-dashboard');
                 default:
                     return redirect('/login')->withErrors(['login_error' => 'No valid role assigned to this user.']);
             }

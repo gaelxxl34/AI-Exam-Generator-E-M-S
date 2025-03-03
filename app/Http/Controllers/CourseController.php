@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 // use PDF;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\File;
 class CourseController extends Controller
 
 {
@@ -17,10 +19,10 @@ class CourseController extends Controller
             $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
             \Log::info('Current user email: ' . $currentUserEmail);
 
-            $firestore = app('firebase.firestore');
-            $database = $firestore->database();
-            $usersRef = $database->collection('Users');
+            $firestore = app('firebase.firestore')->database();
+            $usersRef = $firestore->collection('Users');
 
+            // Fetch the current user from Firestore
             $query = $usersRef->where('email', '==', $currentUserEmail);
             $currentUserSnapshots = $query->documents();
 
@@ -29,22 +31,40 @@ class CourseController extends Controller
                 throw new \Exception('Current user not found in Firestore.');
             }
 
-            // Convert the snapshot to an array and get the first element
+            // Get user data
             $currentUserDataArray = iterator_to_array($currentUserSnapshots);
             $currentUserData = $currentUserDataArray[0]->data();
 
-            $courses = $currentUserData['courses'] ?? [];
-            if (empty($courses)) {
+            // Get the courses assigned to this lecturer
+            $lecturerCourses = $currentUserData['courses'] ?? [];
+
+            if (empty($lecturerCourses)) {
                 \Log::info('No courses found for the current user: ' . $currentUserEmail);
                 throw new \Exception('No courses found for the current user.');
             }
 
-            \Log::info('Courses fetched for the current user: ' . json_encode($courses));
+            // Fetch only the courses that belong to this lecturer from Firestore "Courses" collection
+            $coursesRef = $firestore->collection('Courses');
+            $coursesSnapshots = $coursesRef->where('name', 'in', $lecturerCourses)->documents();
 
-            // Pass the courses to the view
+            $courses = [];
+            foreach ($coursesSnapshots as $course) {
+                if ($course->exists()) {
+                    $data = $course->data();
+                    $courses[] = [
+                        'name' => $data['name'] ?? 'Unknown Course',
+                        'faculty' => $data['faculty'] ?? 'Unknown Faculty'
+                    ];
+                }
+            }
+
+            \Log::info('Courses fetched for the lecturer: ' . json_encode($courses));
+
+            // Pass the courses (with faculty) to the view
             return view('lecturer.l-upload-questions', ['courses' => $courses]);
+
         } catch (\Exception $e) {
-            \Log::error('Error in lecturerList: ' . $e->getMessage());
+            \Log::error('Error in CoursesList: ' . $e->getMessage());
             return 'Error: ' . $e->getMessage();
         }
     }
@@ -169,32 +189,45 @@ class CourseController extends Controller
         $currentUserData = $currentUserDocument->data();
         $faculty = $currentUserData['faculty'] ?? 'default_faculty';
 
-        // Prepare course data from the form
+        // Extract form inputs
+        $courseUnit = $request->input('courseUnit');
+        $courseCode = $request->input('courseCode');
+        $program = $request->input('program');
+        $yearSem = 'Year ' . $request->input('year') . '/Semester ' . $request->input('semester');
+
+        // Check if the course code already exists in the Courses collection
+        $coursesRef = $database->collection('Courses');
+        $query = $coursesRef->where('code', '==', $courseCode);
+        $existingCourses = $query->documents();
+
+        if (!$existingCourses->isEmpty()) {
+            foreach ($existingCourses as $doc) {
+                $existingCourseData = $doc->data();
+                $existingCourseName = $existingCourseData['name'] ?? 'Unknown Course';
+
+                \Log::warning("Course code '$courseCode' already exists for '$existingCourseName'.");
+                return back()->withErrors(["error" => "The course code '$courseCode' is already assigned to '$existingCourseName'. Please use a unique course code."]);
+            }
+        }
+
+        // Prepare course data for Firestore
         $courseData = [
-            'name' => $request->input('courseUnit'),
-            'code' => $request->input('courseCode'),
-            'program' => $request->input('program'),
-            'year_sem' => 'Year ' . $request->input('year') . '/Semester ' . $request->input('semester'),
+            'name' => $courseUnit,
+            'code' => $courseCode,
+            'program' => $program,
+            'year_sem' => $yearSem,
             'faculty' => $faculty
         ];
 
         // Upload to Firestore
-        $coursesRef = $database->collection('Courses');
         $coursesRef->add($courseData);
 
-        // Optionally, fetch all courses for the view
-        $allCourses = $coursesRef->documents();
+        \Log::info("New course '$courseUnit' added successfully with code '$courseCode'.");
 
-        // Prepare data for the view
-        $coursesList = [];
-        foreach ($allCourses as $doc) {
-            $coursesList[] = $doc->data();
-        }
-
-        // Redirect to the courses list view with all courses data
-        return redirect()->intended('admin/courses-list')->with('success', 'uploaded successfully!');
-        
+        // Redirect to courses list with success message
+        return redirect()->intended('admin/courses-list')->with('success', 'Course uploaded successfully!');
     }
+
 
 
     public function showCourses()
@@ -373,37 +406,48 @@ class CourseController extends Controller
             $userFaculty = $currentUserData['faculty'] ?? 'default_faculty';
             \Log::info("Current user faculty: $userFaculty");
 
-            $containsComma = strpos($userFaculty, ',') !== false;
-            \Log::info("Faculty field contains comma: " . ($containsComma ? 'Yes' : 'No'));
+            // 1️⃣ **Fetch all approved exams first**
+            $approvedExamsRef = $database->collection('Exams')->where('status', '==', 'Approved');
+            $approvedExamsSnapshots = $approvedExamsRef->documents();
 
-            $courses = [];
-            $coursesRef = $database->collection('Courses');
-
-            // If faculty contains a comma, fetch all courses; otherwise, fetch by specific faculty
-            if ($containsComma) {
-                $coursesQuery = $coursesRef; // Fetch all courses
-                \Log::info("Fetching all courses due to multiple faculty entries");
-            } else {
-                $coursesQuery = $coursesRef->where('faculty', '==', $userFaculty);
-                \Log::info("Fetching courses for specific faculty: $userFaculty");
+            if ($approvedExamsSnapshots->isEmpty()) {
+                \Log::info("No approved exams found.");
+                return view('genadmin.ai-exam-generator', ['courses' => []]);
             }
 
-            $coursesSnapshots = $coursesQuery->documents();
-
-            foreach ($coursesSnapshots as $document) {
-                if ($document->exists()) {
-                    $data = $document->data();
-                    $courses[] = [
-                        'id' => $document->id(),
-                        'name' => $data['name'] ?? 'Unknown Course'
-                    ];
+            // 2️⃣ **Extract course names from approved exams**
+            $approvedCourseNames = [];
+            foreach ($approvedExamsSnapshots as $exam) {
+                $examData = $exam->data();
+                if (!empty($examData['courseUnit'])) {
+                    $approvedCourseNames[] = $examData['courseUnit'];
                 }
             }
 
-            \Log::info("Number of courses fetched: " . count($courses));
+            $approvedCourseNames = array_unique($approvedCourseNames); // Remove duplicates
+            \Log::info("Approved course names: " . implode(", ", $approvedCourseNames));
 
-            // Pass the courses to the view
-            return view('genadmin.ai-exam-generator', ['courses' => $courses]);
+            // 3️⃣ **Fetch only the courses that match these names**
+            $coursesRef = $database->collection('Courses');
+            $coursesSnapshots = $coursesRef->documents();
+
+            $filteredCourses = [];
+            foreach ($coursesSnapshots as $document) {
+                if ($document->exists()) {
+                    $data = $document->data();
+                    if (in_array($data['name'], $approvedCourseNames)) { // Match with approved courses
+                        $filteredCourses[] = [
+                            'id' => $document->id(),
+                            'name' => $data['name'] ?? 'Unknown Course'
+                        ];
+                    }
+                }
+            }
+
+            \Log::info("Number of approved courses fetched: " . count($filteredCourses));
+
+            // Pass the filtered courses to the view
+            return view('genadmin.ai-exam-generator', ['courses' => $filteredCourses]);
         } catch (\Exception $e) {
             \Log::error("Error fetching courses: " . $e->getMessage());
             return view('genadmin.ai-exam-generator', ['courses' => [], 'error' => 'Failed to fetch courses.']);
@@ -417,9 +461,10 @@ class CourseController extends Controller
 
     public function deleteQuestion($courseUnit, $sectionName, $questionIndex)
     {
-        Log::info("Entering deleteQuestion with parameters: Course Unit - {$courseUnit}, Section Name - {$sectionName}, Question Index - {$questionIndex}");
+        Log::info("🗑 Entering deleteQuestion with parameters: Course Unit - {$courseUnit}, Section Name - {$sectionName}, Question Index - {$questionIndex}");
 
         $firestore = app('firebase.firestore')->database();
+        $storage = app('firebase.storage')->getBucket();
         $examsRef = $firestore->collection('Exams');
         $query = $examsRef->where('courseUnit', '==', $courseUnit);
         $examsSnapshot = $query->documents();
@@ -430,29 +475,52 @@ class CourseController extends Controller
                 $examData = $document->data();
 
                 if (isset($examData['sections'][$sectionName][$questionIndex])) {
-                    $questionToRemove = $examData['sections'][$sectionName][$questionIndex]; // Capture question for logging
-                    array_splice($examData['sections'][$sectionName], $questionIndex, 1);
+                    $questionToRemove = base64_decode($examData['sections'][$sectionName][$questionIndex]); // Decode question content
+                    Log::info("📄 Question Content Before Deletion: " . $questionToRemove);
 
-                    // Update the Firestore document
+                    // Extract Image URLs from Question Content
+                    preg_match_all('/<img.*?src=["\'](.*?)["\']/', $questionToRemove, $matches);
+                    $imagesToDelete = $matches[1] ?? [];
+
+                    Log::info("🖼 Images found for deletion: " . json_encode($imagesToDelete));
+
+                    // Delete Images from Firebase Storage
+                    foreach ($imagesToDelete as $imageUrl) {
+                        $path = urldecode(parse_url($imageUrl, PHP_URL_PATH));
+                        $path = str_replace('/v0/b/' . env('FIREBASE_STORAGE_BUCKET') . '/o/', '', $path);
+                        $path = explode('?alt=media', $path)[0];
+
+                        $object = $storage->object($path);
+                        if ($object->exists()) {
+                            $object->delete();
+                            Log::info("✅ Deleted image: " . $imageUrl);
+                        } else {
+                            Log::warning("⚠ Image not found in storage (already deleted?): " . $imageUrl);
+                        }
+                    }
+
+                    // Remove Question from Firestore
+                    array_splice($examData['sections'][$sectionName], $questionIndex, 1);
                     $examRef->update([
                         ['path' => 'sections.' . $sectionName, 'value' => $examData['sections'][$sectionName]]
                     ]);
 
-                    Log::info("Successfully deleted question. Course Unit: {$courseUnit}, Section: {$sectionName}, Index: {$questionIndex}, Removed Question: {$questionToRemove}");
+                    Log::info("✅ Successfully deleted question. Course Unit: {$courseUnit}, Section: {$sectionName}, Index: {$questionIndex}");
                     return back()->with('success', 'Question deleted successfully.');
                 } else {
-                    Log::warning("Question not found for deletion. Course Unit: {$courseUnit}, Section: {$sectionName}, Index: {$questionIndex}");
+                    Log::warning("❌ Question not found for deletion. Course Unit: {$courseUnit}, Section: {$sectionName}, Index: {$questionIndex}");
                 }
             }
         }
 
-        Log::error("Exam not found for deletion. Course Unit: {$courseUnit}");
+        Log::error("❌ Exam not found for deletion. Course Unit: {$courseUnit}");
         return back()->withErrors(['error' => 'Exam or question not found.']);
     }
 
+
     public function updateQuestion(Request $request, $courseUnit, $sectionName, $questionIndex)
     {
-        Log::info("Entering updateQuestion with parameters: Course Unit - {$courseUnit}, Section Name - {$sectionName}, Question Index - {$questionIndex}");
+        Log::info("Updating question: Course Unit - {$courseUnit}, Section - {$sectionName}, Index - {$questionIndex}");
 
         $request->validate([
             'question' => 'required|string',
@@ -463,42 +531,41 @@ class CourseController extends Controller
         $query = $examsRef->where('courseUnit', '==', $courseUnit);
         $examsSnapshot = $query->documents();
 
-        if (count($examsSnapshot->rows()) == 0) {
-            Log::error("No documents found for Course Unit: {$courseUnit}");
-            return back()->withErrors(['error' => 'No exams found.']);
+        if ($examsSnapshot->isEmpty()) {
+            Log::error("No exam found for Course Unit: {$courseUnit}");
+            return back()->withErrors(['error' => 'No exam found.']);
         }
 
         foreach ($examsSnapshot as $document) {
             if ($document->exists()) {
                 $examRef = $document->reference();
                 $examData = $document->data();
-                Log::info("Document found, processing update...", ['Exam Data' => $examData]);
 
-                if (isset($examData['sections'][$sectionName][$questionIndex])) {
-                    $oldQuestion = $examData['sections'][$sectionName][$questionIndex]; // Capture old question for logging
-
-                    // Base64 encode the new question before saving it
-                    $encodedQuestion = base64_encode($request->question);
-                    $examData['sections'][$sectionName][$questionIndex] = $encodedQuestion;
-
-                    // Update the Firestore document
-                    $examRef->update([
-                        ['path' => 'sections.' . $sectionName, 'value' => $examData['sections'][$sectionName]]
-                    ]);
-
-                    Log::info("Successfully updated question. Course Unit: {$courseUnit}, Section: {$sectionName}, Index: {$questionIndex}, Old Question: {$oldQuestion}, New Question: {$request->question}");
-                    return back()->with('success', 'Question updated successfully.');
-                } else {
-                    Log::warning("Question index $questionIndex not found in section $sectionName");
+                // Reject any Base64 content
+                if (preg_match('/data:image\/[a-zA-Z]+;base64,/', $request->question)) {
+                    Log::error("Base64 detected in question content! Rejecting request.");
+                    return back()->withErrors(['error' => 'Invalid data format. Images should be stored as URLs.']);
                 }
-            } else {
-                Log::error("Document does not exist for the specified ID.");
+
+                // Save the updated question with Firebase Image URLs
+                $examData['sections'][$sectionName][$questionIndex] = base64_encode($request->question);
+                $examRef->update([
+                    ['path' => 'sections.' . $sectionName, 'value' => $examData['sections'][$sectionName]]
+                ]);
+
+                Log::info("Question updated successfully.");
+                return back()->with('success', 'Question updated successfully.');
             }
         }
 
-        Log::error("Failed to update question for Course Unit: {$courseUnit}");
-        return back()->withErrors(['error' => 'Question update failed.']);
+        Log::error("Failed to update question.");
+        return back()->withErrors(['error' => 'Failed to update question.']);
     }
+
+
+
+
+
 
     public function addQuestion(Request $request, $courseUnit)
     {
@@ -674,7 +741,9 @@ class CourseController extends Controller
 
     public function previewPdf($courseUnit)
     {
-        // Fetch the exam details based on the course unit
+        Log::info("📝 Generating PDF preview for Course Unit: {$courseUnit}");
+
+        // 🔹 Fetch the exam details
         $firestore = app('firebase.firestore')->database();
         $examsRef = $firestore->collection('Exams');
         $query = $examsRef->where('courseUnit', '==', $courseUnit);
@@ -684,12 +753,12 @@ class CourseController extends Controller
             return back()->withErrors(['error' => 'No exam found for this course unit.']);
         }
 
-        // Get the first document (since Firestore can return multiple documents)
+        // 🔹 Get the first matching document
         $examData = null;
         foreach ($examsSnapshot as $document) {
             if ($document->exists()) {
-                $examData = $document->data(); // Fetch the exam data
-                break; // Exit the loop after getting the first document
+                $examData = $document->data();
+                break;
             }
         }
 
@@ -697,27 +766,92 @@ class CourseController extends Controller
             return back()->withErrors(['error' => 'No exam data found for this course unit.']);
         }
 
-        // Base64 decode only the questions
+        // 🔹 Define Storage Path (`storage/app/pdf_images/`)
+        $storagePath = storage_path('app/pdf_images/');
+
+        // 🔹 Ensure the directory exists (Create if not)
+        if (!File::exists($storagePath)) {
+            File::makeDirectory($storagePath, 0755, true);
+            Log::info("📂 Created directory for storing preview images: {$storagePath}");
+        }
+
+        // 🔹 Delete previous preview images before generating new ones
+        File::cleanDirectory($storagePath); // Remove all old preview images
+        Log::info("🗑 Cleared old preview images from storage.");
+
+        // 🔹 Process each question to replace Firebase image URLs
         foreach ($examData['sections'] as $sectionName => $questions) {
             foreach ($questions as $index => $question) {
-                // Base64 decode each question before passing it to the template
-                $examData['sections'][$sectionName][$index] = base64_decode($question);
+                $decodedQuestion = base64_decode($question);
+
+                // 🔍 Extract image URLs from the question content
+                preg_match_all('/<img[^>]+src=["\']([^"\']+)["\']/', $decodedQuestion, $matches);
+                $imageUrls = $matches[1] ?? [];
+
+                Log::info("🔗 Found Image URLs:", $imageUrls);
+
+                // 🔹 Replace image URLs with local paths
+                foreach ($imageUrls as $imageUrl) {
+                    // Generate a unique filename for local storage
+                    $fileName = 'pdf_' . uniqid() . '.jpg';
+                    $localPath = $storagePath . $fileName;
+
+                    // 🔻 Download and save image locally in `storage/app/pdf_images/`
+                    try {
+                        file_put_contents($localPath, file_get_contents($imageUrl));
+
+                        // 🔹 Convert storage path to Laravel storage URL
+                        $imageServePath = storage_path("app/pdf_images/{$fileName}");
+                        $decodedQuestion = str_replace($imageUrl, $imageServePath, $decodedQuestion);
+
+                        Log::info("✅ Image replaced: {$imageUrl} -> {$imageServePath}");
+                    } catch (\Exception $e) {
+                        Log::error("❌ Failed to download image: {$imageUrl}, Error: " . $e->getMessage());
+                    }
+                }
+
+                // 🔹 Update the exam data with new image paths
+                $examData['sections'][$sectionName][$index] = $decodedQuestion;
             }
         }
 
-        // Generate the PDF using the available data (course unit, sections, instructions, and questions)
-        $pdf = PDF::loadView('lecturer.preview', [
+        // 🔹 Generate the PDF with updated content
+        $pdf = Pdf::loadView('lecturer.preview', [
             'courseUnit' => $examData['courseUnit'],
             'sections' => $examData['sections'],
-            'sectionAInstructions' => $examData['sectionA_instructions'], // Pass as is
-            'sectionBInstructions' => $examData['sectionB_instructions'], // Pass as is
+            'sectionAInstructions' => $examData['sectionA_instructions'] ?? '',
+            'sectionBInstructions' => $examData['sectionB_instructions'] ?? '',
         ]);
 
-        // Set paper size to A4 and orientation to portrait
-        $pdf->setPaper('A4', 'portrait');
+        Log::info("✅ PDF generated successfully for Course Unit: {$courseUnit}");
 
-        // Stream the PDF to the browser where it can be printed or saved
+        // Stream the PDF to the browser
         return $pdf->stream("Preview_{$courseUnit}.pdf");
+    }
+
+
+    private function downloadFirebaseImage($imageUrl)
+    {
+        try {
+            // Get Image Contents
+            $imageContent = file_get_contents($imageUrl);
+            if (!$imageContent) {
+                Log::error("⚠ Failed to download image from Firebase: {$imageUrl}");
+                return null;
+            }
+
+            // Generate a unique filename
+            $imageName = 'pdf_images/' . uniqid() . '.jpg';
+
+            // Save Image Locally
+            Storage::disk('public')->put($imageName, $imageContent);
+
+            // Return Local Path for PDF
+            return public_path("storage/{$imageName}");
+        } catch (\Exception $e) {
+            Log::error("❌ Error downloading image from Firebase: " . $e->getMessage());
+            return null;
+        }
     }
 
 

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth; // Import Auth for user session
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
@@ -93,5 +95,83 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function index()
+    {
+        try {
+            $faculty = session('user_faculty'); // Get dean's faculty from session
+            \Log::info("Fetching courses for faculty: {$faculty}");
+
+            $firestore = app('firebase.firestore')->database();
+            $examsRef = $firestore->collection('Exams');
+            $query = $examsRef->where('faculty', '==', $faculty);
+            $examsSnapshot = $query->documents();
+
+            $courses = [];
+
+            foreach ($examsSnapshot as $document) {
+                if ($document->exists()) {
+                    $examData = $document->data();
+                    $examData['id'] = $document->id();
+                    $examData['status'] = $examData['status'] ?? 'Pending Review'; // Default if no status field
+                    $courses[] = $examData;
+                }
+            }
+
+            \Log::info("Courses fetched successfully for faculty {$faculty}.", ['count' => count($courses)]);
+            return view('deans.dean-dashboard', compact('courses'));
+
+        } catch (\Exception $e) {
+            \Log::error("Error fetching courses: " . $e->getMessage());
+            return back()->withErrors(['error' => 'Failed to fetch courses.']);
+        }
+    }
+
+
+    public function updateStatus(Request $request, $id)
+    {
+        try {
+            $firestore = app('firebase.firestore')->database();
+            $examRef = $firestore->collection('Exams')->document($id);
+            $examSnapshot = $examRef->snapshot();
+
+            if (!$examSnapshot->exists()) {
+                return response()->json(['error' => 'Exam not found'], 404);
+            }
+
+            $status = $request->input('status');
+            $examRef->update([
+                ['path' => 'status', 'value' => $status]
+            ]);
+
+            return response()->json(['success' => true, 'status' => $status]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Failed to update status'], 500);
+        }
+    }
+
+
+    public function approve($id)
+    {
+        $firestore = app('firebase.firestore')->database();
+        $courseRef = $firestore->collection('Exams')->document($id);
+
+        $courseRef->update([
+            ['path' => 'status', 'value' => 'Approved']
+        ]);
+
+        return back()->with('success', 'Course approved successfully.');
+    }
+
+    public function decline($id)
+    {
+        $firestore = app('firebase.firestore')->database();
+        $courseRef = $firestore->collection('Exams')->document($id);
+
+        $courseRef->update([
+            ['path' => 'status', 'value' => 'Declined']
+        ]);
+
+        return back()->with('success', 'Course declined.');
+    }
 
 }

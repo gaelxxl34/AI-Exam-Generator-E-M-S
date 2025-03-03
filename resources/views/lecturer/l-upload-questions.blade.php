@@ -39,14 +39,19 @@
             <select id="courseUnit" name="courseUnit" class="block w-full p-2 border border-gray-300 rounded-md mb-4" required>
                 <option value="">Select a course unit</option>
                 @foreach ($courses as $course)
-                    <option value="{{ $course }}">{{ $course }}</option>
+                    <option value="{{ $course['name'] }}" data-faculty="{{ $course['faculty'] }}">
+                        {{ $course['name'] }}
+                    </option>
                 @endforeach
             </select>
 
-            <!-- Display error message if required field is missing -->
-            @if ($errors->has('courseUnit'))
+            <!-- Faculty Field (Hidden) -->
+            <input type="hidden" id="facultyField" name="faculty" value="">
+
+            <!-- Display error if faculty is missing -->
+            @if ($errors->has('faculty'))
                 <div class="text-red-500 mt-2 text-sm">
-                    {{ $errors->first('courseUnit') }}
+                    {{ $errors->first('faculty') }}
                 </div>
             @endif
         </div>
@@ -105,6 +110,8 @@
         </div>
     </form>
 </div>
+
+
 
 
 
@@ -249,8 +256,22 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 
+{{-- js for submit faculty --}}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+            let courseDropdown = document.getElementById('courseUnit');
+            let facultyInput = document.getElementById('facultyField');
 
+            courseDropdown.addEventListener('change', function () {
+                let selectedOption = courseDropdown.options[courseDropdown.selectedIndex];
+                let faculty = selectedOption.getAttribute('data-faculty');
 
+                facultyInput.value = faculty; // Set the faculty value dynamically
+                console.log("🔄 Faculty updated:", faculty);
+            });
+        });
+
+</script>
 
 <!-- Include TinyMCE -->
 <script src="https://cdn.tiny.cloud/1/hs23eqphwt8todsqyrkfui7bvhc29664dxr64fj9h09r460f/tinymce/5/tinymce.min.js" referrerpolicy="origin"></script>
