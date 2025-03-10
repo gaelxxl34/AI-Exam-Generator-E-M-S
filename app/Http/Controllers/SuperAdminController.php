@@ -138,14 +138,7 @@ class SuperAdminController extends Controller
             $adminSnapshot = $adminRef->snapshot();
 
             if ($adminSnapshot->exists()) {
-                // Initialize Firebase Storage
-                $storage = app('firebase.storage');
-                $bucket = $storage->getBucket();
-
-                // Fetch profile picture URL
-                $imageReference = $bucket->object($adminSnapshot->data()['profile_picture']);
-                $profilePictureUrl = $imageReference->exists() ? $imageReference->signedUrl(now()->addMinutes(5)) : null;
-
+              
                 // Prepare admin data
                 $adminData = [
                     'id' => $adminSnapshot->id(),
@@ -153,7 +146,6 @@ class SuperAdminController extends Controller
                     'lastName' => $adminSnapshot->data()['lastName'] ?? 'N/A',
                     'email' => $adminSnapshot->data()['email'] ?? 'N/A',
                     'faculty' => $adminSnapshot->data()['faculty'] ?? 'N/A',
-                    'profile_picture' => $profilePictureUrl,
                     'role' => $adminSnapshot->data()['role'] ?? 'N/A',  // Include role in the data
                 ];
 
@@ -170,22 +162,31 @@ class SuperAdminController extends Controller
     public function updateAdminData(Request $request, $id)
     {
         try {
-            // Validation
+            // Validate input data
             $validatedData = $request->validate([
                 'firstName' => 'required',
                 'lastName' => 'required',
                 'email' => 'required|email',
                 'role' => 'required',
                 'faculty' => 'required',
-                'profilePicture' => 'nullable|image|mimes:jpeg,png,jpg,gif', // Adjusted validation rule
             ]);
 
             // Initialize Firebase services
             $firestore = app('firebase.firestore')->database();
-            $storage = app('firebase.storage')->getBucket();
+            $auth = app('firebase.auth');
 
-            // Update Firestore Data
+            // Fetch the current user data
             $adminRef = $firestore->collection('Users')->document($id);
+            $adminSnapshot = $adminRef->snapshot();
+
+            if (!$adminSnapshot->exists()) {
+                return back()->with('error', 'User not found.');
+            }
+
+            $currentData = $adminSnapshot->data();
+            $currentEmail = $currentData['email'] ?? null;
+
+            // **Update Firestore Data**
             $adminRef->update([
                 ['path' => 'firstName', 'value' => $validatedData['firstName']],
                 ['path' => 'lastName', 'value' => $validatedData['lastName']],
@@ -194,27 +195,16 @@ class SuperAdminController extends Controller
                 ['path' => 'faculty', 'value' => $validatedData['faculty']],
             ]);
 
-            // Update Profile Picture in Firebase Storage if provided
-            if ($request->hasFile('profilePicture')) {
-                $oldImageRef = $adminRef->snapshot()->data()['profile_picture'] ?? null;
-
-                // Delete the old image from Firebase Storage, if it exists
-                if ($oldImageRef) {
-                    $storage->object($oldImageRef)->delete();
+            // **Update Firebase Authentication Email if it changed**
+            if ($currentEmail !== $validatedData['email']) {
+                try {
+                    $user = $auth->getUserByEmail($currentEmail);
+                    $auth->updateUser($user->uid, ['email' => $validatedData['email']]);
+                } catch (\Kreait\Firebase\Exception\Auth\UserNotFound $e) {
+                    return back()->with('error', 'User not found in Firebase Authentication.');
+                } catch (\Exception $e) {
+                    return back()->with('error', 'Failed to update authentication email: ' . $e->getMessage());
                 }
-
-                // Upload the new image
-                $image = $request->file('profilePicture');
-                $newImageName = 'admin_images/' . time() . '.' . $image->getClientOriginalExtension();
-                $newImageRef = $storage->upload(
-                    file_get_contents($image->getRealPath()),
-                    ['name' => $newImageName]
-                );
-
-                // Update Firestore with new image path
-                $adminRef->update([
-                    ['path' => 'profile_picture', 'value' => $newImageName],
-                ]);
             }
 
             return back()->with('success', 'Admin updated successfully.');
@@ -222,6 +212,7 @@ class SuperAdminController extends Controller
             return back()->with('error', 'Error updating admin: ' . $e->getMessage());
         }
     }
+
 
 
     public function deleteAdmin($id)
@@ -282,39 +273,44 @@ public function manageLecturers()
     return view('superadmin.lecturer-control', compact('lecturerList'));
 }
 
-public function toggleLecturerStatus($uid, $status)
-{
-    try {
-        $firestore = app('firebase.firestore')->database();
-        $userRef = $firestore->collection('Users')->document($uid);
-        $userSnapshot = $userRef->snapshot();
+    public function toggleLecturerStatus($uid)
+    {
+        try {
+            $firestore = app('firebase.firestore')->database();
+            $userRef = $firestore->collection('Users')->document($uid);
+            $userSnapshot = $userRef->snapshot();
 
-        if (!$userSnapshot->exists()) {
-            \Log::error("❌ Failed: User with UID {$uid} not found in Firestore.");
-            return response()->json(['error' => 'User not found in the system.'], 404);
+            if (!$userSnapshot->exists()) {
+                \Log::error("❌ User with UID {$uid} not found in Firestore.");
+                return response()->json(['error' => 'User not found in the system.'], 404);
+            }
+
+            // Fetch current status and toggle
+            $currentStatus = $userSnapshot->data()['disabled'] ?? false;
+            $newStatus = !$currentStatus; // Toggle the status
+
+            // Update Firestore
+            $userRef->update([
+                ['path' => 'disabled', 'value' => $newStatus]
+            ]);
+
+            // Log status change clearly
+            \Log::info("✅ User {$uid} was " . ($newStatus ? 'DISABLED ❌' : 'ENABLED ✅'));
+
+            return response()->json([
+                'success' => true,
+                'status' => $newStatus,
+                'message' => "User successfully " . ($newStatus ? 'disabled' : 'enabled') . "."
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::error("❌ Error updating user status for {$uid}: " . $e->getMessage());
+            return response()->json(['error' => 'Something went wrong! ' . $e->getMessage()], 500);
         }
-
-        // Determine the new status
-        $newStatus = ($status === 'enable') ? false : true;
-
-        // Update the user's status in Firestore
-        $userRef->update([
-            ['path' => 'disabled', 'value' => $newStatus]
-        ]);
-
-        \Log::info("✅ User {$uid} status updated: " . ($newStatus ? 'Disabled' : 'Enabled'));
-
-        return response()->json([
-            'success' => true,
-            'status' => $newStatus,
-            'message' => "User successfully " . ($newStatus ? 'disabled' : 'enabled') . "."
-        ], 200);
-
-    } catch (\Exception $e) {
-        \Log::error("❌ Error updating user status: " . $e->getMessage());
-        return response()->json(['error' => 'Something went wrong! ' . $e->getMessage()], 500);
     }
-}
+
+
+
 
     // Control Lecturers ends here
 

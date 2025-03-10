@@ -58,18 +58,18 @@
     async function toggleLecturer(id, btn) {
         try {
             const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
-            const newStatus = btn.textContent.trim().toLowerCase() === "disable" ? "enable" : "disable";
 
-            const response = await fetch(`/superadmin/toggle-lecturer/${id}/${newStatus}`, {
+            const response = await fetch(`/superadmin/toggle-lecturer/${id}`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "X-CSRF-TOKEN": csrfToken,
-                }
+                    "X-CSRF-TOKEN": csrfToken
+                },
+                credentials: "same-origin"
             });
 
             if (!response.ok) {
-                const errorText = await response.text(); // Read response body
+                const errorText = await response.text();
                 throw new Error(`Server Error: ${errorText}`);
             }
 
@@ -80,24 +80,26 @@
                 return;
             }
 
-            btn.textContent = newStatus === "enable" ? "Disable" : "Enable";
-            btn.classList.toggle("bg-red-500", newStatus !== "enable");
-            btn.classList.toggle("bg-green-500", newStatus === "enable");
-            btn.classList.toggle("hover:bg-red-700", newStatus !== "enable");
-            btn.classList.toggle("hover:bg-green-700", newStatus === "enable");
+            // **Correct Toggle Logic**
+            const isDisabled = data.status; // Firestore now correctly returns true/false
+            btn.textContent = isDisabled ? "Enable" : "Disable";
+
+            btn.classList.toggle("bg-red-500", !isDisabled);
+            btn.classList.toggle("bg-green-500", isDisabled);
+            btn.classList.toggle("hover:bg-red-700", !isDisabled);
+            btn.classList.toggle("hover:bg-green-700", isDisabled);
 
             let statusCell = btn.parentNode.previousElementSibling;
-            statusCell.textContent = newStatus === "enable" ? "Active" : "Disabled";
-            statusCell.classList.toggle("text-red-600", newStatus !== "enable");
-            statusCell.classList.toggle("text-green-600", newStatus === "enable");
+            statusCell.textContent = isDisabled ? "Disabled " : "Active ";
+            statusCell.classList.toggle("text-red-600", isDisabled);
+            statusCell.classList.toggle("text-green-600", !isDisabled);
 
-            console.log(`✅ User ${id} status updated: ${newStatus}`);
+            console.log(`✅ User ${id} was ${isDisabled ? "DISABLED ❌" : "ENABLED ✅"}`);
         } catch (error) {
             console.error("❌ Error toggling lecturer status:", error);
             alert("Something went wrong! Please check the console.");
         }
     }
-
 
     </script>
 

@@ -41,8 +41,9 @@
                         <option value="FST">Faculty of Science and Technology (FST)</option>
                         <option value="FBM">Faculty of Business Management (FBM)</option>
                         <option value="FOE">Faculty of Engineering (FOE)</option>
-                        <option value="HEC">Higher Education Certificate</option>
-                        <option value="FST,FBM,FOE,HEC">ALL</option>
+                        <option value="FOL">Faculty of Law (FOL)</option>
+                        <option value="HEC">Higher Education Certificate (HEC)</option>
+                        <option value="FST,FBM,FOE,FOL,HEC">ALL</option>
                     </select>
                 </div>
             </div>
