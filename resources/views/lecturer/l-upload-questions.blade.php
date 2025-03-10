@@ -9,14 +9,12 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.js"></script>
 
-        <script src="https://cdn.ckeditor.com/ckeditor5/36.0.1/classic/ckeditor.js"></script>
-
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.js"></script>
-<style>
-    
-</style>
+
+
+
 
 </head>
 <body>
@@ -117,143 +115,226 @@
 
 <!-- JavaScript for populating fields -->
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    // Populate the dropdowns for Section A and B
-    populateDropdown('dropdownA', 20);
-    populateDropdown('dropdownB', 10);
+    document.addEventListener('DOMContentLoaded', function () {
+        // Load the special character modal from an external file 
+        console.log("Attempting to load: {{ asset('./assets/js/special-character-picker.js') }}");
 
-    function populateDropdown(dropdownId, maxFields) {
-        const dropdown = document.getElementById(dropdownId);
-        dropdown.innerHTML = '<option value="">Select number of questions</option>';
+        $.getScript("{{ asset('./assets/js/special-character-picker.js') }}")
+            .done(function () {
+                console.log("✅ special-character-picker.js loaded successfully!");
+                loadSpecialCharModal(); // Call function inside script
+            })
+            .fail(function (jqxhr, settings, exception) {
+                console.error("❌ Failed to load special-character-picker.js:", exception);
+            });
 
-        for (let i = 1; i <= maxFields; i++) {
-            const option = new Option(i, i);
-            dropdown.add(option);
+
+
+        // Populate the dropdowns for Section A and B
+        populateDropdown('dropdownA', 20);
+        populateDropdown('dropdownB', 10);
+
+        function populateDropdown(dropdownId, maxFields) {
+            const dropdown = document.getElementById(dropdownId);
+            dropdown.innerHTML = '<option value="">Select number of questions</option>';
+
+            for (let i = 1; i <= maxFields; i++) {
+                const option = new Option(i, i);
+                dropdown.add(option);
+            }
+
+            dropdown.addEventListener('change', handleDropdownChange);
         }
 
-        dropdown.addEventListener('change', handleDropdownChange);
-    }
+        function handleDropdownChange() {
+            const section = this.id.charAt(this.id.length - 1); // Get section A or B
+            createInputFields(`inputFields${section}`, this.value);
+        }
 
-    function handleDropdownChange() {
-        const section = this.id.charAt(this.id.length - 1); // Get section A or B
-        createInputFields(`inputFields${section}`, this.value);
-    }
+        function createInputFields(containerId, numberOfFields) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = ''; // Clear previous fields
 
-    function createInputFields(containerId, numberOfFields) {
-        const container = document.getElementById(containerId);
-        container.innerHTML = ''; // Clear previous fields
+            for (let i = 1; i <= numberOfFields; i++) {
+                const sectionId = containerId.charAt(containerId.length - 1);
+                const editorId = `${containerId}Editor${i}`;
 
-        for (let i = 1; i <= numberOfFields; i++) {
-            const sectionId = containerId.charAt(containerId.length - 1);
-            const editorId = `${containerId}Editor${i}`;
+                const fieldContainer = document.createElement('div');
+                fieldContainer.className = 'mb-4';
 
-            const fieldContainer = document.createElement('div');
-            fieldContainer.className = 'mb-4';
+                const label = document.createElement('label');
+                label.setAttribute('for', editorId);
+                label.className = 'block text-sm font-medium text-gray-700';
+                label.textContent = `Question ${sectionId}${i}`;
 
-            const label = document.createElement('label');
-            label.setAttribute('for', editorId);
-            label.className = 'block text-sm font-medium text-gray-700';
-            label.textContent = `Field ${sectionId}${i}`;
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = `section${sectionId}[]`;
 
-            const hiddenInput = document.createElement('input');
-            hiddenInput.type = 'hidden';
-            hiddenInput.name = `section${sectionId}[]`;
+                const editorDiv = document.createElement('textarea');
+                editorDiv.id = editorId;
+                editorDiv.className = 'summernote';
 
-            const editorDiv = document.createElement('div');
-            editorDiv.id = editorId;
+                fieldContainer.appendChild(label);
+                fieldContainer.appendChild(editorDiv);
+                fieldContainer.appendChild(hiddenInput);
+                container.appendChild(fieldContainer);
 
-            fieldContainer.appendChild(label);
-            fieldContainer.appendChild(editorDiv);
-            fieldContainer.appendChild(hiddenInput);
-            container.appendChild(fieldContainer);
+                // Initialize Summernote on dynamically created textareas
+                initializeSummernote(`#${editorId}`, hiddenInput);
+            }
+        }
 
-            // Initialize TinyMCE with the custom image picker functionality
-            tinymce.init({
-                selector: `#${editorId}`,
-                plugins: 'image table link code charmap preview fullscreen anchor lists',
-                toolbar: 'undo redo | formatselect | bold italic underline strikethrough | alignleft aligncenter alignright | bullist numlist outdent indent | link image charmap | fullscreen preview code',
-                menubar: 'file edit view insert format tools table help',
-                height: 200,
-
-                // Enable title field in the Image dialog
-                image_title: true,
-
-                // Enable automatic uploads for blob or data URIs
-                automatic_uploads: true,
-
-                // Specify file types for the file picker
-                file_picker_types: 'image',
-
-                // Custom file picker for images
-                file_picker_callback: (cb, value, meta) => {
-                    const input = document.createElement('input');
-                    input.setAttribute('type', 'file');
-                    input.setAttribute('accept', 'image/*');
-
-                    input.addEventListener('change', (e) => {
-                        const file = e.target.files[0];
-
-                        const reader = new FileReader();
-                        reader.addEventListener('load', () => {
-                            const id = 'blobid' + new Date().getTime();
-                            const blobCache = tinymce.activeEditor.editorUpload.blobCache;
-                            const base64 = reader.result.split(',')[1];
-                            const blobInfo = blobCache.create(id, file, base64);
-                            blobCache.add(blobInfo);
-
-                            // Call the callback with the blob URI and populate the title field with the file name
-                            cb(blobInfo.blobUri(), { title: file.name });
-                        });
-                        reader.readAsDataURL(file);
-                    });
-
-                    input.click();
+        // Function to initialize Summernote
+        function initializeSummernote(selector, hiddenInput) {
+            $(selector).summernote({
+                height: 100,
+                minHeight: 150,
+                maxHeight: 300,
+                focus: true,
+                dialogsInBody: true,
+                placeholder: "Type your question here...",
+                fontNames: ['Arial', 'Courier New', 'Times New Roman', 'Verdana', 'Georgia', 'Comic Sans MS'],
+                fontNamesIgnoreCheck: ['Arial', 'Courier New', 'Times New Roman', 'Verdana', 'Georgia', 'Comic Sans MS'],
+                toolbar: [
+                    ['style', ['style']],
+                    ['fontname', ['fontname']],
+                    ['fontsize', ['fontsize']],
+                    ['font', ['bold', 'italic', 'underline', 'strikethrough', 'superscript', 'subscript', 'clear']],
+                    ['color', ['color']],
+                    ['para', ['ul', 'ol', 'paragraph']],
+                    ['insert', ['link', 'picture', 'video', 'table']],
+                    ['view', ['codeview', 'help']],
+                    ['custom', ['specialCharButton']] // ✅ Custom Special Characters Button
+                ],
+                buttons: {
+                    specialCharButton: SpecialCharButton
                 },
-
-                // Update hidden input on change
-                setup: function (editor) {
-                    editor.on('change', function () {
-                        hiddenInput.value = editor.getContent(); // Set TinyMCE content to hidden input field
-                    });
-                },
-
-                content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:16px }'
+                callbacks: {
+                    onKeyup: function () {
+                        $(selector).summernote('saveRange'); // Save cursor position when typing
+                    },
+                    onMouseUp: function () {
+                        $(selector).summernote('saveRange'); // Save cursor position on mouse click
+                    },
+                    onChange: function (contents) {
+                        hiddenInput.value = contents; // Update hidden input with Summernote content
+                    },
+                    
+                }
             });
         }
-    }
 
-    // Automatically create instructions for Section A and B
-    updateInstructions();
+        function SpecialCharButton(context) {
+            var ui = $.summernote.ui;
+            var button = ui.button({
+                contents: '<i class="fas fa-font"></i> Special Characters',
+                tooltip: 'Insert Special Character',
+                click: function () {
+                    // Save Summernote range
+                    $('.summernote').summernote('saveRange');
+                    // Show the Tailwind-based modal
+                    showSpecialCharModal();
+                }
+            });
+            return button.render();
+        }
 
-    function updateInstructions() {
-        const instructionsContainer = document.getElementById('instructionsContainer');
-        instructionsContainer.innerHTML = ''; // Clear previous fields
 
-        const fieldsInfo = ['Section A Instructions', 'Section B Instructions'];
-
-        fieldsInfo.forEach((info, index) => {
-            const inputGroup = document.createElement('div');
-            const label = document.createElement('label');
-            const input = document.createElement('input'); // Simple input field for instructions
-
-            label.textContent = info;
-            label.setAttribute('for', `instructions${index}`);
-            label.className = 'block text-sm font-bold text-gray-900';
-
-            input.id = `instructions${index}`;
-            input.name = `instructions[${index + 1}]`;
-            input.type = 'text';
-            input.required = true;
-            input.className = 'block w-full p-2 border border-gray-300 rounded-md mb-4';
-
-            inputGroup.appendChild(label);
-            inputGroup.appendChild(input);
-            instructionsContainer.appendChild(inputGroup);
+        $(document).on('click', '.special-char', function () {
+            // Restore Summernote cursor position
+            $('.summernote').summernote('restoreRange');
+            // Insert the selected character
+            $('.summernote').summernote('editor.insertText', $(this).text());
+            // Hide the Tailwind modal
+            hideSpecialCharModal();
         });
-    }
-});
 
+
+        // Automatically create instructions for Section A and B
+        updateInstructions();
+
+        function updateInstructions() {
+            const instructionsContainer = document.getElementById('instructionsContainer');
+            instructionsContainer.innerHTML = ''; // Clear previous fields
+
+            const fieldsInfo = ['Section A Instructions', 'Section B Instructions'];
+
+            fieldsInfo.forEach((info, index) => {
+                const inputGroup = document.createElement('div');
+                inputGroup.className = 'mb-4';
+
+                const label = document.createElement('label');
+                label.textContent = info;
+                label.setAttribute('for', `instructions${index}`);
+                label.className = 'block text-sm font-bold text-gray-900';
+
+                const input = document.createElement('input');
+                input.id = `instructions${index}`;
+                input.name = `instructions[${index + 1}]`;
+                input.type = 'text';
+                input.required = true;
+                input.className = 'block w-full p-2 border border-gray-300 rounded-md';
+
+                inputGroup.appendChild(label);
+                inputGroup.appendChild(input);
+                instructionsContainer.appendChild(inputGroup);
+            });
+        }
+
+        // Faculty Selection Handling
+        let courseDropdown = document.getElementById('courseUnit');
+        let facultyInput = document.getElementById('facultyField');
+
+        courseDropdown.addEventListener('change', function () {
+            let selectedOption = courseDropdown.options[courseDropdown.selectedIndex];
+            let faculty = selectedOption.getAttribute('data-faculty');
+
+            if (faculty) {
+                facultyInput.value = faculty; // Set the faculty value dynamically
+                console.log("✅ Faculty updated:", faculty);
+            } else {
+                console.error("⚠ Faculty data missing from selected option.");
+            }
+        });
+
+        // Form Submission with Validation
+        $('#uploadForm').on('submit', function (e) {
+            let isValid = true;
+            let missingFields = [];
+
+            // Check Course Unit
+            if ($('#courseUnit').val() === '') {
+                isValid = false;
+                missingFields.push('Course Unit');
+            }
+
+            // Check Section A & B selection
+            if ($('#dropdownA').val() === '') {
+                isValid = false;
+                missingFields.push('Section A selection');
+            }
+            if ($('#dropdownB').val() === '') {
+                isValid = false;
+                missingFields.push('Section B selection');
+            }
+
+            // Check Instructions
+            $('[name^="instructions"]').each(function () {
+                if ($(this).val().trim() === '') {
+                    isValid = false;
+                    missingFields.push('Instruction fields');
+                }
+            });
+
+            if (!isValid) {
+                e.preventDefault();
+                alert(`⚠ Please fill in the missing fields: \n\n- ${missingFields.join('\n- ')}`);
+            }
+        });
+    });
 </script>
+
 
 
 {{-- js for submit faculty --}}
@@ -273,10 +354,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
 </script>
 
-<!-- Include TinyMCE -->
-<script src="https://cdn.tiny.cloud/1/hs23eqphwt8todsqyrkfui7bvhc29664dxr64fj9h09r460f/tinymce/5/tinymce.min.js" referrerpolicy="origin"></script>
-<!-- Include MathJax -->
-<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
 </body>
 </html>

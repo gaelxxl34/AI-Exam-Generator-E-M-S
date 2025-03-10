@@ -99,7 +99,7 @@ class UploadExamsController extends Controller
     }
 
 
-
+// add comment and also add statistics for reports 
     public function getRandomQuestions(Request $request)
     {
         \Log::info('getRandomQuestions method started');
@@ -189,21 +189,38 @@ class UploadExamsController extends Controller
                 } elseif ($faculty == 'FOE') {
                     // FOE: 4 questions for both Section A and Section B
                     $count = 4;
+                } elseif ($faculty == 'HEC') {
+                    // HEC: 10 questions for Section A, 6 for Section B
+                    $count = ($section == 'A') ? 10 : 6;
+                } elseif ($faculty == 'FOL') {
+                    // FOL: 1 for Section A, 2 for Section B, 4 for Section C
+                    if ($section == 'A') {
+                        $count = 1;
+                    } elseif ($section == 'B') {
+                        $count = 2;
+                    } else {
+                        // Assuming any other section is "C"
+                        $count = 4;
+                    }
                 } else {
                     // Default behavior if faculty is not one of the defined options
-                    $count = ($section == 'A') ? 4 : 6; // Adjust based on your default logic
+                    // Adjust based on your default logic
+                    $count = ($section == 'A') ? 4 : 6;
                 }
 
                 // Slice the questions to the desired count
                 $sections[$section] = array_slice($questions, 0, $count);
             }
 
+
             // Store the sections data in the session
             session([
                 'sections' => $sections,
                 'sectionA_instructions' => $sectionAInstructions,
                 'sectionB_instructions' => $sectionBInstructions,
+                'sectionC_instructions' => $data['sectionC_instructions'] ?? '', // Capture Section C if it exists
             ]);
+
 
             // Store additional course data in the session
             session([
@@ -243,6 +260,7 @@ class UploadExamsController extends Controller
         $yearSem = session('year_sem');
         $sectionAInstructions = session('sectionA_instructions');
         $sectionBInstructions = session('sectionB_instructions');
+        $sectionCInstructions = session('sectionC_instructions');
 
         \Log::info('📄 Generating PDF for Course Unit: ' . $courseUnit);
 
@@ -307,6 +325,7 @@ class UploadExamsController extends Controller
             'generalInstructions' => $generalInstructions,
             'sectionAInstructions' => $sectionAInstructions,
             'sectionBInstructions' => $sectionBInstructions,
+            'sectionCInstructions' => $sectionCInstructions,
         ]);
 
         // Set paper size and orientation

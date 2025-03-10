@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Kreait\Firebase\Factory;
 use Illuminate\Support\Facades\Log;
+use Kreait\Firebase\Auth as FirebaseAuth;
 
 class SuperAdminController extends Controller
 {
@@ -256,5 +257,65 @@ class SuperAdminController extends Controller
             return back()->with('error', 'Error deleting lecturer: ' . $e->getMessage());
         }
     }
+
+
+    // Control Lecturers starts here
+public function manageLecturers()
+{
+    $firestore = app('firebase.firestore')->database();
+    $usersRef = $firestore->collection('Users')->where('role', '==', 'lecturer');
+    $lecturers = $usersRef->documents();
+
+    $lecturerList = [];
+    foreach ($lecturers as $lecturer) {
+        if ($lecturer->exists()) {
+            $data = $lecturer->data();
+            $lecturerList[] = [
+                'id' => $lecturer->id(),
+                'name' => $data['firstName'] . ' ' . ($data['lastName'] ?? ''),
+                'email' => $data['email'] ?? 'No Email',
+                'status' => $data['disabled'] ?? false
+            ];
+        }
+    }
+
+    return view('superadmin.lecturer-control', compact('lecturerList'));
+}
+
+public function toggleLecturerStatus($uid, $status)
+{
+    try {
+        $firestore = app('firebase.firestore')->database();
+        $userRef = $firestore->collection('Users')->document($uid);
+        $userSnapshot = $userRef->snapshot();
+
+        if (!$userSnapshot->exists()) {
+            \Log::error("❌ Failed: User with UID {$uid} not found in Firestore.");
+            return response()->json(['error' => 'User not found in the system.'], 404);
+        }
+
+        // Determine the new status
+        $newStatus = ($status === 'enable') ? false : true;
+
+        // Update the user's status in Firestore
+        $userRef->update([
+            ['path' => 'disabled', 'value' => $newStatus]
+        ]);
+
+        \Log::info("✅ User {$uid} status updated: " . ($newStatus ? 'Disabled' : 'Enabled'));
+
+        return response()->json([
+            'success' => true,
+            'status' => $newStatus,
+            'message' => "User successfully " . ($newStatus ? 'disabled' : 'enabled') . "."
+        ], 200);
+
+    } catch (\Exception $e) {
+        \Log::error("❌ Error updating user status: " . $e->getMessage());
+        return response()->json(['error' => 'Something went wrong! ' . $e->getMessage()], 500);
+    }
+}
+
+    // Control Lecturers ends here
 
 }

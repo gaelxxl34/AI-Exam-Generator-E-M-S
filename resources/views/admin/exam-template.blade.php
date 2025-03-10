@@ -116,27 +116,30 @@
 
 {{-- Ensure sections are sorted by name --}}
 @php
-    ksort($sections);
+ksort($sections);
 @endphp
 
 @foreach ($sections as $sectionName => $questions)
-    <div class="section">
-        <h2>
-            Section {{ $sectionName }}
-            {{-- Inline instructions for each section --}}
-            @if ($sectionName == 'A' && isset($sectionAInstructions))
-                <span>{!! $sectionAInstructions !!}</span>
-            @elseif ($sectionName == 'B' && isset($sectionBInstructions))
-                <span>{!! $sectionBInstructions !!}</span>
-            @endif
-        </h2>
-        @foreach ($questions as $questionIndex => $question)
-            <div class="question">
-                <p style="font-weight: bold; font-size: 16px">Question {{ $questionIndex + 1 }}:</p>
-                <div class="question-content p-4 rounded">{!! $question !!}</div>
-            </div>
-        @endforeach
-    </div>
+        <div class="section">
+            <h2>
+                Section {{ $sectionName }}
+                {{-- Inline instructions for each section --}}
+                @if ($sectionName == 'A' && isset($sectionAInstructions))
+                    <span>{!! $sectionAInstructions !!}</span>
+                @elseif ($sectionName == 'B' && isset($sectionBInstructions))
+                    <span>{!! $sectionBInstructions !!}</span>
+                @elseif ($sectionName == 'C' && isset($sectionCInstructions))
+                    <span>{!! $sectionCInstructions !!}</span>
+                @endif
+            </h2>
+
+            @foreach ($questions as $questionIndex => $question)
+                <div class="question">
+                    <p style="font-weight: bold; font-size: 16px">Question {{ $questionIndex + 1 }}:</p>
+                    <div class="question-content p-4 rounded">{!! $question !!}</div>
+                </div>
+            @endforeach
+        </div>
 @endforeach
 
 </body>

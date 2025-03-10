@@ -438,7 +438,8 @@ class CourseController extends Controller
                     if (in_array($data['name'], $approvedCourseNames)) { // Match with approved courses
                         $filteredCourses[] = [
                             'id' => $document->id(),
-                            'name' => $data['name'] ?? 'Unknown Course'
+                            'name' => $data['name'] ?? 'Unknown Course',
+                            'code' => $data['code'] ?? 'N/A' // Ensure we get the course code
                         ];
                     }
                 }
@@ -446,13 +447,15 @@ class CourseController extends Controller
 
             \Log::info("Number of approved courses fetched: " . count($filteredCourses));
 
-            // Pass the filtered courses to the view
+            // Pass the filtered courses with course codes to the view
             return view('genadmin.ai-exam-generator', ['courses' => $filteredCourses]);
+
         } catch (\Exception $e) {
             \Log::error("Error fetching courses: " . $e->getMessage());
             return view('genadmin.ai-exam-generator', ['courses' => [], 'error' => 'Failed to fetch courses.']);
         }
     }
+
 
 
 
@@ -522,6 +525,7 @@ class CourseController extends Controller
     {
         Log::info("Updating question: Course Unit - {$courseUnit}, Section - {$sectionName}, Index - {$questionIndex}");
 
+        // Validate that the question field is provided
         $request->validate([
             'question' => 'required|string',
         ]);
@@ -541,26 +545,36 @@ class CourseController extends Controller
                 $examRef = $document->reference();
                 $examData = $document->data();
 
-                // Reject any Base64 content
-                if (preg_match('/data:image\/[a-zA-Z]+;base64,/', $request->question)) {
-                    Log::error("Base64 detected in question content! Rejecting request.");
-                    return back()->withErrors(['error' => 'Invalid data format. Images should be stored as URLs.']);
+                // Ensure section and index exist before updating
+                if (!isset($examData['sections'][$sectionName])) {
+                    Log::error("Section '{$sectionName}' not found.");
+                    return back()->withErrors(['error' => "Section '{$sectionName}' not found."]);
                 }
 
-                // Save the updated question with Firebase Image URLs
-                $examData['sections'][$sectionName][$questionIndex] = base64_encode($request->question);
-                $examRef->update([
-                    ['path' => 'sections.' . $sectionName, 'value' => $examData['sections'][$sectionName]]
-                ]);
+                // Convert question content to Base64 before saving
+                $encodedQuestion = base64_encode($request->question);
 
-                Log::info("Question updated successfully.");
-                return back()->with('success', 'Question updated successfully.');
+                // Store the Base64-encoded question in Firestore
+                $examData['sections'][$sectionName][$questionIndex] = $encodedQuestion;
+
+                // Update Firestore
+                try {
+                    $examRef->update([
+                        ['path' => "sections.{$sectionName}", 'value' => $examData['sections'][$sectionName]]
+                    ]);
+                    Log::info("Question updated successfully.");
+                    return back()->with('success', 'Question updated successfully.');
+                } catch (\Exception $e) {
+                    Log::error("Firestore update failed: " . $e->getMessage());
+                    return back()->withErrors(['error' => 'Failed to update question.']);
+                }
             }
         }
 
         Log::error("Failed to update question.");
         return back()->withErrors(['error' => 'Failed to update question.']);
     }
+
 
 
 
@@ -587,6 +601,11 @@ class CourseController extends Controller
                 // Base64 encode the new question before adding it
                 $encodedQuestion = base64_encode($request->newQuestion);
 
+                // Ensure Section C exists if faculty is FOL and it's selected
+                if ($examData['faculty'] == 'FOL' && $request->section == 'C' && !isset($examData['sections']['C'])) {
+                    $examData['sections']['C'] = [];
+                }
+
                 // Add the new encoded question to the specified section
                 $examData['sections'][$request->section][] = $encodedQuestion;
 
@@ -604,11 +623,13 @@ class CourseController extends Controller
         return back()->withErrors(['error' => 'Exam not found.']);
     }
 
+
     public function updateInstruction(Request $request, $courseUnit)
     {
         $request->validate([
             'sectionA_instructions' => 'required|string',
             'sectionB_instructions' => 'required|string',
+            'sectionC_instructions' => 'nullable|string' // Optional field
         ]);
 
         $firestore = app('firebase.firestore')->database();
@@ -625,11 +646,23 @@ class CourseController extends Controller
                 $examData['sectionA_instructions'] = $request->sectionA_instructions;
                 $examData['sectionB_instructions'] = $request->sectionB_instructions;
 
+                // Check if Section C instructions are provided and update them
+                if ($request->filled('sectionC_instructions')) {
+                    $examData['sectionC_instructions'] = $request->sectionC_instructions;
+                    $updateData = [
+                        ['path' => 'sectionA_instructions', 'value' => $examData['sectionA_instructions']],
+                        ['path' => 'sectionB_instructions', 'value' => $examData['sectionB_instructions']],
+                        ['path' => 'sectionC_instructions', 'value' => $examData['sectionC_instructions']],
+                    ];
+                } else {
+                    $updateData = [
+                        ['path' => 'sectionA_instructions', 'value' => $examData['sectionA_instructions']],
+                        ['path' => 'sectionB_instructions', 'value' => $examData['sectionB_instructions']]
+                    ];
+                }
+
                 // Update the Firestore document
-                $examRef->update([
-                    ['path' => 'sectionA_instructions', 'value' => $examData['sectionA_instructions']],
-                    ['path' => 'sectionB_instructions', 'value' => $examData['sectionB_instructions']]
-                ]);
+                $examRef->update($updateData);
 
                 return back()->with('success', 'Instructions updated successfully.');
             }

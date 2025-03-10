@@ -36,7 +36,7 @@
 
         <!-- 🔍 Search Bar -->
         <div class="flex justify-center">
-            <input type="text" id="searchInput" onkeyup="filterCourses()" placeholder="Search by Course Name..."
+            <input type="text" id="searchInput" onkeyup="filterCourses()" placeholder="Search by Course Name or Code..."
                 class="search-bar focus:ring-2 focus:ring-blue-400 focus:outline-none">
         </div>
 
@@ -46,6 +46,7 @@
                     <thead class="bg-gray-800 text-white">
                         <tr>
                             <th class="py-3 px-4 text-left">Course Name</th>
+                            <th class="py-3 px-4 text-left">Course Code</th>
                             <th class="py-3 px-4 text-center">Action</th>
                         </tr>
                     </thead>
@@ -53,6 +54,7 @@
                         @foreach($courses as $course)
                             <tr class="border-b hover:bg-gray-100 transition course-row">
                                 <td class="py-3 px-4 font-semibold text-gray-700 course-name">{{ $course['name'] }}</td>
+                                <td class="py-3 px-4 font-semibold text-gray-700 course-code">{{ $course['code'] }}</td>
                                 <td class="py-3 px-4 text-center">
                                     <form action="{{ route('genadmin.view-generated-exam') }}" method="POST">
                                         @csrf
@@ -82,7 +84,9 @@
 
             rows.forEach(row => {
                 let courseName = row.querySelector(".course-name").textContent.toUpperCase();
-                if (courseName.includes(input)) {
+                let courseCode = row.querySelector(".course-code").textContent.toUpperCase();
+
+                if (courseName.includes(input) || courseCode.includes(input)) {
                     row.style.display = "";
                     row.classList.add("highlight");
                     foundAny = true;

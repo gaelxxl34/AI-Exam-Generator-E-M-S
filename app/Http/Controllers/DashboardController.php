@@ -98,26 +98,64 @@ class DashboardController extends Controller
     public function index()
     {
         try {
-            $faculty = session('user_faculty'); // Get dean's faculty from session
-            \Log::info("Fetching courses for faculty: {$faculty}");
+            $faculty = session('user_faculty'); // Get faculty from session
+
+            // 🔍 Debugging log
+            \Log::info("Fetching courses for faculty:", ['faculty' => $faculty]);
+
+            // Ensure faculty is always an array
+            if (!is_array($faculty)) {
+                $faculty = [$faculty]; // Convert single string to array
+            }
 
             $firestore = app('firebase.firestore')->database();
             $examsRef = $firestore->collection('Exams');
-            $query = $examsRef->where('faculty', '==', $faculty);
-            $examsSnapshot = $query->documents();
 
             $courses = [];
 
-            foreach ($examsSnapshot as $document) {
-                if ($document->exists()) {
-                    $examData = $document->data();
-                    $examData['id'] = $document->id();
-                    $examData['status'] = $examData['status'] ?? 'Pending Review'; // Default if no status field
-                    $courses[] = $examData;
+            // Define minimum required questions per faculty
+            $minQuestions = [
+                "FST" => ["A" => 2, "B" => 12],
+                "FBM" => ["A" => 2, "B" => 12],
+                "FOE" => ["A" => 6, "B" => 6],
+                "HEC" => ["A" => 20, "B" => 10],
+                "FOL" => ["A" => 2, "B" => 4, "C" => 5]
+            ];
+
+            foreach ($faculty as $fac) {
+                $query = $examsRef->where('faculty', '==', $fac); // ✅ Individual queries
+                $examsSnapshot = $query->documents();
+
+                foreach ($examsSnapshot as $document) {
+                    if ($document->exists()) {
+                        $examData = $document->data();
+                        $examData['id'] = $document->id();
+                        $examData['status'] = $examData['status'] ?? 'Pending Review'; // Default status
+
+                        // Get required question count for this faculty
+                        $requiredCounts = $minQuestions[$fac] ?? [];
+
+                        // Count actual questions per section
+                        $meetsRequirement = true;
+                        foreach ($requiredCounts as $section => $minCount) {
+                            $actualCount = isset($examData['sections'][$section]) ? count($examData['sections'][$section]) : 0;
+
+                            // If any section does not meet the minimum, exclude the exam
+                            if ($actualCount < $minCount) {
+                                $meetsRequirement = false;
+                                break; // No need to check further
+                            }
+                        }
+
+                        // Add only if it meets the required number of questions
+                        if ($meetsRequirement) {
+                            $courses[] = $examData;
+                        }
+                    }
                 }
             }
 
-            \Log::info("Courses fetched successfully for faculty {$faculty}.", ['count' => count($courses)]);
+            \Log::info("Courses fetched successfully after filtering.", ['count' => count($courses)]);
             return view('deans.dean-dashboard', compact('courses'));
 
         } catch (\Exception $e) {
@@ -155,23 +193,30 @@ class DashboardController extends Controller
         $firestore = app('firebase.firestore')->database();
         $courseRef = $firestore->collection('Exams')->document($id);
 
+        // Update status and remove comment field
         $courseRef->update([
-            ['path' => 'status', 'value' => 'Approved']
+            ['path' => 'status', 'value' => 'Approved'],
+            ['path' => 'comment', 'value' => null] // Remove comment field
         ]);
 
         return back()->with('success', 'Course approved successfully.');
     }
 
-    public function decline($id)
+    public function decline(Request $request, $id)
     {
         $firestore = app('firebase.firestore')->database();
         $courseRef = $firestore->collection('Exams')->document($id);
 
+        $comment = $request->input('comment');
+
+        // Update status and store comment
         $courseRef->update([
-            ['path' => 'status', 'value' => 'Declined']
+            ['path' => 'status', 'value' => 'Declined'],
+            ['path' => 'comment', 'value' => $comment]
         ]);
 
-        return back()->with('success', 'Course declined.');
+        return back()->with('success', 'Course declined with a comment.');
     }
+
 
 }

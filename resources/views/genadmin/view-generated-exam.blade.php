@@ -24,12 +24,12 @@
                 <div class="mt-8 bg-white rounded-lg shadow-md">
                     <h1 class="text-xl font-bold p-4 border-b text-center">{{ "Exam - " . $courseUnit }}</h1>
                     @php
-                        $sortedSections = ['A' => null, 'B' => null];
-                        foreach ($sections as $sectionName => $questions) {
-                            if (array_key_exists($sectionName, $sortedSections)) {
-                                $sortedSections[$sectionName] = $questions;
-                            }
-                        }
+    $sortedSections = ['A' => null, 'B' => null];
+    foreach ($sections as $sectionName => $questions) {
+        if (array_key_exists($sectionName, $sortedSections)) {
+            $sortedSections[$sectionName] = $questions;
+        }
+    }
                     @endphp
                     @foreach ($sortedSections as $sectionName => $questions)
                         @if (!is_null($questions))
@@ -70,6 +70,7 @@
                         <option value="Faculty of Science and Technology">Faculty of Science and Technology (FST)</option>
                         <option value="Faculty of Business Management">Faculty of Business Management (FBM)</option>
                         <option value="Faculty of Engineering">Faculty of Engineering (FOE)</option>
+                        <option value="Faculty of Law">Faculty of Law (FOL)</option>
                         <option value="Higher Education Certificate ">Higher Education Certificate (HEC)</option>
                     </select>
                 </div>

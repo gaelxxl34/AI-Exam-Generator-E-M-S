@@ -177,7 +177,7 @@ class RegisterLecturerController extends Controller
             ];
 
             // Fetch available faculties
-            $availableFaculties = ['FST', 'FBM', 'FOE', 'HEC']; // Static list
+            $availableFaculties = ['FST', 'FBM', 'FOE', 'FOL', 'HEC']; // Static list
 
             // Fetch available courses based on lecturer faculties
             $coursesRef = $firestore->collection('Courses');

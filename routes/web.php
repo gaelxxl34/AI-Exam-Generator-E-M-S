@@ -236,6 +236,12 @@ Route::get('/superadmin/super-adm-dashboard', function () {
     return view('superadmin.super-adm-dashboard');
 })->middleware(EnsureSuperAdminRole::class)->name('superadmin.super-admin-dashboard');
 
+Route::get('/superadmin/lecturer-control', [SuperAdminController::class, 'manageLecturers'])->name('superadmin.lecturerControl');
+Route::post('/superadmin/toggle-lecturer/{uid}/{status}', [SuperAdminController::class, 'toggleLecturerStatus'])
+    ->name('superadmin.toggleLecturerStatus');
+
+
+
 
 Route::get('/superadmin/add-admin', function () {
     return view('superadmin.add-admin');

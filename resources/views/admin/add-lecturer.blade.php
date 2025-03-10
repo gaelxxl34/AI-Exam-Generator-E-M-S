@@ -53,6 +53,8 @@
                         (FBM)</label><br>
                     <label><input type="checkbox" name="faculties[]" value="FOE"> Faculty of Engineering
                         (FOE)</label><br>
+                    <label><input type="checkbox" name="faculties[]" value="FOL"> Faculty of Law
+                        (FOL)</label><br
                     <label><input type="checkbox" name="faculties[]" value="HEC"> Higher Education Certificate
                         (HEC)</label>
                 </div>

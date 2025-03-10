@@ -89,14 +89,37 @@
                                             <i class="fas fa-check"></i> Approve
                                         </button>
                                     </form>
-                                    <form method="POST" action="{{ route('course.decline', ['id' => $course['id']]) }}">
-                                        @csrf
-                                        <button type="submit"
-                                            class="bg-red-500 hover:bg-red-700 text-white px-3 py-1 rounded text-sm">
-                                            <i class="fas fa-times"></i> Decline
-                                        </button>
-                                    </form>
+                                    <!-- Updated Decline Button -->
+                                    <button onclick="openDeclineModal('{{ $course['id'] }}')"
+                                        class="bg-red-500 hover:bg-red-700 text-white px-3 py-1 rounded text-sm">
+                                        <i class="fas fa-times"></i> Decline
+                                    </button>
                                 </td>
+
+                                <!-- Decline Modal -->
+                                <div id="declineModal"
+                                    class="hidden fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50">
+                                    <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+                                        <h2 class="text-xl font-bold mb-4">Decline Exam</h2>
+                                        <form id="declineForm" method="POST">
+                                            @csrf
+                                            <input type="hidden" id="declineExamId" name="id">
+                                            <textarea name="comment" id="declineComment" rows="3"
+                                                class="w-full border p-2 rounded-md"
+                                                placeholder="Enter a reason for declining..." required></textarea>
+                                            <div class="flex justify-end mt-4 space-x-2">
+                                                <button type="button" onclick="closeDeclineModal()"
+                                                    class="bg-gray-500 text-white px-4 py-2 rounded">
+                                                    Cancel
+                                                </button>
+                                                <button type="submit" class="bg-red-500 text-white px-4 py-2 rounded">
+                                                    Decline
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+
                             </tr>
                         @endforeach
                     </tbody>
@@ -106,6 +129,19 @@
             <p class="text-gray-600 text-center mt-6">No courses available for your faculty.</p>
         @endif
     </div>
+
+
+    <script>
+        function openDeclineModal(examId) {
+            document.getElementById('declineModal').classList.remove('hidden');
+            document.getElementById('declineExamId').value = examId;
+            document.getElementById('declineForm').action = `/deans/course/${examId}/decline`;
+        }
+
+        function closeDeclineModal() {
+            document.getElementById('declineModal').classList.add('hidden');
+        }
+    </script>
 
     <!-- ✅ JavaScript for Search Functionality -->
     <script>
