@@ -70,14 +70,15 @@
                         onclick="toggleDropdown()">
                         Select Courses
                     </button>
-                    <div id="courseList"
-                        class="hidden absolute z-10 w-full bg-white mt-1 border border-gray-300 rounded-md shadow-lg">
+                    <div id="courseList" class="hidden absolute z-10 w-full bg-white mt-1 border border-gray-300 rounded-md shadow-lg">
                         @foreach($courseNames as $course)
                             <label class="block px-4 py-2 text-sm text-gray-700">
-                                <input type="checkbox" name="courses[]" value="{{ $course['name'] }}"> {{ $course['name'] }}
+                                <input type="checkbox" name="courses[]" value="{{ $course['name'] }}">
+                                <span class="font-semibold">{{ $course['code'] ?? 'N/A' }}</span> - {{ $course['name'] }}
                             </label>
                         @endforeach
                     </div>
+
                 </div>
                 <div class="text-red-500 mt-1 hidden" id="courseError">Please select at least one course.</div>
             </div>

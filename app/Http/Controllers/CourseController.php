@@ -332,7 +332,7 @@ class CourseController extends Controller
     // COURSES BY FACULTY
     public function fetchCoursesForFaculty()
     {
-        \Log::info('Entering fetchCoursesForFaculty method');
+            \Log::info('Entering fetchCoursesForFaculty method');
 
         try {
             $firestore = app('firebase.firestore');
@@ -366,10 +366,11 @@ class CourseController extends Controller
                 if ($document->exists()) {
                     $data = $document->data();
                     $courseDetails[] = [
-                        'name' => $data['name'], // Assuming 'name' holds the course name
-                        'id' => $document->id() // Include document ID in case it's needed
+                        'id' => $document->id(),  // Document ID
+                        'name' => $data['name'] ?? 'Unknown Course',  // Course name
+                        'code' => $data['code'] ?? 'N/A'  // Course code (ensure key exists)
                     ];
-                    \Log::info("Course fetched: " . $data['name']);
+                    \Log::info("Course fetched: " . $data['name'] . " (Code: " . ($data['code'] ?? 'N/A') . ")");
                 }
             }
 
@@ -382,6 +383,7 @@ class CourseController extends Controller
             return [];
         }
     }
+
 
 
     public function AllCourses()
