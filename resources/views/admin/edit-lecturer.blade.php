@@ -61,15 +61,17 @@
                                 <button type="button" class="block w-full p-2 border border-gray-300 rounded-md shadow-sm" onclick="toggleDropdown()">
                                     Teaching Courses
                                 </button>
-                                <div id="courseList" class="hidden absolute text-left z-10 w-full bg-white mt-1 border border-gray-300 rounded-md shadow-lg">
+                                <div id="courseList"
+                                    class="hidden absolute text-left z-10 w-full bg-white mt-1 border border-gray-300 rounded-md shadow-lg">
                                     @foreach($courseNames as $course)
-                                        <label class="block px-4 py-2 text-sm text-gray-700">
-                                            <input type="checkbox" name="courses[]" value="{{ $course['name'] }}" 
-                                                @if(in_array($course['name'], $lecturer['courses'])) checked @endif> 
-                                            {{ $course['name'] }}
+                                        <label class="block px-4 py-2 text-sm text-gray-700 flex items-center">
+                                            <input type="checkbox" name="courses[]" value="{{ $course['name'] }}" @if(in_array($course['name'], $lecturer['courses'])) checked @endif>
+                                            <span class="ml-2 font-semibold">{{ $course['name'] }}</span>
+                                            <span class="ml-auto text-gray-500 text-xs">({{ $course['code'] }})</span> <!-- ✅ Course Code Display -->
                                         </label>
                                     @endforeach
                                 </div>
+
                             </div>
                         </div>
 

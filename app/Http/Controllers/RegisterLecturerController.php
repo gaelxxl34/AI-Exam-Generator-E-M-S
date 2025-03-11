@@ -208,21 +208,23 @@ public function editLecturer($id)
             if ($course->exists()) {
                 $courseData = $course->data();
                 $courseNames[] = [
-                    'name' => $courseData['name'], // Course name
                     'id' => $course->id(), // Document ID
+                    'name' => $courseData['name'], // Course name
+                    'code' => $courseData['code'] ?? 'N/A', // ✅ Added course code (Handles missing codes)
                 ];
             }
         }
 
         return view('admin.edit-lecturer', [
             'lecturer' => $lecturerData,
-            'availableFaculties' => $availableFaculties, // ✅ FIX: Ensure it's passed to the view
+            'availableFaculties' => $availableFaculties,
             'courseNames' => $courseNames, // Only courses matching the logged-in user's faculty
         ]);
     } catch (\Exception $e) {
         return back()->withErrors(['error' => 'Error fetching lecturer: ' . $e->getMessage()]);
     }
 }
+
 
 
 
