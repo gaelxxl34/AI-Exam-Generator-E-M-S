@@ -153,55 +153,78 @@ class RegisterLecturerController extends Controller
 
 
 
-    public function editLecturer($id)
-    {
-        try {
-            $firestore = app('firebase.firestore')->database();
+public function editLecturer($id)
+{
+    try {
+        $firestore = app('firebase.firestore')->database();
 
-            // Fetch lecturer data by ID
-            $lecturerRef = $firestore->collection('Users')->document($id);
-            $lecturerSnapshot = $lecturerRef->snapshot();
+        // Fetch logged-in user's faculty
+        $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
+        $usersRef = $firestore->collection('Users');
+        $userQuery = $usersRef->where('email', '==', $currentUserEmail);
+        $currentUserSnapshots = $userQuery->documents();
 
-            if (!$lecturerSnapshot->exists()) {
-                return back()->withErrors(['error' => 'Lecturer not found']);
-            }
-
-            // Prepare lecturer data
-            $lecturerData = [
-                'id' => $lecturerSnapshot->id(),
-                'firstName' => $lecturerSnapshot->data()['firstName'] ?? 'N/A',
-                'lastName' => $lecturerSnapshot->data()['lastName'] ?? 'N/A',
-                'email' => $lecturerSnapshot->data()['email'] ?? 'N/A',
-                'faculties' => $lecturerSnapshot->data()['faculties'] ?? [], // Fetch faculties array
-                'courses' => $lecturerSnapshot->data()['courses'] ?? [], // Fetch courses array
-            ];
-
-            // Fetch available faculties
-            $availableFaculties = ['FST', 'FBM', 'FOE', 'FOL', 'HEC']; // Static list
-
-            // Fetch available courses based on lecturer faculties
-            $coursesRef = $firestore->collection('Courses');
-            $coursesSnapshot = $coursesRef->documents();
-            $courseNames = [];
-
-            foreach ($coursesSnapshot as $course) {
-                if ($course->exists()) {
-                    $courseNames[] = [
-                        'name' => $course->data()['name'], // Course name
-                        'id' => $course->id(), // Document ID
-                    ];
-                }
-            }
-
-            return view('admin.edit-lecturer', [
-                'lecturer' => $lecturerData,
-                'availableFaculties' => $availableFaculties,
-                'courseNames' => $courseNames, // Available courses
-            ]);
-        } catch (\Exception $e) {
-            return back()->withErrors(['error' => 'Error fetching lecturer: ' . $e->getMessage()]);
+        if ($currentUserSnapshots->isEmpty()) {
+            \Log::error("❌ Firestore user not found with email: $currentUserEmail");
+            return back()->withErrors(['error' => 'Current user not found in Firestore.']);
         }
+
+        $currentUserData = iterator_to_array($currentUserSnapshots)[0]->data();
+        $adminFaculty = $currentUserData['faculty'] ?? null;
+
+        if (!$adminFaculty) {
+            \Log::error("❌ Current user has no assigned faculty.");
+            return back()->withErrors(['error' => 'Faculty information missing for current user.']);
+        }
+
+        // Fetch lecturer data by ID
+        $lecturerRef = $firestore->collection('Users')->document($id);
+        $lecturerSnapshot = $lecturerRef->snapshot();
+
+        if (!$lecturerSnapshot->exists()) {
+            return back()->withErrors(['error' => 'Lecturer not found']);
+        }
+
+        // Prepare lecturer data
+        $lecturerData = [
+            'id' => $lecturerSnapshot->id(),
+            'firstName' => $lecturerSnapshot->data()['firstName'] ?? 'N/A',
+            'lastName' => $lecturerSnapshot->data()['lastName'] ?? 'N/A',
+            'email' => $lecturerSnapshot->data()['email'] ?? 'N/A',
+            'faculties' => $lecturerSnapshot->data()['faculties'] ?? [], // Fetch faculties array
+            'courses' => $lecturerSnapshot->data()['courses'] ?? [], // Fetch courses array
+        ];
+
+        // Define available faculties (Static List)
+        $availableFaculties = ['FST', 'FBM', 'FOE', 'FOL', 'HEC'];
+
+        // Fetch only courses from the logged-in user's faculty
+        $coursesRef = $firestore->collection('Courses');
+        $coursesQuery = $coursesRef->where('faculty', '==', $adminFaculty);
+        $coursesSnapshot = $coursesQuery->documents();
+
+        $courseNames = [];
+        foreach ($coursesSnapshot as $course) {
+            if ($course->exists()) {
+                $courseData = $course->data();
+                $courseNames[] = [
+                    'name' => $courseData['name'], // Course name
+                    'id' => $course->id(), // Document ID
+                ];
+            }
+        }
+
+        return view('admin.edit-lecturer', [
+            'lecturer' => $lecturerData,
+            'availableFaculties' => $availableFaculties, // ✅ FIX: Ensure it's passed to the view
+            'courseNames' => $courseNames, // Only courses matching the logged-in user's faculty
+        ]);
+    } catch (\Exception $e) {
+        return back()->withErrors(['error' => 'Error fetching lecturer: ' . $e->getMessage()]);
     }
+}
+
+
 
 
 
