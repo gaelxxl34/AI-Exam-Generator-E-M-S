@@ -30,7 +30,6 @@
                 <div class="table-responsive">
                     @foreach ($lecturersByFaculty as $faculty => $lecturers)
                         <div class="mb-6">
-
                             <div class="overflow-x-auto shadow-md rounded-lg">
                                 <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md lecturer-table">
                                     <thead class="bg-gray-800 text-white">
@@ -47,11 +46,19 @@
                                                 <td class="py-3 px-4 lecturer-name">{{ $lecturer['firstName'] }}</td>
                                                 <td class="py-3 px-4 lecturer-lastname">{{ $lecturer['lastName'] }}</td>
                                                 <td class="py-3 px-4 lecturer-email">{{ $lecturer['email'] }}</td>
-                                                <td class="py-3 px-4 text-center">
+                                                <td class="py-3 px-4 text-center flex justify-center space-x-2">
+                                                    <!-- Edit Button -->
                                                     <a href="{{ route('editLecturer', ['id' => $lecturer['id']]) }}"
                                                         class="text-red-500 hover:text-red-700 font-semibold">
                                                         <i class="fas fa-pen"></i>
                                                     </a>
+
+                                                    <!-- Info Button to Show Courses -->
+                                                    <button
+                                                        onclick="showCourses('{{ $lecturer['id'] }}', {{ json_encode($lecturer['courses']) }})"
+                                                        class="text-blue-500 hover:text-blue-700 font-semibold">
+                                                        <i class="fas fa-info-circle"></i>
+                                                    </button>
                                                 </td>
                                             </tr>
                                         @empty
@@ -81,7 +88,18 @@
         @endif
     </div>
 
-    <!-- 🔎 JavaScript for Search Filtering -->
+    <!-- 📌 Modal for Showing Lecturer Courses -->
+    <div id="courseModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex justify-center items-center">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+            <h2 class="text-xl font-semibold text-gray-800 mb-3">Courses Taught</h2>
+            <ul id="courseList" class="text-gray-700 space-y-2"></ul>
+            <button onclick="closeModal()" class="mt-4 w-full bg-blue-500 hover:bg-blue-700 text-white py-2 rounded-md">
+                Close
+            </button>
+        </div>
+    </div>
+
+    <!-- ✅ JavaScript for Search Filtering and Course Info -->
     <script>
         function filterLecturers() {
             let input = document.getElementById("searchInput").value.toLowerCase();
@@ -99,8 +117,39 @@
                 }
             });
         }
+
+        // 🔹 Show Courses Modal
+        function showCourses(lecturerId, courses) {
+            let modal = document.getElementById("courseModal");
+            let courseList = document.getElementById("courseList");
+
+            // Clear previous list
+            courseList.innerHTML = "";
+
+            if (courses.length > 0) {
+                courses.forEach(course => {
+                    let listItem = document.createElement("li");
+                    listItem.textContent = "📌 " + course;
+                    listItem.classList.add("border", "p-2", "rounded-md", "bg-gray-100");
+                    courseList.appendChild(listItem);
+                });
+            } else {
+                let noCourses = document.createElement("li");
+                noCourses.textContent = "No courses assigned.";
+                noCourses.classList.add("text-gray-600", "italic");
+                courseList.appendChild(noCourses);
+            }
+
+            modal.classList.remove("hidden");
+        }
+
+        // 🔹 Close Modal
+        function closeModal() {
+            document.getElementById("courseModal").classList.add("hidden");
+        }
     </script>
 
 </body>
+
 
 </html>

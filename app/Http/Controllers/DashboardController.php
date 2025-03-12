@@ -14,37 +14,88 @@ class DashboardController extends Controller
         $firestore = app('firebase.firestore');
         $database = $firestore->database();
 
-        // Fetch the current user's email and faculty
-        $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
+        try {
+            // 🔹 Get the current admin's email from session
+            $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
+            \Log::info("🔍 Current user email: $currentUserEmail");
 
-        // Fetch current user's data to get their faculty
-        $userRef = $database->collection('Users')->where('email', '==', $currentUserEmail);
-        $userSnapshot = $userRef->documents()->rows()[0] ?? null;
-        if (!$userSnapshot) {
-            throw new \Exception('User not found.');
+            // 🔹 Fetch admin's data to get faculties
+            $userQuery = $database->collection('Users')->where('email', '==', $currentUserEmail);
+            $userSnapshots = $userQuery->documents();
+
+            if ($userSnapshots->isEmpty()) {
+                \Log::error("❌ User not found: $currentUserEmail");
+                return back()->withErrors(['error' => 'User not found.']);
+            }
+
+            $currentUserData = $userSnapshots->rows()[0]->data();
+            $adminFaculties = $currentUserData['faculties'] ?? ($currentUserData['faculty'] ?? []);
+
+            // Convert to array if it's a single string
+            if (!is_array($adminFaculties)) {
+                $adminFaculties = [$adminFaculties];
+            }
+
+            \Log::info("🔍 Admin Faculties: " . json_encode($adminFaculties));
+
+            // 🔹 Fetch all lecturers (Since Firestore doesn't allow array contains for direct filtering)
+            $lecturersQuery = $database->collection('Users')->where('role', '==', 'lecturer')->documents();
+            $lecturerCount = 0;
+
+            foreach ($lecturersQuery as $lecturer) {
+                if ($lecturer->exists()) {
+                    $lecturerFaculties = $lecturer->data()['faculties'] ?? [];
+
+                    // 🔥 **Check if any faculty in `adminFaculties` matches lecturer's faculties**
+                    if (!empty(array_intersect($adminFaculties, $lecturerFaculties))) {
+                        $lecturerCount++;
+                    }
+                }
+            }
+
+            \Log::info("✅ Total Lecturers Found: $lecturerCount");
+
+            // 🔹 Fetch past exams matching the admin’s faculties
+            $pastExamsQuery = $database->collection('pastExams')->documents();
+            $pastExamsCount = 0;
+
+            foreach ($pastExamsQuery as $exam) {
+                if ($exam->exists()) {
+                    $examFaculty = $exam->data()['faculty'] ?? null;
+                    if ($examFaculty && in_array($examFaculty, $adminFaculties)) {
+                        $pastExamsCount++;
+                    }
+                }
+            }
+
+            // 🔹 Fetch courses matching the admin’s faculties
+            $coursesQuery = $database->collection('Courses')->documents();
+            $coursesCount = 0;
+
+            foreach ($coursesQuery as $course) {
+                if ($course->exists()) {
+                    $courseFaculty = $course->data()['faculty'] ?? null;
+                    if ($courseFaculty && in_array($courseFaculty, $adminFaculties)) {
+                        $coursesCount++;
+                    }
+                }
+            }
+
+            return view('admin.dashboard', [
+                'lecturerCount' => $lecturerCount,
+                'pastExamsCount' => $pastExamsCount,
+                'coursesCount' => $coursesCount,
+                'faculty' => implode(', ', $adminFaculties),
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error("❌ Error in adminDashboard: " . $e->getMessage());
+            return back()->withErrors(['error' => 'Error loading dashboard: ' . $e->getMessage()]);
         }
-        $currentUserFaculty = $userSnapshot->data()['faculty'] ?? 'No faculty assigned';
-
-        // Filter and count documents in Users where role is 'lecturer' and faculty matches
-        $lecturersQuery = $database->collection('Users')->where('role', '==', 'lecturer')->where('faculty', '==', $currentUserFaculty);
-        $lecturerCount = $lecturersQuery->documents()->size();
-
-        // Filter and count all documents in pastExams that match the faculty
-        $pastExamsQuery = $database->collection('pastExams')->where('faculty', '==', $currentUserFaculty);
-        $pastExamsCount = $pastExamsQuery->documents()->size();
-
-        // Filter and count all documents in Courses that match the faculty
-        $coursesQuery = $database->collection('Courses')->where('faculty', '==', $currentUserFaculty);
-        $coursesCount = $coursesQuery->documents()->size();
-
-        // Pass the counts to the view
-        return view('admin.dashboard', [
-            'lecturerCount' => $lecturerCount,
-            'pastExamsCount' => $pastExamsCount,
-            'coursesCount' => $coursesCount,
-            'faculty' => $currentUserFaculty  // Optional, to display on dashboard if needed
-        ]);
     }
+
+
+
 
     public function genAdminDashboard()
     {
