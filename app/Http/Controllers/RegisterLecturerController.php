@@ -235,44 +235,56 @@ class RegisterLecturerController extends Controller
 
 
 
-    public function updateLecturer(Request $request, $id)
-    {
-        try {
-            // Validation
-            $validatedData = $request->validate([
-                'firstName' => 'required',
-                'lastName' => 'required',
-                'email' => 'required|email',
-                'faculties' => 'required|array|min:1', // Ensure at least one faculty is selected
-                'courses' => 'required|array|min:1', // Ensure at least one course is selected
-            ]);
+public function updateLecturer(Request $request, $id)
+{
+    try {
+        // Validation
+        $validatedData = $request->validate([
+            'firstName' => 'required',
+            'lastName' => 'required',
+            'email' => 'required|email',
+            'faculties' => 'required|array|min:1', // Ensure at least one faculty is selected
+            'courses' => 'required|array|min:1', // Ensure at least one course is selected
+        ]);
 
-            $firestore = app('firebase.firestore')->database();
-            $auth = app('firebase.auth');
+        $firestore = app('firebase.firestore')->database();
+        $auth = app('firebase.auth');
 
-            // Reference to Firestore document
-            $lecturerRef = $firestore->collection('Users')->document($id);
+        // Reference to Firestore document
+        $lecturerRef = $firestore->collection('Users')->document($id);
+        $lecturerSnapshot = $lecturerRef->snapshot();
 
-            // Update lecturer data
-            $lecturerRef->update([
-                ['path' => 'firstName', 'value' => $validatedData['firstName']],
-                ['path' => 'lastName', 'value' => $validatedData['lastName']],
-                ['path' => 'email', 'value' => $validatedData['email']], // Update email
-                ['path' => 'faculties', 'value' => $validatedData['faculties']], // Update faculties
-                ['path' => 'courses', 'value' => $validatedData['courses']], // Update courses
-            ]);
-
-            // Update Firebase Authentication Email
-            $user = $auth->getUser($id);
-            if ($validatedData['email'] !== $user->email) {
-                $auth->changeUserEmail($id, $validatedData['email']);
-            }
-
-            return back()->with('success', 'Lecturer updated successfully.');
-        } catch (\Exception $e) {
-            return back()->withErrors(['error' => 'Error updating lecturer: ' . $e->getMessage()]);
+        if (!$lecturerSnapshot->exists()) {
+            return back()->withErrors(['error' => 'Lecturer not found in Firestore.']);
         }
+
+        $lecturerData = $lecturerSnapshot->data();
+        $existingCourses = $lecturerData['courses'] ?? [];
+
+        // **Merge Courses Instead of Replacing**
+        $updatedCourses = array_unique(array_merge($existingCourses, $validatedData['courses']));
+
+        // Update lecturer data
+        $lecturerRef->update([
+            ['path' => 'firstName', 'value' => $validatedData['firstName']],
+            ['path' => 'lastName', 'value' => $validatedData['lastName']],
+            ['path' => 'email', 'value' => $validatedData['email']], // Update email
+            ['path' => 'faculties', 'value' => $validatedData['faculties']], // Update faculties
+            ['path' => 'courses', 'value' => $updatedCourses], // **Only Add New Courses**
+        ]);
+
+        // Update Firebase Authentication Email
+        $user = $auth->getUser($id);
+        if ($validatedData['email'] !== $user->email) {
+            $auth->changeUserEmail($id, $validatedData['email']);
+        }
+
+        return back()->with('success', 'Lecturer updated successfully.');
+    } catch (\Exception $e) {
+        return back()->withErrors(['error' => 'Error updating lecturer: ' . $e->getMessage()]);
     }
+}
+
 
 
 
