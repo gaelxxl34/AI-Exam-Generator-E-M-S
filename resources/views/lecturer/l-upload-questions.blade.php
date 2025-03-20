@@ -38,7 +38,7 @@
                 <option value="">Select a course unit</option>
                 @foreach ($courses as $course)
                     <option value="{{ $course['name'] }}" data-faculty="{{ $course['faculty'] }}">
-                        {{ $course['name'] }}
+                        {{ $course['name'] }} ({{ $course['code'] }})
                     </option>
                 @endforeach
             </select>
@@ -53,6 +53,7 @@
                 </div>
             @endif
         </div>
+
 
         <!-- Hidden Format Input -->
         <input type="hidden" name="format" value="AB">

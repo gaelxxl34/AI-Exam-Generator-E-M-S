@@ -24,7 +24,6 @@
         .question p {
             margin: 0;
             font-size: 16px;
-            font-weight: bold;
         }
 
         .question-content {
@@ -32,7 +31,6 @@
             margin-top: 5px;
             margin-bottom: 10px;
             font-size: 15px;
-            font-weight: normal;
             line-height: 1.6;
         }
 
@@ -47,7 +45,7 @@
 
 <body>
 
-    <h1 style="text-align: center; font-size: 24px; font-weight: bold;">{{ $courseUnit }}</h1>
+    <h1 style="text-align: center; font-size: 24px;">{{ $courseUnit }}</h1>
 
     @php
         ksort($sections);

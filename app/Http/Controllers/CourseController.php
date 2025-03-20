@@ -11,63 +11,66 @@ use Illuminate\Support\Facades\File;
 class CourseController extends Controller
 
 {
-    public function CoursesList()
-    {
-        \Log::info('CoursesList method called');
+public function CoursesList()
+{
+    \Log::info('CoursesList method called');
 
-        try {
-            $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
-            \Log::info('Current user email: ' . $currentUserEmail);
+    try {
+        // Get the current user's email from session or authentication
+        $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
+        \Log::info('Current user email: ' . $currentUserEmail);
 
-            $firestore = app('firebase.firestore')->database();
-            $usersRef = $firestore->collection('Users');
+        $firestore = app('firebase.firestore')->database();
+        $usersRef = $firestore->collection('Users');
 
-            // Fetch the current user from Firestore
-            $query = $usersRef->where('email', '==', $currentUserEmail);
-            $currentUserSnapshots = $query->documents();
+        // Fetch the current user from Firestore
+        $query = $usersRef->where('email', '==', $currentUserEmail);
+        $currentUserSnapshots = $query->documents();
 
-            if ($currentUserSnapshots->isEmpty()) {
-                \Log::error("Firestore user not found with email: $currentUserEmail");
-                throw new \Exception('Current user not found in Firestore.');
-            }
-
-            // Get user data
-            $currentUserDataArray = iterator_to_array($currentUserSnapshots);
-            $currentUserData = $currentUserDataArray[0]->data();
-
-            // Get the courses assigned to this lecturer
-            $lecturerCourses = $currentUserData['courses'] ?? [];
-
-            if (empty($lecturerCourses)) {
-                \Log::info('No courses found for the current user: ' . $currentUserEmail);
-                throw new \Exception('No courses found for the current user.');
-            }
-
-            // Fetch only the courses that belong to this lecturer from Firestore "Courses" collection
-            $coursesRef = $firestore->collection('Courses');
-            $coursesSnapshots = $coursesRef->where('name', 'in', $lecturerCourses)->documents();
-
-            $courses = [];
-            foreach ($coursesSnapshots as $course) {
-                if ($course->exists()) {
-                    $data = $course->data();
-                    $courses[] = [
-                        'name' => $data['name'] ?? 'Unknown Course',
-                        'faculty' => $data['faculty'] ?? 'Unknown Faculty'
-                    ];
-                }
-            }
-
-            \Log::info('Courses fetched for the lecturer: ' . json_encode($courses));
-
-            // Pass the courses (with faculty) to the view
-            return view('lecturer.l-upload-questions', ['courses' => $courses]);
-
-        } catch (\Exception $e) {
-            \Log::error('Error in CoursesList: ' . $e->getMessage());
-            return 'Error: ' . $e->getMessage();
+        if ($currentUserSnapshots->isEmpty()) {
+            \Log::error("Firestore user not found with email: $currentUserEmail");
+            throw new \Exception('Current user not found in Firestore.');
         }
+
+        // Get user data
+        $currentUserDataArray = iterator_to_array($currentUserSnapshots);
+        $currentUserData = $currentUserDataArray[0]->data();
+
+        // Get the courses assigned to this lecturer
+        $lecturerCourses = $currentUserData['courses'] ?? [];
+
+        if (empty($lecturerCourses)) {
+            \Log::info('No courses found for the current user: ' . $currentUserEmail);
+            throw new \Exception('No courses found for the current user.');
+        }
+
+        // Fetch only the courses that belong to this lecturer from Firestore "Courses" collection
+        $coursesRef = $firestore->collection('Courses');
+        $coursesSnapshots = $coursesRef->where('name', 'in', $lecturerCourses)->documents();
+
+        $courses = [];
+        foreach ($coursesSnapshots as $course) {
+            if ($course->exists()) {
+                $data = $course->data();
+                $courses[] = [
+                    'name' => $data['name'] ?? 'Unknown Course',
+                    'code' => $data['code'] ?? 'No Code', // Now includes course code
+                    'faculty' => $data['faculty'] ?? 'Unknown Faculty'
+                ];
+            }
+        }
+
+        \Log::info('Courses fetched for the lecturer: ' . json_encode($courses));
+
+        // Pass the courses (with faculty and course code) to the view
+        return view('lecturer.l-upload-questions', ['courses' => $courses]);
+
+    } catch (\Exception $e) {
+        \Log::error('Error in CoursesList: ' . $e->getMessage());
+        return 'Error: ' . $e->getMessage();
     }
+}
+
 
     public function fetchCourses()
     {
