@@ -146,74 +146,98 @@ class DashboardController extends Controller
         ]);
     }
 
-    public function index()
-    {
-        try {
-            $faculty = session('user_faculty'); // Get faculty from session
+public function index()
+{
+    try {
+        $faculty = session('user_faculty');
+        \Log::info("Fetching courses for faculty:", ['faculty' => $faculty]);
 
-            // 🔍 Debugging log
-            \Log::info("Fetching courses for faculty:", ['faculty' => $faculty]);
+        if (!is_array($faculty)) {
+            $faculty = [$faculty];
+        }
 
-            // Ensure faculty is always an array
-            if (!is_array($faculty)) {
-                $faculty = [$faculty]; // Convert single string to array
-            }
+        $firestore = app('firebase.firestore')->database();
+        $examsRef = $firestore->collection('Exams');
+        $usersRef = $firestore->collection('Users');
+        $coursesRepoRef = $firestore->collection('Courses');
 
-            $firestore = app('firebase.firestore')->database();
-            $examsRef = $firestore->collection('Exams');
+        $courses = [];
 
-            $courses = [];
+        $minQuestions = [
+            "FST" => ["A" => 2, "B" => 12],
+            "FBM" => ["A" => 2, "B" => 12],
+            "FOE" => ["A" => 6, "B" => 6],
+            "HEC" => ["A" => 20, "B" => 10],
+            "FOL" => ["A" => 2, "B" => 4, "C" => 5]
+        ];
 
-            // Define minimum required questions per faculty
-            $minQuestions = [
-                "FST" => ["A" => 2, "B" => 12],
-                "FBM" => ["A" => 2, "B" => 12],
-                "FOE" => ["A" => 6, "B" => 6],
-                "HEC" => ["A" => 20, "B" => 10],
-                "FOL" => ["A" => 2, "B" => 4, "C" => 5]
-            ];
+        foreach ($faculty as $fac) {
+            $query = $examsRef->where('faculty', '==', $fac);
+            $examsSnapshot = $query->documents();
 
-            foreach ($faculty as $fac) {
-                $query = $examsRef->where('faculty', '==', $fac); // ✅ Individual queries
-                $examsSnapshot = $query->documents();
+            foreach ($examsSnapshot as $document) {
+                if ($document->exists()) {
+                    $examData = $document->data();
+                    $examData['id'] = $document->id();
+                    $examData['status'] = $examData['status'] ?? 'Pending Review';
 
-                foreach ($examsSnapshot as $document) {
-                    if ($document->exists()) {
-                        $examData = $document->data();
-                        $examData['id'] = $document->id();
-                        $examData['status'] = $examData['status'] ?? 'Pending Review'; // Default status
+                    $requiredCounts = $minQuestions[$fac] ?? [];
+                    $meetsRequirement = true;
 
-                        // Get required question count for this faculty
-                        $requiredCounts = $minQuestions[$fac] ?? [];
+                    foreach ($requiredCounts as $section => $minCount) {
+                        $actualCount = isset($examData['sections'][$section]) ? count($examData['sections'][$section]) : 0;
+                        if ($actualCount < $minCount) {
+                            $meetsRequirement = false;
+                            break;
+                        }
+                    }
 
-                        // Count actual questions per section
-                        $meetsRequirement = true;
-                        foreach ($requiredCounts as $section => $minCount) {
-                            $actualCount = isset($examData['sections'][$section]) ? count($examData['sections'][$section]) : 0;
+                    if ($meetsRequirement) {
+                        $courseUnit = $examData['courseUnit'];
+                        \Log::info("➡️ Looking for course code for courseUnit: {$courseUnit}");
 
-                            // If any section does not meet the minimum, exclude the exam
-                            if ($actualCount < $minCount) {
-                                $meetsRequirement = false;
-                                break; // No need to check further
-                            }
+                        // Lecturer info
+                        $lecturerSnapshot = $usersRef->where('courses', 'array-contains', $courseUnit)->documents();
+                        $lecturerInfo = null;
+                        foreach ($lecturerSnapshot as $doc) {
+                            $lecturerInfo = $doc->data();
+                            break;
                         }
 
-                        // Add only if it meets the required number of questions
-                        if ($meetsRequirement) {
-                            $courses[] = $examData;
+                        // Get course from Courses repo (fix: match by 'name')
+                        $courseRepoSnapshot = $coursesRepoRef->where('name', '==', $courseUnit)->documents();
+                        $courseInfo = null;
+                        foreach ($courseRepoSnapshot as $doc) {
+                            $courseInfo = $doc->data();
+                            break;
                         }
+
+                        if (!$courseInfo) {
+                            \Log::warning("⚠️ No matching course found in Courses collection for '{$courseUnit}'");
+                        } else {
+                            \Log::info("✅ Found course '{$courseInfo['name']}' with code '{$courseInfo['code']}'");
+                        }
+
+                        $examData['lecturerName'] = $lecturerInfo['name'] ?? 'Unknown';
+                        $examData['lecturerEmail'] = $lecturerInfo['email'] ?? 'N/A';
+                        $examData['courseCode'] = $courseInfo['code'] ?? 'N/A';
+
+                        $courses[] = $examData;
                     }
                 }
             }
-
-            \Log::info("Courses fetched successfully after filtering.", ['count' => count($courses)]);
-            return view('deans.dean-dashboard', compact('courses'));
-
-        } catch (\Exception $e) {
-            \Log::error("Error fetching courses: " . $e->getMessage());
-            return back()->withErrors(['error' => 'Failed to fetch courses.']);
         }
+
+        \Log::info("Courses fetched successfully after filtering.", ['count' => count($courses)]);
+        return view('deans.dean-dashboard', compact('courses'));
+
+    } catch (\Exception $e) {
+        \Log::error("❌ Error fetching courses: " . $e->getMessage());
+        return back()->withErrors(['error' => 'Failed to fetch courses.']);
     }
+}
+
+
 
 
     public function updateStatus(Request $request, $id)

@@ -1,6 +1,7 @@
     <nav class="fixed top-0 z-50 w-full border-b border-gray-200 dark:bg-black dark:border-gray-700"
         style="background-color: #7a0000;">
         <div class="px-3 py-4 lg:px-5 lg:pl-3"> <!-- Increased padding here -->
+
                 <div class="flex items-center justify-between">
                     <div class="flex items-center justify-start rtl:justify-end">
                         <button data-drawer-target="logo-sidebar" data-drawer-toggle="logo-sidebar" aria-controls="logo-sidebar"
@@ -19,6 +20,16 @@
                                 class="h-12 me-3" alt="FlowBite Logo" /> <!-- Increased logo height here -->
                         </a>
                     </div>
+
+                        <!-- Center: Alert -->
+                        <div class="hidden sm:block flex-1 text-center">
+                            <div class="inline-block bg-yellow-400 text-black text-xl font-bold text-sm px-4 py-1 rounded shadow">
+                                🚨 <span class="underline font-extrabold">System closes March 28.</span> Make sure all exams are uploaded and statuses
+                                confirmed before the deadline! 🚨
+                            </div>
+                        </div>
+
+
                     <div class="flex items-center">
                         <div class="flex items-center ms-3">
                             <div>

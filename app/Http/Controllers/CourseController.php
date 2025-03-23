@@ -71,7 +71,6 @@ public function CoursesList()
     }
 }
 
-
     public function fetchCourses()
     {
         \Log::info('Fetching courses for dashboard');
