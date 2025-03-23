@@ -15,9 +15,26 @@
 
     <div class="p-4 sm:ml-64 mt-20">
         <h1 class="text-3xl font-bold text-gray-800">👨‍🏫 Lecturer Management</h1>
-        <p class="text-gray-600">Enable or disable lecturer accounts.</p>
+
+
 
         <div class="overflow-x-auto bg-white p-6 rounded-lg shadow-lg mt-6">
+
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <button onclick="toggleAllLecturers(true)"
+                                class="bg-red-600 hover:bg-red-800 text-white px-4 py-2 rounded mr-2">
+                                Disable All
+                            </button>
+                            <button onclick="toggleAllLecturers(false)"
+                                class="bg-green-600 hover:bg-green-800 text-white px-4 py-2 rounded">
+                                Enable All
+                            </button>
+                        </div>
+                        <div class="text-gray-700 font-medium">
+                            Total Lecturers: {{ count($lecturerList) }}
+                        </div>
+                    </div>
             @if(count($lecturerList) > 0)
                 <table class="min-w-full border border-gray-300 rounded-lg shadow-md">
                     <thead class="bg-gray-800 text-white">
@@ -55,7 +72,7 @@
 
     <!-- ✅ JavaScript for Toggle Action -->
     <script>
-    async function toggleLecturer(id, btn) {
+        async function toggleLecturer(id, btn) {
         try {
             const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
 
@@ -102,6 +119,39 @@
     }
 
     </script>
+
+    <!-- ✅ JavaScript for Toggle general action for all lecturers Action -->
+<script>
+    async function toggleAllLecturers(disable) {
+        const confirmation = confirm(`Are you sure you want to ${disable ? 'disable' : 'enable'} all lecturers?`);
+        if (!confirmation) return;
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+
+        try {
+            const res = await fetch("{{ route('superadmin.toggleAllLecturers') }}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-TOKEN": csrfToken
+                },
+                body: JSON.stringify({ disable })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                alert(`✅ ${disable ? 'Disabled' : 'Enabled'} all lecturers.`);
+                location.reload(); // reload to reflect changes
+            } else {
+                alert(data.error || "An unknown error occurred.");
+            }
+        } catch (err) {
+            console.error("❌ Failed to toggle all lecturers:", err);
+            alert("Error occurred. Check the console.");
+        }
+    }
+</script>
+
 
 </body>
 

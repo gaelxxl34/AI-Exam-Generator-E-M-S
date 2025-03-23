@@ -251,27 +251,27 @@ class SuperAdminController extends Controller
 
 
     // Control Lecturers starts here
-public function manageLecturers()
-{
-    $firestore = app('firebase.firestore')->database();
-    $usersRef = $firestore->collection('Users')->where('role', '==', 'lecturer');
-    $lecturers = $usersRef->documents();
+    public function manageLecturers()
+    {
+        $firestore = app('firebase.firestore')->database();
+        $usersRef = $firestore->collection('Users')->where('role', '==', 'lecturer');
+        $lecturers = $usersRef->documents();
 
-    $lecturerList = [];
-    foreach ($lecturers as $lecturer) {
-        if ($lecturer->exists()) {
-            $data = $lecturer->data();
-            $lecturerList[] = [
-                'id' => $lecturer->id(),
-                'name' => $data['firstName'] . ' ' . ($data['lastName'] ?? ''),
-                'email' => $data['email'] ?? 'No Email',
-                'status' => $data['disabled'] ?? false
-            ];
+        $lecturerList = [];
+        foreach ($lecturers as $lecturer) {
+            if ($lecturer->exists()) {
+                $data = $lecturer->data();
+                $lecturerList[] = [
+                    'id' => $lecturer->id(),
+                    'name' => $data['firstName'] . ' ' . ($data['lastName'] ?? ''),
+                    'email' => $data['email'] ?? 'No Email',
+                    'status' => $data['disabled'] ?? false
+                ];
+            }
         }
-    }
 
-    return view('superadmin.lecturer-control', compact('lecturerList'));
-}
+        return view('superadmin.lecturer-control', compact('lecturerList'));
+    }
 
     public function toggleLecturerStatus($uid)
     {
@@ -309,8 +309,29 @@ public function manageLecturers()
         }
     }
 
+    public function toggleAllLecturersStatus(Request $request)
+    {
+        try {
+            $disable = $request->input('disable') === 'true';
+            $firestore = app('firebase.firestore')->database();
+            $usersRef = $firestore->collection('Users')->where('role', '==', 'lecturer');
+            $lecturers = $usersRef->documents();
 
+            foreach ($lecturers as $lecturer) {
+                if ($lecturer->exists()) {
+                    $lecturer->reference()->update([
+                        ['path' => 'disabled', 'value' => $disable]
+                    ]);
+                    \Log::info("Lecturer {$lecturer->id()} status set to " . ($disable ? 'DISABLED' : 'ENABLED'));
+                }
+            }
 
+            return response()->json(['success' => true, 'message' => 'All lecturers updated.'], 200);
+        } catch (\Exception $e) {
+            \Log::error('Bulk lecturer toggle failed: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to update lecturers.'], 500);
+        }
+    }
 
     // Control Lecturers ends here
 

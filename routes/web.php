@@ -239,6 +239,8 @@ Route::get('/superadmin/super-adm-dashboard', function () {
 Route::get('/superadmin/lecturer-control', [SuperAdminController::class, 'manageLecturers'])->name('superadmin.lecturerControl');
 Route::post('/superadmin/toggle-lecturer/{uid}', [SuperAdminController::class, 'toggleLecturerStatus'])
     ->name('superadmin.toggleLecturerStatus');
+Route::post('/superadmin/toggle-all-lecturers', [SuperAdminController::class, 'toggleAllLecturersStatus'])
+    ->name('superadmin.toggleAllLecturers');
 
 
 
