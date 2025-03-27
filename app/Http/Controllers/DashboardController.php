@@ -148,6 +148,8 @@ class DashboardController extends Controller
 
 public function index()
 {
+    set_time_limit(360); // 1 minute timeout only for this function
+
     try {
         $faculty = session('user_faculty');
         \Log::info("Fetching courses for faculty:", ['faculty' => $faculty]);
