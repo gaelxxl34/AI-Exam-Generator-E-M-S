@@ -4,15 +4,21 @@
     <meta charset="UTF-8">
     <title>Exam - {{ $courseUnit }}</title>
     <style>
+            * {
+        font-family: "Times New Roman", Times, serif !important;
+    }
         body {
-            font-family: "Times New Roman", Times, serif;
             font-size: 14px;
             margin: 15px;
         }
-   .exam-cover {
+
+    h1, h2, h3, h4, h5, h6,
+    p, span, div, td, th, strong, b, em, i, textarea, input, label {
+        font-family: "Times New Roman", Times, serif !important;
+    }
+        .exam-cover {
             text-align: center;
             page-break-after: always;
-            
         }
         .exam-cover img {
             margin: 0 auto;
@@ -45,7 +51,7 @@
         .instructions {
             font-weight: bold;
             
-            margin-top: 20px;
+            margin-top: 18px;
             text-transform: uppercase;
             text-decoration: underline;
         }
@@ -95,7 +101,7 @@
 <body>
 <div class="exam-cover">
     <img src="https://iuea.ac.ug/sitepad-data/uploads//2020/11/Website-Logo.png" alt="University Logo">
-    <div class="faculty-name">FACULTY OF {{ $facultyOf }}</div>
+    <div class="faculty-name">{{ $facultyOf }}</div>
     <div class="exam-date uppercase">END OF SEMESTER EXAMINATIONS - {{ $examPeriod }}</div>
     <div class="info-left">
         <p>PROGRAMME: {{ $program }}</p>
@@ -141,6 +147,23 @@ ksort($sections);
             @endforeach
         </div>
 @endforeach
+
+
+@if (isset($pdf))
+    <script type="text/php">
+            if (isset($pdf)) {
+                $font = $fontMetrics->getFont("Times New Roman", "normal");
+                $size = 10;
+                $pdf->page_script('
+                    if ($PAGE_COUNT > 1) {
+                        $font = $fontMetrics->getFont("Times New Roman", "normal");
+                        $pdf->text(520, 820, "Page $PAGE_NUM of $PAGE_COUNT", $font, 10);
+                    }
+                ');
+            }
+        </script>
+@endif
+
 
 </body>
 </html>

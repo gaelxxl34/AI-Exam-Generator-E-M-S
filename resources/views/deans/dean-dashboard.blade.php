@@ -108,6 +108,29 @@
     @endif
 </div>
 
+<!-- Decline Modal -->
+<div id="declineModal" class="hidden fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+    <div class="bg-white p-6 rounded shadow-lg w-96">
+        <h2 class="text-xl font-bold mb-4">Decline Exam</h2>
+        <form id="declineForm" method="POST">
+            @csrf
+            <textarea name="comment" placeholder="Enter reason for declining..." required
+                class="w-full p-2 border rounded mb-4"></textarea>
+            <input type="hidden" id="declineExamId" name="exam_id">
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="closeDeclineModal()"
+                    class="bg-gray-400 hover:bg-gray-600 text-white px-4 py-2 rounded">
+                    Cancel
+                </button>
+                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">
+                    Submit Decline
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
 <!-- 🔁 JS for Alphabetical Sort and Search -->
 <script>
     // Sort by course name alphabetically
@@ -166,6 +189,9 @@
             document.getElementById('declineModal').classList.add('hidden');
         }
     </script>
+
+
+
 
     <!-- No Results Message -->
     <div id="noResultsMessage" class="text-center text-gray-600 font-semibold mt-4 hidden">

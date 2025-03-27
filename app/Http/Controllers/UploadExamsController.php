@@ -326,10 +326,13 @@ class UploadExamsController extends Controller
             'sectionAInstructions' => $sectionAInstructions,
             'sectionBInstructions' => $sectionBInstructions,
             'sectionCInstructions' => $sectionCInstructions,
+            'pdf' => true // ✅ Ensure this flag is passed!
         ]);
 
         // Set paper size and orientation
         $pdf->setPaper('A4', 'portrait');
+        $pdf->getDomPDF()->set_option('isPhpEnabled', true); // ✅ enables PHP in scripts
+        $pdf->getDomPDF()->set_option('isHtml5ParserEnabled', true);
 
         // Enable remote images
         $pdf->getDomPDF()->set_option('isRemoteEnabled', true);
