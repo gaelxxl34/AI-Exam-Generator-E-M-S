@@ -214,8 +214,10 @@ Route::get('/lecturer/l-dashboard', [CourseController::class, 'fetchCourses'])
     ->name('lecturer.l-dashboard');
 
 Route::get('/lecturer/l-course-exams/{courseUnit}', [CourseController::class, 'courseDetails'])
+    ->where('courseUnit', '.*')
     ->middleware(EnsureLecturerRole::class)
     ->name('lecturer.l-course-exams');
+
 //////////
 
 Route::get('/lecturer/l-upload-questions', function () {
