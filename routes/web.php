@@ -196,7 +196,9 @@ Route::post('/exams/{courseUnit}/file/upload', [CourseController::class, 'upload
 Route::get('/exams/{courseUnit}/marking-guide/download', [CourseController::class, 'downloadMarkingGuide'])->name('download.markingGuide');
 
 
-Route::get('/preview-pdf/{courseUnit}', [CourseController::class, 'previewPdf'])->name('preview.pdf');
+Route::get('/preview-pdf/{courseUnit}', [CourseController::class, 'previewPdf'])
+    ->where('courseUnit', '.*')
+    ->name('preview.pdf');
 
 
 
