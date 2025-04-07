@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth; // Import Auth for user session
 use Illuminate\Support\Facades\Log;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Session;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -146,6 +148,205 @@ class DashboardController extends Controller
         ]);
     }
 
+private function getDashboardData(): array
+{
+    $faculty = session('user_faculty');
+    \Log::info("🟢 Starting optimized dashboard stats generation for faculty:", ['faculty' => $faculty]);
+
+    if (!is_array($faculty)) {
+        $faculty = [$faculty];
+    }
+
+    $firestore = app('firebase.firestore')->database();
+    $usersRef = $firestore->collection('Users');
+    $coursesRef = $firestore->collection('Courses');
+    $examsRef = $firestore->collection('Exams');
+
+    $allLecturers = [];
+    $lecturerDataMap = [];
+    $facultyCourses = [];
+    $allExams = [];
+
+    $submittedCourses = [];
+    $lecturerSubmissions = [];
+    $incompleteExams = [];
+    $questionCountPerSection = ['A' => 0, 'B' => 0, 'C' => 0];
+    $sectionExamCount = ['A' => 0, 'B' => 0, 'C' => 0];
+    $submissionsByMonth = [];
+
+    $minQuestions = [
+        "FST" => ["A" => 2, "B" => 12],
+        "FBM" => ["A" => 2, "B" => 12],
+        "FOE" => ["A" => 6, "B" => 6],
+        "HEC" => ["A" => 20, "B" => 10],
+        "FOL" => ["A" => 2, "B" => 4, "C" => 5]
+    ];
+
+    $pendingExams = 0;
+    $approvedExams = 0;
+    $declinedExams = 0;
+
+    foreach ($faculty as $fac) {
+        \Log::info("🔍 Processing faculty: $fac");
+
+        // Lecturers
+        $usersSnapshot = $usersRef
+            ->where('faculties', 'array-contains', $fac)
+            ->where('role', '==', 'lecturer')
+            ->documents();
+
+        foreach ($usersSnapshot as $userDoc) {
+            if ($userDoc->exists()) {
+                $data = $userDoc->data();
+                $email = $data['email'] ?? null;
+                if ($email) {
+                    $allLecturers[] = $email;
+                    $lecturerDataMap[$email] = $data;
+                }
+            }
+        }
+
+        \Log::info("👨‍🏫 Lecturers fetched: " . count($allLecturers));
+
+        // Courses
+        $coursesSnapshot = $coursesRef->where('faculty', '==', $fac)->documents();
+
+        foreach ($coursesSnapshot as $doc) {
+            if ($doc->exists()) {
+                $data = $doc->data();
+                $name = strtolower(trim($data['name'] ?? ''));
+                $facultyCourses[$name] = $data;
+            }
+        }
+
+        \Log::info("📘 Courses fetched: " . count($facultyCourses));
+
+        // Exams
+        $examsSnapshot = $examsRef->where('faculty', '==', $fac)->documents();
+
+        foreach ($examsSnapshot as $doc) {
+            if ($doc->exists()) {
+                $data = $doc->data();
+                $data['id'] = $doc->id();
+                $allExams[] = $data;
+
+                if (!isset($data['status'])) $pendingExams++;
+                elseif ($data['status'] === 'Approved') $approvedExams++;
+                elseif ($data['status'] === 'Declined') $declinedExams++;
+
+                if (isset($data['created_at'])) {
+                    try {
+                        $month = \Carbon\Carbon::parse($data['created_at'])->format('Y-m');
+                        $submissionsByMonth[$month] = ($submissionsByMonth[$month] ?? 0) + 1;
+                    } catch (\Exception $e) {
+                        \Log::warning("⚠️ Invalid created_at", ['value' => $data['created_at']]);
+                    }
+                }
+
+                foreach (['A', 'B', 'C'] as $section) {
+                    if (isset($data['sections'][$section])) {
+                        $count = count($data['sections'][$section]);
+                        $questionCountPerSection[$section] += $count;
+                        $sectionExamCount[$section]++;
+                    }
+                }
+
+                $requiredCounts = $minQuestions[$fac] ?? [];
+                foreach ($requiredCounts as $section => $minCount) {
+                    $actualCount = isset($data['sections'][$section]) ? count($data['sections'][$section]) : 0;
+                    if ($actualCount < $minCount) {
+                        $incompleteExams[] = $data;
+                        break;
+                    }
+                }
+
+                $submittedCourses[] = strtolower(trim($data['courseUnit'] ?? ''));
+            }
+        }
+
+        \Log::info("🧾 Exams fetched: " . count($allExams));
+
+        // Participation
+        foreach ($lecturerDataMap as $email => $lecturer) {
+            $lecturerCourses = $lecturer['courses'] ?? [];
+            foreach ($lecturerCourses as $courseUnit) {
+                $unit = strtolower(trim($courseUnit));
+                if (isset($facultyCourses[$unit]) && in_array($unit, $submittedCourses)) {
+                    $lecturerSubmissions[] = $email;
+                    break;
+                }
+            }
+        }
+    }
+
+    $lecturerSubmissions = array_unique(array_filter($lecturerSubmissions));
+    $allLecturers = array_unique($allLecturers);
+
+    \Log::info("✅ Participating lecturers: " . count($lecturerSubmissions));
+    \Log::info("📌 Missing courses: " . count(array_diff(array_keys($facultyCourses), $submittedCourses)));
+    \Log::info("📋 Final — Pending: $pendingExams | Approved: $approvedExams | Declined: $declinedExams | Incomplete: " . count($incompleteExams));
+
+    $averageQuestions = [];
+    foreach ($questionCountPerSection as $section => $total) {
+        $averageQuestions[$section] = $sectionExamCount[$section] > 0
+            ? round($total / $sectionExamCount[$section], 2)
+            : 0;
+    }
+
+    $missingCourses = array_diff(array_keys($facultyCourses), $submittedCourses);
+
+    // Attach lecturer info to incomplete exams
+    foreach ($incompleteExams as &$exam) {
+        $unit = strtolower(trim($exam['courseUnit'] ?? ''));
+        $matched = false;
+        foreach ($lecturerDataMap as $email => $lecturer) {
+            foreach ($lecturer['courses'] ?? [] as $course) {
+                if (strtolower(trim($course)) === $unit) {
+                    $exam['lecturerName'] = $lecturer['firstName'] ?? 'Unknown';
+                    $exam['lecturerEmail'] = $email;
+                    $matched = true;
+                    break;
+                }
+            }
+            if ($matched) break;
+        }
+
+        $exam['lecturerName'] = $exam['lecturerName'] ?? 'Unknown';
+        $exam['lecturerEmail'] = $exam['lecturerEmail'] ?? 'N/A';
+        $exam['status'] = $exam['status'] ?? 'Pending Review';
+    }
+
+    return compact(
+        'pendingExams',
+        'approvedExams',
+        'declinedExams',
+        'facultyCourses',
+        'lecturerSubmissions',
+        'allLecturers',
+        'missingCourses',
+        'submissionsByMonth',
+        'averageQuestions',
+        'incompleteExams'
+    );
+}
+
+
+public function dashboardStats()
+{
+    $data = $this->getDashboardData();
+    return view('deans.dean-dashboard', $data);
+}
+
+
+public function exportDashboardReport()
+{
+    $data = $this->getDashboardData();
+    $pdf = Pdf::loadView('deans.dashboard-report', $data)->setPaper('a4', 'portrait');
+    return $pdf->download('faculty-dashboard-report.pdf');
+}
+
+
+
 public function index()
 {
     set_time_limit(360); // 1 minute timeout only for this function
@@ -231,7 +432,7 @@ public function index()
         }
 
         \Log::info("Courses fetched successfully after filtering.", ['count' => count($courses)]);
-        return view('deans.dean-dashboard', compact('courses'));
+        return view('deans.dean-moderation', compact('courses'));
 
     } catch (\Exception $e) {
         \Log::error("❌ Error fetching courses: " . $e->getMessage());

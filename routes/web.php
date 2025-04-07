@@ -72,7 +72,10 @@ Route::get('/genadmin/ai-exam-generator', [CourseController::class, 'AllCourses'
 
 
 Route::middleware([EnsureDeanRole::class])->group(function () {
-    Route::get('/deans/dean-dashboard', [DashboardController::class, 'index'])->name('dean.dashboard');
+    Route::get('/deans/dean-dashboard', [DashboardController::class, 'dashboardStats'])->name('dean.dashboard');
+    Route::get('/deans/dean-moderation', [DashboardController::class, 'index'])->name('dean.moderation');
+    Route::get('/deans/dashboard/report', [DashboardController::class, 'exportDashboardReport'])
+    ->name('dashboard.export-report');
 });
 
 Route::post('/course/update-status/{id}', [DashboardController::class, 'updateStatus'])->name('course.updateStatus');
