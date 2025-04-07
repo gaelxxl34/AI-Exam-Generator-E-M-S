@@ -205,11 +205,15 @@ Route::get('/preview-pdf/{courseUnit}', [CourseController::class, 'previewPdf'])
 
 
 
+// Delete Question
 Route::delete('/exams/{courseUnit}/{sectionName}/{questionIndex}/delete', [CourseController::class, 'deleteQuestion'])
-->name('delete.question');
+    ->where('courseUnit', '.*')
+    ->name('delete.question');
 
+// Add Question
 Route::post('/exams/{courseUnit}/questions/add', [CourseController::class, 'addQuestion'])
-->name('add.question');
+    ->where('courseUnit', '.*')
+    ->name('add.question');
 
 Route::get('/delete-past-exam/{id}', [PastExamController::class, 'delete'])->name('delete-past-exam');
 
