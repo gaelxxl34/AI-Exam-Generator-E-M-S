@@ -123,7 +123,7 @@ if (!is_array($faculties)) {
         </div>
     
         {{-- Top Incomplete Exams --}}
-        <div class="bg-white p-6 rounded shadow">
+        {{-- <div class="bg-white p-6 rounded shadow">
             <h2 class="text-xl font-bold text-gray-800 mb-4">⚠️ Incomplete Exams</h2>
             @if(count($incompleteExams))
                 <table class="w-full table-auto text-sm text-left border">
@@ -149,7 +149,7 @@ if (!is_array($faculties)) {
             @else
                 <p class="text-gray-600">All exams meet the minimum required questions per section.</p>
             @endif
-        </div>
+        </div> --}}
     
     </div>
 
