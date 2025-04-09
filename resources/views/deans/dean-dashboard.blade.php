@@ -123,33 +123,46 @@ if (!is_array($faculties)) {
         </div>
     
         {{-- Top Incomplete Exams --}}
-        {{-- <div class="bg-white p-6 rounded shadow">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">⚠️ Incomplete Exams</h2>
+        <div class="bg-white p-6 rounded shadow mt-8">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">⚠️ Incomplete & Missing Exams</h2>
+
             @if(count($incompleteExams))
-                <table class="w-full table-auto text-sm text-left border">
-                    <thead class="bg-gray-100 font-semibold">
-                        <tr>
-                            <th class="px-4 py-2">Course Unit</th>
-                            <th class="px-4 py-2">Lecturer</th>
-                            <th class="px-4 py-2">Email</th>
-                            <th class="px-4 py-2">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($incompleteExams as $exam)
-                            <tr class="border-t">
-                                <td class="px-4 py-2">{{ $exam['courseUnit'] ?? 'N/A' }}</td>
-                                <td class="px-4 py-2">{{ $exam['lecturerName'] ?? 'Unknown' }}</td>
-                                <td class="px-4 py-2">{{ $exam['lecturerEmail'] ?? 'N/A' }}</td>
-                                <td class="px-4 py-2">{{ $exam['status'] ?? 'Pending Review' }}</td>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white border text-sm">
+                        <thead class="bg-gray-100 text-left text-gray-700 font-semibold">
+                            <tr>
+                                <th class="px-4 py-2 border-b">Course Unit</th>
+                                <th class="px-4 py-2 border-b">Lecturer</th>
+                                <th class="px-4 py-2 border-b">Email</th>
+                                <th class="px-4 py-2 border-b">Status</th>
+                                <th class="px-4 py-2 border-b">Notes</th>
                             </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            @foreach ($incompleteExams as $exam)
+                                <tr class="border-b hover:bg-gray-50">
+                                    <td class="px-4 py-2">{{ $exam['courseUnit'] ?? 'N/A' }}</td>
+                                    <td class="px-4 py-2">{{ $exam['lecturerName'] ?? 'Unknown' }}</td>
+                                    <td class="px-4 py-2">{{ $exam['lecturerEmail'] ?? 'N/A' }}</td>
+                                    <td class="px-4 py-2">
+                                        <span
+                                            class="px-2 py-1 rounded text-xs font-medium
+                                                    {{ $exam['status'] === 'Not Submitted' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800' }}">
+                                            {{ $exam['status'] }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-2 text-xs text-gray-600">{{ $exam['notes'] ?? '—' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
             @else
-                <p class="text-gray-600">All exams meet the minimum required questions per section.</p>
+                <p class="text-gray-600">✅ All exams are submitted and complete.</p>
             @endif
-        </div> --}}
+        </div>
+
+
     
     </div>
 

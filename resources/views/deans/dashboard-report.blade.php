@@ -104,7 +104,7 @@ $facultyOf = $facultyNames[$facultyCode] ?? $facultyCode;
     </div>
 
     <div class="section">
-        <h3>Incomplete Exams</h3>
+        <h3>Incomplete / Missing / Declined Exams</h3>
         <table>
             <thead>
                 <tr>
@@ -112,6 +112,7 @@ $facultyOf = $facultyNames[$facultyCode] ?? $facultyCode;
                     <th>Lecturer</th>
                     <th>Email</th>
                     <th>Status</th>
+                    <th>Notes</th>
                 </tr>
             </thead>
             <tbody>
@@ -121,15 +122,17 @@ $facultyOf = $facultyNames[$facultyCode] ?? $facultyCode;
                         <td>{{ $exam['lecturerName'] ?? 'Unknown' }}</td>
                         <td>{{ $exam['lecturerEmail'] ?? 'N/A' }}</td>
                         <td>{{ $exam['status'] ?? 'Pending Review' }}</td>
+                        <td>{{ $exam['notes'] ?? '—' }}</td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="4">No incomplete exams found.</td>
+                        <td colspan="5">No issues found with submitted exams.</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
+
 
 </body>
 

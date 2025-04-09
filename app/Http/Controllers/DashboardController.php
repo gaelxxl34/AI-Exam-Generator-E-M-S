@@ -151,7 +151,7 @@ class DashboardController extends Controller
 private function getDashboardData(): array
 {
     $faculty = session('user_faculty');
-    \Log::info("🟢 Starting optimized dashboard stats generation for faculty:", ['faculty' => $faculty]);
+    \Log::info("🟢 Starting full dashboard stats generation for faculty:", ['faculty' => $faculty]);
 
     if (!is_array($faculty)) {
         $faculty = [$faculty];
@@ -165,11 +165,10 @@ private function getDashboardData(): array
     $allLecturers = [];
     $lecturerDataMap = [];
     $facultyCourses = [];
-    $allExams = [];
-
-    $submittedCourses = [];
     $lecturerSubmissions = [];
+    $submittedCourses = [];
     $incompleteExams = [];
+
     $questionCountPerSection = ['A' => 0, 'B' => 0, 'C' => 0];
     $sectionExamCount = ['A' => 0, 'B' => 0, 'C' => 0];
     $submissionsByMonth = [];
@@ -185,6 +184,7 @@ private function getDashboardData(): array
     $pendingExams = 0;
     $approvedExams = 0;
     $declinedExams = 0;
+    $allExams = [];
 
     foreach ($faculty as $fac) {
         \Log::info("🔍 Processing faculty: $fac");
@@ -206,24 +206,17 @@ private function getDashboardData(): array
             }
         }
 
-        \Log::info("👨‍🏫 Lecturers fetched: " . count($allLecturers));
-
         // Courses
         $coursesSnapshot = $coursesRef->where('faculty', '==', $fac)->documents();
-
         foreach ($coursesSnapshot as $doc) {
             if ($doc->exists()) {
-                $data = $doc->data();
-                $name = strtolower(trim($data['name'] ?? ''));
-                $facultyCourses[$name] = $data;
+                $name = strtolower(trim($doc->data()['name'] ?? ''));
+                $facultyCourses[$name] = $doc->data();
             }
         }
 
-        \Log::info("📘 Courses fetched: " . count($facultyCourses));
-
         // Exams
         $examsSnapshot = $examsRef->where('faculty', '==', $fac)->documents();
-
         foreach ($examsSnapshot as $doc) {
             if ($doc->exists()) {
                 $data = $doc->data();
@@ -251,69 +244,90 @@ private function getDashboardData(): array
                     }
                 }
 
-                $requiredCounts = $minQuestions[$fac] ?? [];
-                foreach ($requiredCounts as $section => $minCount) {
-                    $actualCount = isset($data['sections'][$section]) ? count($data['sections'][$section]) : 0;
-                    if ($actualCount < $minCount) {
-                        $incompleteExams[] = $data;
-                        break;
-                    }
-                }
-
                 $submittedCourses[] = strtolower(trim($data['courseUnit'] ?? ''));
             }
         }
 
-        \Log::info("🧾 Exams fetched: " . count($allExams));
-
-        // Participation
+        // Lecturer evaluation
         foreach ($lecturerDataMap as $email => $lecturer) {
+            $lecturerName = $lecturer['firstName'] ?? 'Unknown';
             $lecturerCourses = $lecturer['courses'] ?? [];
+
+            \Log::info("🔍 Checking lecturer: $lecturerName <$email>");
+
             foreach ($lecturerCourses as $courseUnit) {
+                if (stripos($courseUnit, 'online') !== false) {
+                    \Log::info("🟦 Skipped Online course: $courseUnit");
+                    continue;
+                }
+
                 $unit = strtolower(trim($courseUnit));
-                if (isset($facultyCourses[$unit]) && in_array($unit, $submittedCourses)) {
-                    $lecturerSubmissions[] = $email;
-                    break;
+                if (!isset($facultyCourses[$unit])) continue;
+
+                $matchingExam = collect($allExams)->firstWhere(fn($exam) =>
+                    strtolower(trim($exam['courseUnit'] ?? '')) === $unit
+                );
+
+                if (!$matchingExam) {
+                    \Log::info("❌ No exam submitted for: $courseUnit");
+                    $incompleteExams[] = [
+                        'courseUnit' => $courseUnit,
+                        'lecturerName' => $lecturerName,
+                        'lecturerEmail' => $email,
+                        'status' => 'Not Submitted',
+                        'notes' => 'No exam submitted for this course.'
+                    ];
+                    continue;
+                }
+
+                $lecturerSubmissions[] = $email;
+                $isIncomplete = false;
+                $reasons = [];
+
+                $required = $minQuestions[$fac] ?? [];
+
+                foreach ($required as $section => $minCount) {
+                    $actual = isset($matchingExam['sections'][$section]) ? count($matchingExam['sections'][$section]) : 0;
+                    if ($actual < $minCount) {
+                        $isIncomplete = true;
+                        $reasons[] = "Section $section has $actual (min $minCount)";
+                    }
+                }
+
+                if ($isIncomplete) {
+                    \Log::warning("⚠️ Incomplete exam for $courseUnit → " . implode(', ', $reasons));
+                    $incompleteExams[] = [
+                        'courseUnit' => $matchingExam['courseUnit'] ?? $unit,
+                        'lecturerName' => $lecturerName,
+                        'lecturerEmail' => $email,
+                        'status' => $matchingExam['status'] ?? 'Pending Review',
+                        'notes' => implode('; ', $reasons),
+                    ];
+                } elseif (($matchingExam['status'] ?? '') === 'Declined') {
+                    \Log::warning("🚫 Declined exam for $courseUnit");
+                    $incompleteExams[] = [
+                        'courseUnit' => $matchingExam['courseUnit'] ?? $unit,
+                        'lecturerName' => $lecturerName,
+                        'lecturerEmail' => $email,
+                        'status' => 'Declined',
+                        'notes' => 'This exam was declined by reviewer.',
+                    ];
+                } else {
+                    \Log::info("✅ Complete and accepted exam for $courseUnit");
                 }
             }
         }
     }
 
-    $lecturerSubmissions = array_unique(array_filter($lecturerSubmissions));
+    $lecturerSubmissions = array_unique($lecturerSubmissions);
     $allLecturers = array_unique($allLecturers);
-
-    \Log::info("✅ Participating lecturers: " . count($lecturerSubmissions));
-    \Log::info("📌 Missing courses: " . count(array_diff(array_keys($facultyCourses), $submittedCourses)));
-    \Log::info("📋 Final — Pending: $pendingExams | Approved: $approvedExams | Declined: $declinedExams | Incomplete: " . count($incompleteExams));
+    $missingCourses = array_diff(array_keys($facultyCourses), $submittedCourses);
 
     $averageQuestions = [];
     foreach ($questionCountPerSection as $section => $total) {
         $averageQuestions[$section] = $sectionExamCount[$section] > 0
             ? round($total / $sectionExamCount[$section], 2)
             : 0;
-    }
-
-    $missingCourses = array_diff(array_keys($facultyCourses), $submittedCourses);
-
-    // Attach lecturer info to incomplete exams
-    foreach ($incompleteExams as &$exam) {
-        $unit = strtolower(trim($exam['courseUnit'] ?? ''));
-        $matched = false;
-        foreach ($lecturerDataMap as $email => $lecturer) {
-            foreach ($lecturer['courses'] ?? [] as $course) {
-                if (strtolower(trim($course)) === $unit) {
-                    $exam['lecturerName'] = $lecturer['firstName'] ?? 'Unknown';
-                    $exam['lecturerEmail'] = $email;
-                    $matched = true;
-                    break;
-                }
-            }
-            if ($matched) break;
-        }
-
-        $exam['lecturerName'] = $exam['lecturerName'] ?? 'Unknown';
-        $exam['lecturerEmail'] = $exam['lecturerEmail'] ?? 'N/A';
-        $exam['status'] = $exam['status'] ?? 'Pending Review';
     }
 
     return compact(
