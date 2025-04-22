@@ -150,6 +150,7 @@ class DashboardController extends Controller
 
 private function getDashboardData(): array
 {
+    set_time_limit(320);
     $faculty = session('user_faculty');
     \Log::info("🟢 Starting full dashboard stats generation for faculty:", ['faculty' => $faculty]);
 

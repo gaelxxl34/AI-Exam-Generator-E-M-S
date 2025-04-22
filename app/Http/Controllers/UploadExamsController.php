@@ -100,146 +100,129 @@ class UploadExamsController extends Controller
 
 
 // add comment and also add statistics for reports 
-    public function getRandomQuestions(Request $request)
-    {
-        \Log::info('getRandomQuestions method started');
-        $selectedCourse = $request->input('course');
+public function getRandomQuestions(Request $request)
+{
+    \Log::info('getRandomQuestions method started');
+    $selectedCourse = $request->input('course');
 
-        try {
-            $firestore = app('firebase.firestore')->database();
+    try {
+        $firestore = app('firebase.firestore')->database();
 
-            // Fetch course information directly from the Courses collection
-            $coursesRef = $firestore->collection('Courses');
-            $query = $coursesRef->where('name', '==', $selectedCourse);
-            $courseSnapshots = $query->documents();
+        // Fetch course information directly from the Courses collection
+        $coursesRef = $firestore->collection('Courses');
+        $query = $coursesRef->where('name', '==', $selectedCourse);
+        $courseSnapshots = $query->documents();
 
-            if ($courseSnapshots->isEmpty()) {
-                \Log::error("No course found with the name: $selectedCourse");
-                throw new \Exception("No course found with the specified name.");
-            }
-
-            $courseData = null;
-            foreach ($courseSnapshots as $snapshot) {
-                if ($snapshot->exists()) {
-                    $courseData = $snapshot->data();
-                    break; // Assuming only one course matches the name, so we take the first match.
-                }
-            }
-
-            if ($courseData === null) {
-                \Log::error("No existing course found with the name: $selectedCourse");
-                throw new \Exception("No existing course found.");
-            }
-
-            $code = $courseData['code'] ?? 'default_code';
-            $program = $courseData['program'] ?? 'default_program';
-            $year_sem = $courseData['year_sem'] ?? 'default_year_sem';
-            $faculty = $courseData['faculty'] ?? 'default_faculty'; // Get faculty field
-            \Log::info("Course details fetched: Code: $code, Program: $program, Year/Sem: $year_sem, Faculty: $faculty");
-
-            // Initialize arrays to hold instructions
-            $sectionAInstructions = '';
-            $sectionBInstructions = '';  // Initialize as empty string
-
-            // Fetch exams based on the course code
-            $examsQuery = $firestore->collection('Exams')->where('courseUnit', '==', $selectedCourse);
-            $examsSnapshot = $examsQuery->documents();
-
-            $sections = []; // Initialize as an empty array
-
-            foreach ($examsSnapshot as $exam) {
-                if ($exam->exists()) {
-                    $data = $exam->data();
-
-                    // Get section instructions
-                    $sectionAInstructions = $data['sectionA_instructions'] ?? '';
-                    if (isset($data['sectionB_instructions'])) {
-                        $sectionBInstructions = $data['sectionB_instructions'];
-                    }
-
-                    // Get the sections data
-                    foreach ($data['sections'] as $section => $contents) {
-                        if (!isset($sections[$section])) {
-                            $sections[$section] = [];
-                        }
-
-                        foreach ($contents as $index => $content) {
-                            // Base64 decode the content before storing
-                            $decodedContent = base64_decode($content); // Decode the base64 content
-
-                            // Load the decoded content into DOMDocument
-                            $doc = new \DOMDocument();
-                            @$doc->loadHTML($decodedContent, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-
-                            // Save the decoded HTML
-                            $sections[$section][] = $doc->saveHTML();
-                        }
-                    }
-                }
-            }
-
-            // Shuffle and slice questions based on faculty logic
-            foreach ($sections as $section => $questions) {
-                shuffle($questions);
-
-                // Determine the number of questions to pick based on faculty and section
-                if ($faculty == 'FST' || $faculty == 'FBM') {
-                    // FST and FBM: 1 question for Section A, 6 questions for Section B
-                    $count = ($section == 'A') ? 1 : 6;
-                } elseif ($faculty == 'FOE') {
-                    // FOE: 4 questions for both Section A and Section B
-                    $count = 4;
-                } elseif ($faculty == 'HEC') {
-                    // HEC: 10 questions for Section A, 6 for Section B
-                    $count = ($section == 'A') ? 10 : 6;
-                } elseif ($faculty == 'FOL') {
-                    // FOL: 1 for Section A, 2 for Section B, 4 for Section C
-                    if ($section == 'A') {
-                        $count = 1;
-                    } elseif ($section == 'B') {
-                        $count = 2;
-                    } else {
-                        // Assuming any other section is "C"
-                        $count = 4;
-                    }
-                } else {
-                    // Default behavior if faculty is not one of the defined options
-                    // Adjust based on your default logic
-                    $count = ($section == 'A') ? 4 : 6;
-                }
-
-                // Slice the questions to the desired count
-                $sections[$section] = array_slice($questions, 0, $count);
-            }
-
-
-            // Store the sections data in the session
-            session([
-                'sections' => $sections,
-                'sectionA_instructions' => $sectionAInstructions,
-                'sectionB_instructions' => $sectionBInstructions,
-                'sectionC_instructions' => $data['sectionC_instructions'] ?? '', // Capture Section C if it exists
-            ]);
-
-
-            // Store additional course data in the session
-            session([
-                'faculty' => $faculty,
-                'code' => $code,
-                'program' => $program,
-                'year_sem' => $year_sem,
-            ]);
-
-            return view('genadmin.view-generated-exam', [
-                'courseUnit' => $selectedCourse,
-                'sections' => $sections
-            ]);
-
-        } catch (\Exception $e) {
-            \Log::error('Error in getRandomQuestions: ' . $e->getMessage());
-            return 'Error: ' . $e->getMessage();
+        if ($courseSnapshots->isEmpty()) {
+            \Log::error("No course found with the name: $selectedCourse");
+            throw new \Exception("No course found with the specified name.");
         }
+
+        $courseData = null;
+        foreach ($courseSnapshots as $snapshot) {
+            if ($snapshot->exists()) {
+                $courseData = $snapshot->data();
+                break;
+            }
+        }
+
+        if ($courseData === null) {
+            \Log::error("No existing course found with the name: $selectedCourse");
+            throw new \Exception("No existing course found.");
+        }
+
+        $code = $courseData['code'] ?? 'default_code';
+        $program = $courseData['program'] ?? 'default_program';
+        $year_sem = $courseData['year_sem'] ?? 'default_year_sem';
+        $faculty = $courseData['faculty'] ?? 'default_faculty';
+
+        \Log::info("Course details fetched: Code: $code, Program: $program, Year/Sem: $year_sem, Faculty: $faculty");
+
+        $sectionAInstructions = '';
+        $sectionBInstructions = '';
+
+        $examsQuery = $firestore->collection('Exams')->where('courseUnit', '==', $selectedCourse);
+        $examsSnapshot = $examsQuery->documents();
+
+        $sections = [];
+
+        foreach ($examsSnapshot as $exam) {
+            if ($exam->exists()) {
+                $data = $exam->data();
+
+                $sectionAInstructions = $data['sectionA_instructions'] ?? '';
+                $sectionBInstructions = $data['sectionB_instructions'] ?? '';
+
+                foreach ($data['sections'] as $section => $contents) {
+                    if (!isset($sections[$section])) {
+                        $sections[$section] = [];
+                    }
+
+                    foreach ($contents as $index => $content) {
+                        // Decode base64 content and convert to HTML entities
+                        $decodedContent = mb_convert_encoding(base64_decode($content), 'HTML-ENTITIES', 'UTF-8');
+
+                        // Load content into DOMDocument with UTF-8 encoding declaration
+                        libxml_use_internal_errors(true);
+                        $doc = new \DOMDocument();
+                        $doc->loadHTML('<?xml encoding="utf-8" ?>' . $decodedContent, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+                        libxml_clear_errors();
+
+                        // Save cleaned HTML
+                        $sections[$section][] = $doc->saveHTML();
+                    }
+                }
+            }
+        }
+
+        // Shuffle and trim questions by faculty rules
+        foreach ($sections as $section => $questions) {
+            shuffle($questions);
+
+            if ($faculty == 'FST' || $faculty == 'FBM') {
+                $count = ($section == 'A') ? 1 : 6;
+            } elseif ($faculty == 'FOE') {
+                $count = 4;
+            } elseif ($faculty == 'HEC') {
+                $count = ($section == 'A') ? 10 : 6;
+            } elseif ($faculty == 'FOL') {
+                if ($section == 'A') {
+                    $count = 1;
+                } elseif ($section == 'B') {
+                    $count = 2;
+                } else {
+                    $count = 4;
+                }
+            } else {
+                $count = ($section == 'A') ? 4 : 6;
+            }
+
+            $sections[$section] = array_slice($questions, 0, $count);
+        }
+
+        // Save to session
+        session([
+            'sections' => $sections,
+            'sectionA_instructions' => $sectionAInstructions,
+            'sectionB_instructions' => $sectionBInstructions,
+            'sectionC_instructions' => $data['sectionC_instructions'] ?? '',
+            'faculty' => $faculty,
+            'code' => $code,
+            'program' => $program,
+            'year_sem' => $year_sem,
+        ]);
+
+        return view('genadmin.view-generated-exam', [
+            'courseUnit' => $selectedCourse,
+            'sections' => $sections
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('Error in getRandomQuestions: ' . $e->getMessage());
+        return 'Error: ' . $e->getMessage();
     }
+}
+
 
 
 
