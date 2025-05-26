@@ -113,14 +113,14 @@ class AuthController extends Controller
                 
                 if (!$userSnapshot->exists()) {
                     Log::warning('User document not found in Firestore for UID: ' . $uid);
-                    return back()->withErrors(['login_error' => 'Account not found in our database.']);
+                    return redirect()->route('login')->withErrors(['login_error' => 'Account not found in our database.']);
                 }
                 
                 $userData = $userSnapshot->data();
                 Log::info('User data retrieved from Firestore: ' . json_encode(array_keys($userData)));
             
                 if (!empty($userData['disabled'])) {
-                    return back()->withErrors(['login_error' => 'Your account is disabled.']);
+                    return redirect()->route('login')->withErrors(['login_error' => 'Your account is disabled.']);
                 }
         
                 $faculty = [];
@@ -131,7 +131,7 @@ class AuthController extends Controller
                 }
         
                 if (empty($faculty)) {
-                    return back()->withErrors(['login_error' => 'Faculty info missing.']);
+                    return redirect()->route('login')->withErrors(['login_error' => 'Faculty info missing.']);
                 }
         
                 session()->put([
@@ -154,22 +154,22 @@ class AuthController extends Controller
             } catch (\Exception $firestoreException) {
                 Log::error('Firestore error: ' . $firestoreException->getMessage());
                 Log::error('Firestore error trace: ' . $firestoreException->getTraceAsString());
-                return back()->withErrors(['login_error' => 'Error accessing user data: ' . $firestoreException->getMessage()]);
+                return redirect()->route('login')->withErrors(['login_error' => 'Error accessing user data: ' . $firestoreException->getMessage()]);
             }
             
         } catch (\Kreait\Firebase\Exception\Auth\InvalidPassword $e) {
             Log::warning('Invalid password for user: ' . $credentials['email']);
-            return back()->withErrors(['login_error' => 'Invalid email or password.']);
+            return redirect()->route('login')->withErrors(['login_error' => 'Invalid email or password.']);
         
         } catch (\Kreait\Firebase\Exception\Auth\UserNotFound $e) {
             Log::warning('User not found: ' . $credentials['email']);
-            return back()->withErrors(['login_error' => 'Your account does not exist.']);
+            return redirect()->route('login')->withErrors(['login_error' => 'Your account does not exist.']);
         
         } catch (\Throwable $e) {
             Log::error('Authentication error: ' . $e->getMessage());
             Log::error('Error class: ' . get_class($e));
             Log::error('Stack trace: ' . $e->getTraceAsString());
-            return back()->withErrors(['login_error' => 'Authentication error: ' . $e->getMessage()]);
+            return redirect()->route('login')->withErrors(['login_error' => 'Authentication error: ' . $e->getMessage()]);
         }
     }
     
