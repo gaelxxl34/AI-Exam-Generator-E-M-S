@@ -45,12 +45,14 @@ Route::get('/fst/fstdiploma-common-page', function () {
 
 
 
-// Login and forget password
-Route::post('login', [AuthController::class, 'showLoginForm'])->name('login');
-Route::get('login', [AuthController::class, 'showLoginForm'])->name('login');
+// Show the login form:
+    Route::get('login', [AuthController::class, 'showLoginForm'])
+    ->name('login');
 
-Route::post('authenticate', [AuthController::class, 'authenticate'])->name('authenticate');
-Route::get('authenticate', [AuthController::class, 'authenticate'])->name('authenticate');
+// Handle the form POST:
+Route::post('authenticate', [AuthController::class, 'authenticate'])
+    ->name('authenticate');
+    
 
 Route::get('logout', 'App\Http\Controllers\AuthController@logout')->name('logout');
 Route::post('logout', 'App\Http\Controllers\AuthController@logout')->name('logout');
