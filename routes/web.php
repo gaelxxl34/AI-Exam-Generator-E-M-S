@@ -52,10 +52,10 @@ Route::get('/fst/fstdiploma-common-page', function () {
 // Handle the form POST:
 Route::post('authenticate', [AuthController::class, 'authenticate'])
     ->name('authenticate');
-    
 
-Route::get('logout', 'App\Http\Controllers\AuthController@logout')->name('logout');
+
 Route::post('logout', 'App\Http\Controllers\AuthController@logout')->name('logout');
+
 Route::post('forget-password', [AuthController::class, 'sendPasswordResetLink'])->name('forget-password.action');
 Route::get('/forget-password', [AuthController::class, 'showForgetPasswordForm'])->name('forget-password');
 
