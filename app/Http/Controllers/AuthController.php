@@ -38,7 +38,8 @@ class AuthController extends Controller
         $firebaseFactory = (new Factory)->withServiceAccount($serviceAccount)->withDatabaseUri(env('FIREBASE_DATABASE_URL'));
     
         $this->firebaseAuth = $firebaseFactory->createAuth();
-        $this->firebaseFirestore = $firebaseFactory->createFirestore(); // Initialize Firestore
+        // Fix: Get the correct Firestore database instance
+        $this->firebaseFirestore = $firebaseFactory->createFirestore()->database();
     }
     
     
@@ -112,22 +113,42 @@ class AuthController extends Controller
             ]);
     
             return match ($userData['role'] ?? '') {
-                'admin'      => redirect('/admin/dashboard'),
-                'lecturer'   => redirect('/lecturer/lecturer.l-upload-questions'),
-                'superadmin' => redirect('/superadmin/super-adm-dashboard'),
-                'genadmin'   => redirect('/genadmin/gen-dashboard'),
-                'dean'       => redirect('/deans/dean-dashboard'),
+                'admin'      => redirect()->route('admin.dashboard'),
+                'lecturer'   => redirect()->route('lecturer.l-upload-questions'),
+                'superadmin' => redirect()->route('superadmin.super-admin-dashboard'),
+                'genadmin'   => redirect()->route('genadmin.gen-dashboard'),
+                'dean'       => redirect()->route('dean.dashboard'),
                 default      => throw new \Exception("No valid role assigned to user."),
             };
     
         } catch (\Kreait\Firebase\Exception\Auth\InvalidPassword $e) {
-            return back()->withErrors(['login_error' => 'Invalid email or password.']);
+            Log::warning('Invalid password attempt for: ' . $credentials['email']);
+            return redirect()->route('login')->withErrors(['login_error' => 'Invalid email or password.']);
     
         } catch (\Kreait\Firebase\Exception\Auth\UserNotFound $e) {
-            return back()->withErrors(['login_error' => 'Your account does not exist.']);
+            Log::warning('User not found: ' . $credentials['email']);
+            return redirect()->route('login')->withErrors(['login_error' => 'Your account does not exist.']);
     
         } catch (\Throwable $e) {
-            return back()->withErrors(['login_error' => 'An unexpected error occurred.']);
+            // Enhanced logging for debugging
+            Log::error('===== AUTHENTICATION ERROR =====');
+            Log::error('Error message: ' . $e->getMessage());
+            Log::error('Error code: ' . $e->getCode());
+            Log::error('Error class: ' . get_class($e));
+            Log::error('Error file: ' . $e->getFile() . ' (line ' . $e->getLine() . ')');
+            Log::error('Error trace: ' . $e->getTraceAsString());
+            Log::error('Request IP: ' . $request->ip());
+            Log::error('Session ID: ' . session()->getId());
+            Log::error('Email attempting login: ' . ($credentials['email'] ?? 'not provided'));
+            Log::error('================================');
+            
+            // Show a more descriptive error message in development
+            if (config('app.debug')) {
+                return redirect()->route('login')->withErrors(['login_error' => 'Error: ' . $e->getMessage()]);
+            }
+            
+            // Generic message for production
+            return redirect()->route('login')->withErrors(['login_error' => 'Authentication failed. Please try again later.']);
         }
     }
     
