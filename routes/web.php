@@ -237,7 +237,7 @@ Route::get('/lecturer/l-upload-questions', function () {
 
 Route::get('/lecturer/lecturer.l-upload-questions', [CourseController::class, 'CoursesList'])
     ->middleware(EnsureLecturerRole::class)
-    ->name('lecturer.l-upload-questions');
+    ->name('lecturer.l-dashboard');
 
 
 
