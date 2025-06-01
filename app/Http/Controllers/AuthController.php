@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-
 use Illuminate\Http\Request;
 use Kreait\Firebase\Factory;
 use Kreait\Firebase\Exception\Auth\UserNotFound;
 use Illuminate\Support\Facades\Session;
 use Kreait\Firebase\Exception\Auth\InvalidPassword;
 use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\CourseController;
 
 
 class AuthController extends Controller
@@ -71,84 +71,78 @@ class AuthController extends Controller
         $credentials = $request->only('email', 'password');
     
         try {
+            Log::info('Authentication attempt for: ' . $credentials['email']);
+            
             $signInResult = $this->firebaseAuth->signInWithEmailAndPassword(
                 $credentials['email'],
                 $credentials['password']
             );
     
             $uid = $signInResult->firebaseUserId();
+            Log::info('Firebase auth successful, UID: ' . $uid);
     
-            $userSnapshot = $this->firebaseFirestore
-                ->collection('Users')
-                ->document($uid)
-                ->snapshot();
-    
-            if (!$userSnapshot->exists()) {
-                return back()->withErrors(['login_error' => 'Account not found in our database.']);
+            try {
+                $userSnapshot = $this->firebaseFirestore
+                    ->collection('Users')
+                    ->document($uid)
+                    ->snapshot();
+                
+                if (!$userSnapshot->exists()) {
+                    Log::warning('User document not found for UID: ' . $uid);
+                    return back()->withErrors(['login_error' => 'Account not found in our database.']);
+                }
+                
+                $userData = $userSnapshot->data();
+                Log::info('User data retrieved successfully');
+                
+                $faculty = [];
+                if (!empty($userData['faculties']) && is_array($userData['faculties'])) {
+                    $faculty = $userData['faculties'];
+                } elseif (!empty($userData['faculty'])) {
+                    $faculty = [(string) $userData['faculty']];
+                }
+        
+                if (empty($faculty)) {
+                    return back()->withErrors(['login_error' => 'Faculty info missing.']);
+                }
+        
+                session()->put([
+                    'user_email'     => $credentials['email'],
+                    'user'           => $uid,
+                    'user_faculty'   => $faculty,
+                    'user_firstName' => $userData['firstName'] ?? 'Unknown',
+                    'user_role'      => $userData['role'] ?? 'unknown',
+                ]);
+        
+                // Redirect based on role
+                $role = $userData['role'] ?? '';
+                Log::info('Redirecting user with role: ' . $role);
+                
+                return match ($role) {
+                    'admin'      => redirect('/admin/dashboard'),
+                    'lecturer'   => redirect()->action([CourseController::class, 'CoursesList']),
+                    'superadmin' => redirect('/superadmin/super-adm-dashboard'),
+                    'genadmin'   => redirect('/genadmin/gen-dashboard'),
+                    'dean'       => redirect('/deans/dean-dashboard'),
+                    default      => throw new \Exception("No valid role assigned to user."),
+                };
+            } catch (\Exception $firestoreError) {
+                Log::error('Firestore error: ' . $firestoreError->getMessage());
+                return back()->withErrors(['login_error' => 'Error retrieving user data: ' . $firestoreError->getMessage()]);
             }
-    
-            $userData = $userSnapshot->data();
-    
-            if (!empty($userData['disabled'])) {
-                return back()->withErrors(['login_error' => 'Your account is disabled.']);
-            }
-    
-            $faculty = [];
-            if (!empty($userData['faculties']) && is_array($userData['faculties'])) {
-                $faculty = $userData['faculties'];
-            } elseif (!empty($userData['faculty'])) {
-                $faculty = [(string) $userData['faculty']];
-            }
-    
-            if (empty($faculty)) {
-                return back()->withErrors(['login_error' => 'Faculty info missing.']);
-            }
-    
-            session()->put([
-                'user_email'     => $credentials['email'],
-                'user'           => $uid,
-                'user_faculty'   => $faculty,
-                'user_firstName' => $userData['firstName'] ?? 'Unknown',
-                'user_role'      => $userData['role'] ?? 'unknown',
-            ]);
-    
-            return match ($userData['role'] ?? '') {
-                'admin'      => redirect()->route('admin.dashboard'),
-                'lecturer'   => redirect()->route('lecturer.l-upload-questions'),
-                'superadmin' => redirect()->route('superadmin.super-admin-dashboard'),
-                'genadmin'   => redirect()->route('genadmin.gen-dashboard'),
-                'dean'       => redirect()->route('dean.dashboard'),
-                default      => throw new \Exception("No valid role assigned to user."),
-            };
-    
         } catch (\Kreait\Firebase\Exception\Auth\InvalidPassword $e) {
-            Log::warning('Invalid password attempt for: ' . $credentials['email']);
-            return redirect()->route('login')->withErrors(['login_error' => 'Invalid email or password.']);
+            Log::warning('Invalid password for user: ' . $credentials['email']);
+            return back()->withErrors(['login_error' => 'Invalid email or password.']);
     
         } catch (\Kreait\Firebase\Exception\Auth\UserNotFound $e) {
             Log::warning('User not found: ' . $credentials['email']);
-            return redirect()->route('login')->withErrors(['login_error' => 'Your account does not exist.']);
+            return back()->withErrors(['login_error' => 'Your account does not exist.']);
     
         } catch (\Throwable $e) {
-            // Enhanced logging for debugging
-            Log::error('===== AUTHENTICATION ERROR =====');
-            Log::error('Error message: ' . $e->getMessage());
-            Log::error('Error code: ' . $e->getCode());
+            Log::error('Authentication error: ' . $e->getMessage());
             Log::error('Error class: ' . get_class($e));
-            Log::error('Error file: ' . $e->getFile() . ' (line ' . $e->getLine() . ')');
-            Log::error('Error trace: ' . $e->getTraceAsString());
-            Log::error('Request IP: ' . $request->ip());
-            Log::error('Session ID: ' . session()->getId());
-            Log::error('Email attempting login: ' . ($credentials['email'] ?? 'not provided'));
-            Log::error('================================');
-            
-            // Show a more descriptive error message in development
-            if (config('app.debug')) {
-                return redirect()->route('login')->withErrors(['login_error' => 'Error: ' . $e->getMessage()]);
-            }
-            
-            // Generic message for production
-            return redirect()->route('login')->withErrors(['login_error' => 'Authentication failed. Please try again later.']);
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+            return back()->withErrors(['login_error' => 'Authentication error: ' . $e->getMessage()]);
         }
     }
     
@@ -199,7 +193,7 @@ class AuthController extends Controller
     {
         session()->forget('user');
         // You can also sign out the Firebase user if needed using $this->firebaseAuth->signOut()
-        
+
         return redirect('/login');
     }
 }
