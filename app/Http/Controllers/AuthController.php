@@ -9,12 +9,12 @@ use Illuminate\Support\Facades\Session;
 use Kreait\Firebase\Exception\Auth\InvalidPassword;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\CourseController;
-
+use Google\Cloud\Firestore\FirestoreClient;
 
 class AuthController extends Controller
 {
     protected $firebaseAuth;
-    protected $firebaseFirestore; // Add this property
+    protected $firestore; // Changed to use Google Cloud Firestore directly
     
     public function __construct()
     {
@@ -38,8 +38,25 @@ class AuthController extends Controller
         $firebaseFactory = (new Factory)->withServiceAccount($serviceAccount)->withDatabaseUri(env('FIREBASE_DATABASE_URL'));
     
         $this->firebaseAuth = $firebaseFactory->createAuth();
-        // Fix: Get the correct Firestore database instance
-        $this->firebaseFirestore = $firebaseFactory->createFirestore()->database();
+        
+        // Use Google Cloud Firestore client directly
+        try {
+            if (env('FIREBASE_CREDENTIALS_BASE64')) {
+                $this->firestore = new FirestoreClient([
+                    'keyFile' => json_decode(base64_decode(env('FIREBASE_CREDENTIALS_BASE64')), true),
+                    'projectId' => env('FIREBASE_PROJECT_ID')
+                ]);
+            } else {
+                $this->firestore = new FirestoreClient([
+                    'keyFilePath' => $firebaseCredentialsPath,
+                    'projectId' => env('FIREBASE_PROJECT_ID')
+                ]);
+            }
+            Log::info('Firestore client initialized successfully');
+        } catch (\Exception $e) {
+            Log::error('Failed to initialize Firestore client: ' . $e->getMessage());
+            throw $e;
+        }
     }
     
     
@@ -53,7 +70,7 @@ class AuthController extends Controller
     */
     public function showLoginForm()
     {
-        return view('login');
+        return response(view('login'));
     }
 
 
@@ -82,10 +99,9 @@ class AuthController extends Controller
             Log::info('Firebase auth successful, UID: ' . $uid);
     
             try {
-                $userSnapshot = $this->firebaseFirestore
-                    ->collection('Users')
-                    ->document($uid)
-                    ->snapshot();
+                // Use Google Cloud Firestore client directly
+                $userDoc = $this->firestore->collection('Users')->document($uid);
+                $userSnapshot = $userDoc->snapshot();
                 
                 if (!$userSnapshot->exists()) {
                     Log::warning('User document not found for UID: ' . $uid);
@@ -128,6 +144,7 @@ class AuthController extends Controller
                 };
             } catch (\Exception $firestoreError) {
                 Log::error('Firestore error: ' . $firestoreError->getMessage());
+                Log::error('Firestore error trace: ' . $firestoreError->getTraceAsString());
                 return back()->withErrors(['login_error' => 'Error retrieving user data: ' . $firestoreError->getMessage()]);
             }
         } catch (\Kreait\Firebase\Exception\Auth\InvalidPassword $e) {
