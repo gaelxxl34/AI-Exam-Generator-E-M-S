@@ -62,12 +62,37 @@ class AuthController extends Controller
             $firebaseFactory = (new Factory)->withServiceAccount($serviceAccount)->withDatabaseUri(env('FIREBASE_DATABASE_URL'));
             $this->firebaseAuth = $firebaseFactory->createAuth();
             
-            // Force Firestore to use REST transport instead of gRPC
-            $this->firestore = $firebaseFactory->createFirestore([
-                'transport' => 'rest'
-            ])->database();
+            // Try gRPC first with proper configuration
+            try {
+                $this->firestore = $firebaseFactory->createFirestore([
+                    'transport' => 'grpc',
+                    'grpcOptions' => [
+                        'grpc.keepalive_time_ms' => 120000,
+                        'grpc.keepalive_timeout_ms' => 5000,
+                        'grpc.keepalive_permit_without_calls' => true,
+                        'grpc.http2.max_pings_without_data' => 0,
+                        'grpc.http2.min_time_between_pings_ms' => 10000,
+                        'grpc.http2.min_ping_interval_without_data_ms' => 300000,
+                        'grpc.max_receive_message_length' => 4 * 1024 * 1024, // 4MB
+                        'grpc.max_send_message_length' => 4 * 1024 * 1024,    // 4MB
+                    ],
+                    'requestTimeout' => 30.0, // 30 seconds timeout
+                ])->database();
+                
+                Log::info('Firebase Firestore initialized with gRPC transport');
+            } catch (\Exception $grpcError) {
+                Log::warning('gRPC failed, falling back to REST: ' . $grpcError->getMessage());
+                
+                // Fallback to REST transport
+                $this->firestore = $firebaseFactory->createFirestore([
+                    'transport' => 'rest',
+                    'requestTimeout' => 30.0
+                ])->database();
+                
+                Log::info('Firebase Firestore initialized with REST fallback');
+            }
             
-            Log::info('Firebase services initialized successfully with REST transport');
+            Log::info('Firebase services initialized successfully');
         } catch (\Exception $e) {
             Log::error('Firebase initialization failed: ' . $e->getMessage());
             throw $e;
@@ -114,13 +139,42 @@ class AuthController extends Controller
             Log::info('Firebase auth successful, UID: ' . $uid);
     
             try {
-                // Use REST-based Firestore
-                $userSnapshot = $this->getFirestore()
-                    ->collection('Users')
-                    ->document($uid)
-                    ->snapshot();
+                // Add timeout and retry logic for Firestore calls
+                $maxRetries = 3;
+                $retryCount = 0;
+                $userSnapshot = null;
                 
-                if (!$userSnapshot->exists()) {
+                while ($retryCount < $maxRetries && !$userSnapshot) {
+                    try {
+                        // Set a timeout context
+                        $context = stream_context_create([
+                            'http' => [
+                                'timeout' => 10 // 10 seconds timeout
+                            ]
+                        ]);
+                        
+                        $userSnapshot = $this->getFirestore()
+                            ->collection('Users')
+                            ->document($uid)
+                            ->snapshot();
+                            
+                        if ($userSnapshot->exists()) {
+                            break;
+                        }
+                    } catch (\Exception $e) {
+                        $retryCount++;
+                        Log::warning("Firestore attempt {$retryCount} failed: " . $e->getMessage());
+                        
+                        if ($retryCount >= $maxRetries) {
+                            throw $e;
+                        }
+                        
+                        // Wait before retry
+                        usleep(500000); // 0.5 second delay
+                    }
+                }
+                
+                if (!$userSnapshot || !$userSnapshot->exists()) {
                     Log::warning('User document not found for UID: ' . $uid);
                     return back()->withErrors(['login_error' => 'Account not found in our database.']);
                 }
