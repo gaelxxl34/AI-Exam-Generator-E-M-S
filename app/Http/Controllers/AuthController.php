@@ -9,52 +9,67 @@ use Illuminate\Support\Facades\Session;
 use Kreait\Firebase\Exception\Auth\InvalidPassword;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\CourseController;
-use Google\Cloud\Firestore\FirestoreClient;
 
 class AuthController extends Controller
 {
     protected $firebaseAuth;
-    protected $firestore; // Changed to use Google Cloud Firestore directly
+    protected $firestore;
     
     public function __construct()
     {
-        if (env('FIREBASE_CREDENTIALS_BASE64')) {
-            $firebaseCredentialsJson = base64_decode(env('FIREBASE_CREDENTIALS_BASE64'));
-            if (!$firebaseCredentialsJson) {
-                throw new \Exception('Failed to decode FIREBASE_CREDENTIALS_BASE64');
-            }
-            $serviceAccount = json_decode($firebaseCredentialsJson, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new \Exception('Failed to decode JSON: ' . json_last_error_msg());
-            }
-        } else {
-            $firebaseCredentialsPath = env('FIREBASE_CREDENTIALS');
-            if (!$firebaseCredentialsPath || !file_exists($firebaseCredentialsPath)) {
-                throw new \Exception('Firebase credentials file path is not set or file does not exist');
-            }
-            $serviceAccount = $firebaseCredentialsPath;
+        // Remove Firebase initialization from constructor to avoid recursion
+        // Firebase services will be initialized lazily when needed
+    }
+    
+    protected function getFirebaseAuth()
+    {
+        if (!$this->firebaseAuth) {
+            $this->initializeFirebase();
         }
+        return $this->firebaseAuth;
+    }
     
-        $firebaseFactory = (new Factory)->withServiceAccount($serviceAccount)->withDatabaseUri(env('FIREBASE_DATABASE_URL'));
+    protected function getFirestore()
+    {
+        if (!$this->firestore) {
+            $this->initializeFirebase();
+        }
+        return $this->firestore;
+    }
     
-        $this->firebaseAuth = $firebaseFactory->createAuth();
-        
-        // Use Google Cloud Firestore client directly
+    protected function initializeFirebase()
+    {
         try {
             if (env('FIREBASE_CREDENTIALS_BASE64')) {
-                $this->firestore = new FirestoreClient([
-                    'keyFile' => json_decode(base64_decode(env('FIREBASE_CREDENTIALS_BASE64')), true),
-                    'projectId' => env('FIREBASE_PROJECT_ID')
-                ]);
+                $firebaseCredentialsJson = base64_decode(env('FIREBASE_CREDENTIALS_BASE64'));
+                if (!$firebaseCredentialsJson) {
+                    throw new \Exception('Failed to decode FIREBASE_CREDENTIALS_BASE64');
+                }
+                $serviceAccount = json_decode($firebaseCredentialsJson, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    throw new \Exception('Failed to decode JSON: ' . json_last_error_msg());
+                }
             } else {
-                $this->firestore = new FirestoreClient([
-                    'keyFilePath' => $firebaseCredentialsPath,
-                    'projectId' => env('FIREBASE_PROJECT_ID')
-                ]);
+                $firebaseCredentialsPath = env('FIREBASE_CREDENTIALS');
+                if (!$firebaseCredentialsPath || !file_exists($firebaseCredentialsPath)) {
+                    throw new \Exception('Firebase credentials file path is not set or file does not exist');
+                }
+                $serviceAccount = $firebaseCredentialsPath;
             }
-            Log::info('Firestore client initialized successfully');
+
+            Log::info('Initializing Firebase services lazily');
+
+            $firebaseFactory = (new Factory)->withServiceAccount($serviceAccount)->withDatabaseUri(env('FIREBASE_DATABASE_URL'));
+            $this->firebaseAuth = $firebaseFactory->createAuth();
+            
+            // Force Firestore to use REST transport instead of gRPC
+            $this->firestore = $firebaseFactory->createFirestore([
+                'transport' => 'rest'
+            ])->database();
+            
+            Log::info('Firebase services initialized successfully with REST transport');
         } catch (\Exception $e) {
-            Log::error('Failed to initialize Firestore client: ' . $e->getMessage());
+            Log::error('Firebase initialization failed: ' . $e->getMessage());
             throw $e;
         }
     }
@@ -90,7 +105,7 @@ class AuthController extends Controller
         try {
             Log::info('Authentication attempt for: ' . $credentials['email']);
             
-            $signInResult = $this->firebaseAuth->signInWithEmailAndPassword(
+            $signInResult = $this->getFirebaseAuth()->signInWithEmailAndPassword(
                 $credentials['email'],
                 $credentials['password']
             );
@@ -99,9 +114,11 @@ class AuthController extends Controller
             Log::info('Firebase auth successful, UID: ' . $uid);
     
             try {
-                // Use Google Cloud Firestore client directly
-                $userDoc = $this->firestore->collection('Users')->document($uid);
-                $userSnapshot = $userDoc->snapshot();
+                // Use REST-based Firestore
+                $userSnapshot = $this->getFirestore()
+                    ->collection('Users')
+                    ->document($uid)
+                    ->snapshot();
                 
                 if (!$userSnapshot->exists()) {
                     Log::warning('User document not found for UID: ' . $uid);
@@ -109,7 +126,7 @@ class AuthController extends Controller
                 }
                 
                 $userData = $userSnapshot->data();
-                Log::info('User data retrieved successfully');
+                Log::info('User data retrieved successfully from Firestore');
                 
                 $faculty = [];
                 if (!empty($userData['faculties']) && is_array($userData['faculties'])) {
@@ -136,7 +153,7 @@ class AuthController extends Controller
                 
                 return match ($role) {
                     'admin'      => redirect('/admin/dashboard'),
-                    'lecturer'   => redirect()->action([CourseController::class, 'CoursesList']),
+                    'lecturer'   => app(CourseController::class)->CoursesList(), // Call the method directly
                     'superadmin' => redirect('/superadmin/super-adm-dashboard'),
                     'genadmin'   => redirect('/genadmin/gen-dashboard'),
                     'dean'       => redirect('/deans/dean-dashboard'),
@@ -144,7 +161,6 @@ class AuthController extends Controller
                 };
             } catch (\Exception $firestoreError) {
                 Log::error('Firestore error: ' . $firestoreError->getMessage());
-                Log::error('Firestore error trace: ' . $firestoreError->getTraceAsString());
                 return back()->withErrors(['login_error' => 'Error retrieving user data: ' . $firestoreError->getMessage()]);
             }
         } catch (\Kreait\Firebase\Exception\Auth\InvalidPassword $e) {
@@ -182,11 +198,9 @@ class AuthController extends Controller
         ]);
 
         try {
-            // Check if user exists in Firebase
-            $user = $this->firebaseAuth->getUserByEmail($request->email);
-
-            // If the user exists, send the password reset link
-            $this->firebaseAuth->sendPasswordResetLink($request->email);
+            // Use lazy-loaded Firebase Auth
+            $user = $this->getFirebaseAuth()->getUserByEmail($request->email);
+            $this->getFirebaseAuth()->sendPasswordResetLink($request->email);
 
             return back()->with('status', 'Password reset link sent to your email.');
         } catch (UserNotFound $e) {
@@ -200,8 +214,6 @@ class AuthController extends Controller
 
 
     /**
-     * 
-     * 
      * Log out the user.
      *
      * @return \Illuminate\Http\Response

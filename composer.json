@@ -9,7 +9,7 @@
         "barryvdh/laravel-dompdf": "^2.1",
         "dompdf/dompdf": "^2.0",
         "google/cloud-core": "^1.56",
-        "google/cloud-firestore": "^1.42",
+        "google/cloud-firestore": "^1.50",
         "kreait/laravel-firebase": "^5.8",
         "laravel/framework": "^11.0",
         "laravel/tinker": "^2.9",

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "59bde384d6dc8794d3141a0b37180eac",
+    "content-hash": "d37a6819f81ba863c099fc60fda1306f",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
@@ -1170,16 +1170,16 @@
         },
         {
             "name": "google/cloud-firestore",
-            "version": "v1.48.0",
+            "version": "v1.50.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/googleapis/google-cloud-php-firestore.git",
-                "reference": "3f2cbd6ea3a2201f83eda220117d80d404e4d76d"
+                "reference": "22d883035f77dce56936cc1909159b8858bcb0b6"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/googleapis/google-cloud-php-firestore/zipball/3f2cbd6ea3a2201f83eda220117d80d404e4d76d",
-                "reference": "3f2cbd6ea3a2201f83eda220117d80d404e4d76d",
+                "url": "https://api.github.com/repos/googleapis/google-cloud-php-firestore/zipball/22d883035f77dce56936cc1909159b8858bcb0b6",
+                "reference": "22d883035f77dce56936cc1909159b8858bcb0b6",
                 "shasum": ""
             },
             "require": {
@@ -1221,9 +1221,9 @@
             ],
             "description": "Cloud Firestore Client for PHP",
             "support": {
-                "source": "https://github.com/googleapis/google-cloud-php-firestore/tree/v1.48.0"
+                "source": "https://github.com/googleapis/google-cloud-php-firestore/tree/v1.50.0"
             },
-            "time": "2025-01-24T21:24:06+00:00"
+            "time": "2025-04-18T20:49:28+00:00"
         },
         {
             "name": "google/cloud-storage",
