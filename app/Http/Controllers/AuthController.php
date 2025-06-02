@@ -150,7 +150,7 @@ class AuthController extends Controller
                 
                 return match ($role) {
                     'admin'      => redirect('/admin/dashboard'),
-                    'lecturer'   => app(CourseController::class)->CoursesList(), // Call the method directly
+                    'lecturer'   => app(CourseController::class)->CoursesList(), // Call the method directly with updated REST service
                     'superadmin' => redirect('/superadmin/super-adm-dashboard'),
                     'genadmin'   => redirect('/genadmin/gen-dashboard'),
                     'dean'       => redirect('/deans/dean-dashboard'),

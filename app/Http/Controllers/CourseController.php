@@ -4,121 +4,90 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
-// use PDF;
-use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Support\Facades\File;
+use App\Services\FirestoreRestService;
+
 class CourseController extends Controller
-
 {
-public function CoursesList()
-{
-    \Log::info('CoursesList method called');
-
-    try {
-        // Get the current user's email from session or authentication
-        $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
-        \Log::info('Current user email: ' . $currentUserEmail);
-
-        $firestore = app('firebase.firestore')->database();
-        $usersRef = $firestore->collection('Users');
-
-        // Fetch the current user from Firestore
-        $query = $usersRef->where('email', '==', $currentUserEmail);
-        $currentUserSnapshots = $query->documents();
-
-        if ($currentUserSnapshots->isEmpty()) {
-            \Log::error("Firestore user not found with email: $currentUserEmail");
-            throw new \Exception('Current user not found in Firestore.');
-        }
-
-        // Get user data
-        $currentUserDataArray = iterator_to_array($currentUserSnapshots);
-        $currentUserData = $currentUserDataArray[0]->data();
-
-        // Get the courses assigned to this lecturer
-        $lecturerCourses = $currentUserData['courses'] ?? [];
-
-        if (empty($lecturerCourses)) {
-            \Log::info('No courses found for the current user: ' . $currentUserEmail);
-            throw new \Exception('No courses found for the current user.');
-        }
-
-        // Fetch only the courses that belong to this lecturer from Firestore "Courses" collection
-        $coursesRef = $firestore->collection('Courses');
-        $coursesSnapshots = $coursesRef->where('name', 'in', $lecturerCourses)->documents();
-
-        $courses = [];
-        foreach ($coursesSnapshots as $course) {
-            if ($course->exists()) {
-                $data = $course->data();
-                $courses[] = [
-                    'name' => $data['name'] ?? 'Unknown Course',
-                    'code' => $data['code'] ?? 'No Code', // Now includes course code
-                    'faculty' => $data['faculty'] ?? 'Unknown Faculty'
-                ];
-            }
-        }
-
-        \Log::info('Courses fetched for the lecturer: ' . json_encode($courses));
-
-        // Pass the courses (with faculty and course code) to the view
-        return view('lecturer.l-upload-questions', ['courses' => $courses]);
-
-    } catch (\Exception $e) {
-        \Log::error('Error in CoursesList: ' . $e->getMessage());
-        return 'Error: ' . $e->getMessage();
+    protected $firestoreService;
+    
+    public function __construct()
+    {
+        $this->firestoreService = new FirestoreRestService();
     }
-}
+
+    public function CoursesList()
+    {
+        try {
+            Log::info('CoursesList method called');
+            
+            $userEmail = session('user_email');
+            Log::info('Current user email: ' . $userEmail);
+            
+            if (!$userEmail) {
+                return redirect('/login')->withErrors(['error' => 'Session expired. Please login again.']);
+            }
+            
+            // Get courses using our REST service instead of gRPC
+            $courses = $this->firestoreService->getCollection('Courses');
+            
+            // Filter courses for the current lecturer
+            $userFaculty = session('user_faculty', []);
+            $lecturerCourses = [];
+            
+            foreach ($courses as $course) {
+                // Check if course belongs to lecturer's faculty
+                if (in_array($course['faculty'] ?? '', $userFaculty)) {
+                    $lecturerCourses[] = $course;
+                }
+            }
+            
+            Log::info('Retrieved ' . count($lecturerCourses) . ' courses for lecturer');
+            
+            return view('lecturer.l-upload-questions', ['courses' => $lecturerCourses]);
+            
+        } catch (\Exception $e) {
+            Log::error('Error in CoursesList: ' . $e->getMessage());
+            return view('lecturer.l-upload-questions', ['courses' => []]);
+        }
+    }
 
     public function fetchCourses()
     {
-        \Log::info('Fetching courses for dashboard');
+        Log::info('Fetching courses for dashboard');
 
         try {
-            $firestore = app('firebase.firestore')->database();
             $lecturerEmail = session()->get('user_email');
-            \Log::info('Current user email: ' . $lecturerEmail);
+            Log::info('Current user email: ' . $lecturerEmail);
 
-            // Query the Users collection to find the lecturer's document by email
-            $usersRef = $firestore->collection('Users');
-            $query = $usersRef->where('email', '=', $lecturerEmail);
-            $snapshot = $query->documents();
-
-            $lecturerCourses = [];
-
-            foreach ($snapshot as $doc) {
-                if ($doc->exists() && $doc['email'] === $lecturerEmail) {
-                    $lecturerCourses = $doc['courses'];
-                    break; // Assuming one match, we can break the loop once found
-                }
-            }
-
-            if (empty($lecturerCourses)) {
-                \Log::error("Lecturer not found or no courses assigned");
+            // Get lecturer's document using REST service
+            $users = $this->firestoreService->queryCollection('Users', 'email', 'EQUAL', $lecturerEmail);
+            
+            if (empty($users)) {
+                Log::error("Lecturer not found or no courses assigned");
                 return back()->withErrors(['fetch_error' => 'Lecturer not found or no courses assigned.']);
             }
 
-            $examsRef = $firestore->collection('Exams');
-            $courses = [];
+            $lecturerData = $users[0];
+            $lecturerCourses = $lecturerData['courses'] ?? [];
 
+            if (empty($lecturerCourses)) {
+                Log::error("No courses assigned to lecturer");
+                return back()->withErrors(['fetch_error' => 'No courses assigned to lecturer.']);
+            }
+
+            // Get exams for lecturer's courses
+            $courses = [];
             foreach ($lecturerCourses as $courseUnit) {
-                $courseExams = $examsRef->where('courseUnit', '=', $courseUnit)->documents();
-                foreach ($courseExams as $document) {
-                    if ($document->exists()) {
-                        $data = $document->data();
-                        if (!isset($courses[$courseUnit])) {
-                            $courses[$courseUnit] = [];
-                        }
-                        $courses[$courseUnit][] = $data;
-                    }
+                $exams = $this->firestoreService->queryCollection('Exams', 'courseUnit', 'EQUAL', $courseUnit);
+                if (!empty($exams)) {
+                    $courses[$courseUnit] = $exams;
                 }
             }
 
             return view('lecturer.l-dashboard', ['courses' => $courses]);
 
         } catch (\Throwable $e) {
-            \Log::error("Error fetching courses: " . $e->getMessage());
+            Log::error("Error fetching courses: " . $e->getMessage());
             return back()->withErrors(['fetch_error' => 'Error fetching courses.'])->with('message', 'Error fetching courses: ' . $e->getMessage());
         }
     }
