@@ -62,19 +62,10 @@ class AuthController extends Controller
             $firebaseFactory = (new Factory)->withServiceAccount($serviceAccount)->withDatabaseUri(env('FIREBASE_DATABASE_URL'));
             $this->firebaseAuth = $firebaseFactory->createAuth();
             
-            // Force REST transport only - disable gRPC completely
-            $this->firestore = $firebaseFactory->createFirestore([
-                'transport' => 'rest',
-                'requestTimeout' => 30.0,
-                // Explicitly disable gRPC
-                'transportConfig' => [
-                    'rest' => [
-                        'restClientConfigPath' => null,
-                    ]
-                ]
-            ])->database();
+            // Skip Firestore SDK entirely - we'll use direct HTTP calls
+            $this->firestore = null; // We'll handle this differently
             
-            Log::info('Firebase Firestore initialized with REST transport only');
+            Log::info('Firebase Auth initialized successfully - using direct HTTP for Firestore');
             Log::info('Firebase services initialized successfully');
         } catch (\Exception $e) {
             Log::error('Firebase initialization failed: ' . $e->getMessage());
@@ -122,21 +113,17 @@ class AuthController extends Controller
             Log::info('Firebase auth successful, UID: ' . $uid);
     
             try {
-                // Simplified approach - no retry logic that might cause issues
-                Log::info('Attempting to fetch user data from Firestore');
+                // Use direct HTTP request to Firestore REST API
+                Log::info('Attempting to fetch user data via HTTP REST API');
                 
-                $userSnapshot = $this->getFirestore()
-                    ->collection('Users')
-                    ->document($uid)
-                    ->snapshot();
+                $userData = $this->getUserDataViaHTTP($uid);
                 
-                if (!$userSnapshot->exists()) {
+                if (!$userData) {
                     Log::warning('User document not found for UID: ' . $uid);
                     return back()->withErrors(['login_error' => 'Account not found in our database.']);
                 }
                 
-                $userData = $userSnapshot->data();
-                Log::info('User data retrieved successfully from Firestore');
+                Log::info('User data retrieved successfully via HTTP');
                 
                 $faculty = [];
                 if (!empty($userData['faculties']) && is_array($userData['faculties'])) {
@@ -169,9 +156,9 @@ class AuthController extends Controller
                     'dean'       => redirect('/deans/dean-dashboard'),
                     default      => throw new \Exception("No valid role assigned to user."),
                 };
-            } catch (\Exception $firestoreError) {
-                Log::error('Firestore error: ' . $firestoreError->getMessage());
-                return back()->withErrors(['login_error' => 'Error retrieving user data: ' . $firestoreError->getMessage()]);
+            } catch (\Exception $httpError) {
+                Log::error('HTTP Firestore error: ' . $httpError->getMessage());
+                return back()->withErrors(['login_error' => 'Error retrieving user data: ' . $httpError->getMessage()]);
             }
         } catch (\Kreait\Firebase\Exception\Auth\InvalidPassword $e) {
             Log::warning('Invalid password for user: ' . $credentials['email']);
@@ -188,7 +175,131 @@ class AuthController extends Controller
             return back()->withErrors(['login_error' => 'Authentication error: ' . $e->getMessage()]);
         }
     }
-    
+
+    /**
+     * Get user data via direct HTTP request to Firestore REST API
+     */
+    private function getUserDataViaHTTP($uid)
+    {
+        try {
+            // Get access token
+            $accessToken = $this->getAccessToken();
+            
+            $projectId = env('FIREBASE_PROJECT_ID');
+            $url = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/Users/{$uid}";
+            
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Authorization: Bearer ' . $accessToken,
+                'Content-Type: application/json'
+            ]);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            if ($httpCode === 404) {
+                return null; // Document not found
+            }
+            
+            if ($httpCode !== 200) {
+                throw new \Exception("HTTP request failed with code: {$httpCode}");
+            }
+            
+            $data = json_decode($response, true);
+            
+            // Convert Firestore document format to simple array
+            return $this->convertFirestoreDocument($data);
+            
+        } catch (\Exception $e) {
+            Log::error('HTTP request to Firestore failed: ' . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Get access token for Google API
+     */
+    private function getAccessToken()
+    {
+        if (env('FIREBASE_CREDENTIALS_BASE64')) {
+            $serviceAccount = json_decode(base64_decode(env('FIREBASE_CREDENTIALS_BASE64')), true);
+        } else {
+            $serviceAccount = json_decode(file_get_contents(env('FIREBASE_CREDENTIALS')), true);
+        }
+        
+        $jwt = $this->createJWT($serviceAccount);
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, 'https://oauth2.googleapis.com/token');
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+            'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            'assertion' => $jwt
+        ]));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/x-www-form-urlencoded']);
+        
+        $response = curl_exec($ch);
+        curl_close($ch);
+        
+        $data = json_decode($response, true);
+        return $data['access_token'];
+    }
+
+    /**
+     * Create JWT for service account authentication
+     */
+    private function createJWT($serviceAccount)
+    {
+        $header = json_encode(['typ' => 'JWT', 'alg' => 'RS256']);
+        $now = time();
+        $payload = json_encode([
+            'iss' => $serviceAccount['client_email'],
+            'scope' => 'https://www.googleapis.com/auth/datastore',
+            'aud' => 'https://oauth2.googleapis.com/token',
+            'exp' => $now + 3600,
+            'iat' => $now
+        ]);
+        
+        $base64Header = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($header));
+        $base64Payload = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($payload));
+        
+        $signature = '';
+        openssl_sign($base64Header . '.' . $base64Payload, $signature, $serviceAccount['private_key'], 'SHA256');
+        $base64Signature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
+        
+        return $base64Header . '.' . $base64Payload . '.' . $base64Signature;
+    }
+
+    /**
+     * Convert Firestore document format to simple array
+     */
+    private function convertFirestoreDocument($firestoreDoc)
+    {
+        if (!isset($firestoreDoc['fields'])) {
+            return null;
+        }
+        
+        $result = [];
+        foreach ($firestoreDoc['fields'] as $key => $value) {
+            if (isset($value['stringValue'])) {
+                $result[$key] = $value['stringValue'];
+            } elseif (isset($value['arrayValue']['values'])) {
+                $result[$key] = array_map(function($item) {
+                    return $item['stringValue'] ?? $item;
+                }, $value['arrayValue']['values']);
+            } elseif (isset($value['booleanValue'])) {
+                $result[$key] = $value['booleanValue'];
+            }
+            // Add more type conversions as needed
+        }
+        
+        return $result;
+    }
 
 
 
