@@ -157,10 +157,6 @@ class AuthController extends Controller
                 return redirect()->route('login')->withErrors(['login_error' => 'Error accessing user data: ' . $firestoreException->getMessage()]);
             }
             
-        } catch (\Kreait\Firebase\Exception\Auth\InvalidPassword $e) {
-            Log::warning('Invalid password for user: ' . $credentials['email']);
-            return redirect()->route('login')->withErrors(['login_error' => 'Invalid email or password.']);
-        
         } catch (\Kreait\Firebase\Exception\Auth\UserNotFound $e) {
             Log::warning('User not found: ' . $credentials['email']);
             return redirect()->route('login')->withErrors(['login_error' => 'Your account does not exist.']);

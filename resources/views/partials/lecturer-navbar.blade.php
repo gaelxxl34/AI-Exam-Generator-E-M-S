@@ -21,13 +21,6 @@
                         </a>
                     </div>
 
-                        <!-- Center: Alert -->
-                        <div class="hidden sm:block flex-1 text-center">
-                            <div class="inline-block bg-yellow-400 text-black text-xl font-bold text-sm px-4 py-1 rounded shadow">
-                                🚨 <span class="underline font-extrabold">System closes 1 April.</span> Make sure all exams are uploaded and statuses
-                                confirmed before the deadline! 🚨
-                            </div>
-                        </div>
 
 
                     <div class="flex items-center">

@@ -18,3 +18,4 @@ yarn-error.log
 /.idea
 /.vscode
 firebase_credentials.json
+database/database.sqlite

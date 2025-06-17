@@ -249,12 +249,25 @@ Route::get('/superadmin/super-adm-dashboard', function () {
     return view('superadmin.super-adm-dashboard');
 })->middleware(EnsureSuperAdminRole::class)->name('superadmin.super-admin-dashboard');
 
-Route::get('/superadmin/lecturer-control', [SuperAdminController::class, 'manageLecturers'])->name('superadmin.lecturerControl');
-Route::post('/superadmin/toggle-lecturer/{uid}', [SuperAdminController::class, 'toggleLecturerStatus'])
-    ->name('superadmin.toggleLecturerStatus');
-Route::post('/superadmin/toggle-all-lecturers', [SuperAdminController::class, 'toggleAllLecturersStatus'])
-    ->name('superadmin.toggleAllLecturers');
+Route::get('/superadmin/lecturer-control', [SuperAdminController::class, 'manageLecturers'])
+    ->middleware(EnsureSuperAdminRole::class)
+    ->name('superadmin.lecturerControl');
 
+Route::post('/superadmin/lecturer-control/toggle/{uid}', [SuperAdminController::class, 'toggleLecturerStatus'])
+    ->middleware(EnsureSuperAdminRole::class)
+    ->name('superadmin.toggle-lecturer-status');
+
+Route::post('/superadmin/lecturer-control/toggle-all', [SuperAdminController::class, 'toggleAllLecturersStatus'])
+    ->middleware(EnsureSuperAdminRole::class)
+    ->name('superadmin.toggle-all-lecturers');
+
+Route::post('/superadmin/lecturer-control/clear-courses/{uid}', [SuperAdminController::class, 'clearLecturerCourses'])
+    ->middleware(EnsureSuperAdminRole::class)
+    ->name('superadmin.clear-lecturer-courses');
+
+Route::post('/superadmin/lecturer-control/clear-all-courses', [SuperAdminController::class, 'clearAllLecturersCourses'])
+    ->middleware(EnsureSuperAdminRole::class)
+    ->name('superadmin.clear-all-lecturer-courses');
 
 
 
