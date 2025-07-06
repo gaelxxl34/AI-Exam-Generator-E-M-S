@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -38,6 +39,7 @@
             padding: .75rem;
             vertical-align: top;
         }
+
         /* Ensure the modal is always on top */
         #statusOverlay {
             position: fixed;
@@ -82,474 +84,560 @@
         body.modal-open {
             overflow: hidden;
         }
-
     </style>
 </head>
+
 <body>
-    
+
     @include('partials.lecturer-navbar')
 
-<div class="p-4 sm:ml-64 mt-20">
+    <div class="p-4 sm:ml-64 mt-20">
+        <div class="container mx-auto px-4">
+            @forelse ($exams as $index => $exam)
+                <!-- Header with course info and status -->
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">{{ $exam['courseUnit'] }}</h1>
+                        <span class="text-sm text-gray-500">Faculty: {{ $exam['faculty'] }}</span>
+                    </div>
+                    <div class="flex items-center space-x-2 mt-2 md:mt-0">
+                        <button id="statusButton"
+                            class="inline-flex items-center px-4 py-2 text-white text-sm font-bold rounded-full">
+                            <i class="fas fa-info-circle mr-2"></i> Status
+                        </button>
+                        <form action="{{ route('preview.pdf', ['courseUnit' => $exam['courseUnit']]) }}" method="GET"
+                            x-data="{ loading: false }" x-on:submit="loading = true" class="inline">
+                            <button type="submit"
+                                class="inline-flex items-center px-4 py-2 bg-gray-500 text-white text-sm font-bold rounded-full hover:bg-black focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-700"
+                                :disabled="loading">
+                                <span x-show="!loading"><i class="fas fa-oil-can mr-2"></i> Preview</span>
+                                <span x-show="loading" class="flex items-center">
+                                    <svg class="animate-spin h-4 w-4 mr-2 text-white" xmlns="http://www.w3.org/2000/svg"
+                                        fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                            stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                                    </svg>
+                                    Previewing...
+                                </span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
 
-<div  class="container mx-auto px-4">
-    @forelse ($exams as $index => $exam)
-                            <div class="mt-8 bg-white rounded-lg shadow-md">
-                                <div class="flex items-center justify-between">
-                                    <h1 class="text-xl font-bold p-4 border-b text-center">{{$exam['courseUnit'] }}</h1>
+                <!-- Tabs -->
+                <div x-data="{ tab: 'questions' }" class="mb-8">
+                    <nav class="flex space-x-4 border-b mb-4">
+                        <button
+                            :class="tab === 'questions' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500'"
+                            class="px-4 py-2 font-semibold focus:outline-none" @click="tab = 'questions'">Questions</button>
+                        <button
+                            :class="tab === 'instructions' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500'"
+                            class="px-4 py-2 font-semibold focus:outline-none"
+                            @click="tab = 'instructions'">Instructions</button>
+                        <button
+                            :class="tab === 'marking' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500'"
+                            class="px-4 py-2 font-semibold focus:outline-none" @click="tab = 'marking'">Marking
+                            Guide</button>
+                    </nav>
 
-                                    <div class="flex items-center space-x-2">
-                                        <!-- Status Button -->
-                                            <button id="statusButton" class="inline-flex items-center px-4 py-2 text-white text-sm font-bold rounded-full">
-                                                <i class="fas fa-info-circle mr-2"></i> Status
-                                            </button>
-
-                                        <!-- Preview Button -->
-                                        <a href="{{ route('preview.pdf', ['courseUnit' => $exam['courseUnit']]) }}"
-                                            class="inline-flex items-center px-4 py-2 bg-gray-500 text-white text-sm font-bold rounded-full hover:bg-black">
-                                            <i class="fas fa-oil-can mr-2"></i> Preview
-                                        </a>
+                    <!-- Questions Tab -->
+                    <div x-show="tab === 'questions'">
+                        <!-- Floating Add Question Button -->
+                        <button @click="$refs.addQuestionModal.showModal()"
+                            class="fixed bottom-8 right-8 z-50 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-lg p-4 flex items-center space-x-2 transition-all duration-200">
+                            <i class="fas fa-plus"></i>
+                            <span class="hidden md:inline">Add Question</span>
+                        </button>
+                        <!-- Add Question Modal -->
+                        <dialog x-ref="addQuestionModal" class="rounded-lg shadow-lg w-full max-w-lg p-0">
+                            <form enctype="multipart/form-data"
+                                action="{{ route('add.question', ['courseUnit' => $exam['courseUnit']]) }}" method="POST"
+                                x-data="{ loading: false }" x-on:submit="loading = true">
+                                @csrf
+                                <div class="p-6">
+                                    <h2 class="text-lg font-semibold mb-4">Add New Question</h2>
+                                    <div class="mb-4">
+                                        <label for="sectionSelect" class="block text-gray-700 text-sm font-bold mb-2">Select
+                                            Section:</label>
+                                        <select id="sectionSelect" name="section"
+                                            class="block w-full bg-white border border-gray-200 text-gray-700 py-2 px-3 rounded leading-tight focus:outline-none focus:border-gray-500"
+                                            required>
+                                            @foreach ($exam['sections'] as $sectionName => $questions)
+                                                <option value="{{ $sectionName }}">Section {{ $sectionName }}</option>
+                                            @endforeach
+                                            @if ($exam['faculty'] == 'FOL' && !isset($exam['sections']['C']))
+                                                <option value="C">Section C</option>
+                                            @endif
+                                        </select>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label for="newQuestion"
+                                            class="block text-gray-700 text-sm font-bold mb-2">Question:</label>
+                                        <textarea id="questionEditor_new" name="newQuestion"
+                                            class="tinyMCEEditor"></textarea>
+                                    </div>
+                                    <div class="flex justify-end space-x-2">
+                                        <button type="button" @click="$refs.addQuestionModal.close()"
+                                            class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">Cancel</button>
+                                        <button type="submit"
+                                            class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex items-center transition-all duration-200"
+                                            :disabled="loading">
+                                            <template x-if="!loading">
+                                                <span><i class="fas fa-plus mr-2"></i>Add Question</span>
+                                            </template>
+                                            <template x-if="loading">
+                                                <span class="flex items-center"><svg
+                                                        class="animate-spin h-5 w-5 mr-2 text-white"
+                                                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                            stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor"
+                                                            d="M4 12a8 8 0 018-8v8z"></path>
+                                                    </svg>Adding Question...</span>
+                                            </template>
+                                        </button>
                                     </div>
                                 </div>
+                            </form>
+                        </dialog>
 
-            <!-- Status Modal -->
-            <div id="statusOverlay" class="hidden">
-                <div id="statusModal">
-                    <h2 class="text-lg font-bold">Exam Status</h2>
-                    <p id="statusMessage"></p>
-                    <ul id="commentList"></ul>
-                    <button id="closeStatusModal" class="bg-red-500 text-white px-4 py-2 rounded mt-2">Close</button>
+                        <!-- Section Accordions -->
+                        <div class="space-y-4">
+                            @php ksort($exam['sections']); @endphp
+                            @foreach ($exam['sections'] as $sectionName => $questions)
+                                <div x-data="{ open: true }" class="border rounded-lg shadow-sm bg-white">
+                                    <button @click="open = !open"
+                                        class="w-full flex justify-between items-center px-6 py-4 text-lg font-semibold focus:outline-none">
+                                        <span>Section {{ $sectionName }}</span>
+                                        <svg :class="open ? 'rotate-180' : ''" class="h-5 w-5 transition-transform" fill="none"
+                                            stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </button>
+                                    <div x-show="open" class="px-6 pb-4 space-y-4">
+                                        @foreach ($questions as $questionIndex => $question)
+                                            <div class="bg-gray-50 rounded-lg p-4 shadow flex flex-col">
+                                                <div class="font-semibold text-gray-700 mb-1">Question
+                                                    {{ $questionIndex + 1 }}
+                                                </div>
+                                                <!-- Save Form: wraps editor and Save button only -->
+                                                <form class="update-question-form w-full mb-2"
+                                                    action="{{ route('update.question', ['courseUnit' => $exam['courseUnit'], 'sectionName' => $sectionName, 'questionIndex' => $questionIndex]) }}"
+                                                    method="POST" x-data="{ loading: false }" x-on:submit="loading = true">
+                                                    @csrf
+                                                    @method('PUT')
+                                                    <textarea id="questionEditor_{{ $sectionName }}_{{ $questionIndex }}"
+                                                        class="tinyMCEEditor" name="question">{!! $question !!}</textarea>
+                                                    <div class="flex justify-end mt-4">
+                                                        <button type="submit"
+                                                            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded flex items-center transition-all duration-200"
+                                                            :disabled="loading">
+                                                            <template x-if="!loading">
+                                                                <span><i class="fas fa-save mr-1"></i>Save</span>
+                                                            </template>
+                                                            <template x-if="loading">
+                                                                <span class="flex items-center"><svg
+                                                                        class="animate-spin h-4 w-4 mr-1 text-white"
+                                                                        xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                                        viewBox="0 0 24 24">
+                                                                        <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                                            stroke="currentColor" stroke-width="4"></circle>
+                                                                        <path class="opacity-75" fill="currentColor"
+                                                                            d="M4 12a8 8 0 018-8v8z"></path>
+                                                                    </svg>Saving...</span>
+                                                            </template>
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                                <!-- Delete Form: only the button, not nested, sibling to Save form -->
+                                                <form
+                                                    action="{{ route('delete.question', ['courseUnit' => $exam['courseUnit'], 'sectionName' => $sectionName, 'questionIndex' => $questionIndex]) }}"
+                                                    method="POST" x-data="{ loading: false }" x-on:submit="loading = true"
+                                                    class="w-full">
+                                                    @csrf
+                                                    <input type="hidden" name="_method" value="DELETE">
+                                                    <div class="flex justify-start">
+                                                        <button type="submit"
+                                                            class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-3 rounded flex items-center transition-all duration-200"
+                                                            :disabled="loading"
+                                                            onclick="return confirm('Are you sure you want to delete this question?')">
+                                                            <template x-if="!loading">
+                                                                <span><i class="fas fa-trash-alt mr-1"></i>Delete</span>
+                                                            </template>
+                                                            <template x-if="loading">
+                                                                <span class="flex items-center"><svg
+                                                                        class="animate-spin h-4 w-4 mr-1 text-white"
+                                                                        xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                                        viewBox="0 0 24 24">
+                                                                        <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                                            stroke="currentColor" stroke-width="4"></circle>
+                                                                        <path class="opacity-75" fill="currentColor"
+                                                                            d="M4 12a8 8 0 018-8v8z"></path>
+                                                                    </svg>Deleting...</span>
+                                                            </template>
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        @endforeach
+                                        <!-- Error message for number of questions in the section (below questions) -->
+                                        @php
+                                            $questionCount = count($questions);
+                                            $errorMessage = '';
+                                            if (in_array($exam['faculty'], ['FST', 'FBM'])) {
+                                                if ($sectionName == 'A' && $questionCount < 2) {
+                                                    $errorMessage = 'Minimum required 2 Case Studies for Section A';
+                                                } elseif ($sectionName == 'B' && $questionCount < 12) {
+                                                    $errorMessage = 'Minimum required 12 questions for Section B';
+                                                }
+                                            } elseif ($exam['faculty'] == 'FOE') {
+                                                if ($sectionName == 'A' && $questionCount < 4) {
+                                                    $errorMessage = 'Minimum required 6 questions for Section A';
+                                                } elseif ($sectionName == 'B' && $questionCount < 4) {
+                                                    $errorMessage = 'Minimum required 4 questions for Section B';
+                                                }
+                                            } elseif ($exam['faculty'] == 'HEC') {
+                                                if ($sectionName == 'A' && $questionCount < 20) {
+                                                    $errorMessage = 'Minimum required 20 questions for Section A';
+                                                } elseif ($sectionName == 'B' && $questionCount < 10) {
+                                                    $errorMessage = 'Minimum required 10 questions for Section B';
+                                                }
+                                            } elseif ($exam['faculty'] == 'FOL') {
+                                                if ($sectionName == 'A' && $questionCount < 2) {
+                                                    $errorMessage = 'Minimum required 2 questions for Section A';
+                                                } elseif ($sectionName == 'B' && $questionCount < 4) {
+                                                    $errorMessage = 'Minimum required 4 questions for Section B';
+                                                } elseif ($sectionName == 'C' && $questionCount < 5) {
+                                                    $errorMessage = 'Minimum required 5 essay questions for Section C';
+                                                }
+                                            }
+                                        @endphp
+                                        @if ($errorMessage)
+                                            <p class="text-red-700 font-semibold text-md mt-2">{{ $errorMessage }}</p>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <!-- Instructions Tab -->
+                    <div x-show="tab === 'instructions'">
+                        <div class="bg-white rounded-lg shadow-md p-6 max-w-xl mx-auto">
+                            <h2 class="text-lg font-semibold flex justify-center mb-4">Edit Instructions</h2>
+                            <form action="{{ route('update.instructions', ['courseUnit' => $exam['courseUnit']]) }}"
+                                method="POST" x-data="{ loading: false }" x-on:submit="loading = true">
+                                @csrf
+                                @method('PUT')
+                                <div class="mb-4">
+                                    <label for="sectionA_instructions"
+                                        class="block text-gray-700 text-sm font-bold mb-2">Section A Instructions:</label>
+                                    <input type="text" id="sectionA_instructions" name="sectionA_instructions"
+                                        value="{{ $exam['sectionA_instructions'] ?? '' }}"
+                                        class="block w-full bg-white border border-gray-300 text-gray-700 py-2 px-3 rounded leading-tight focus:outline-none focus:border-gray-500">
+                                </div>
+                                <div class="mb-4">
+                                    <label for="sectionB_instructions"
+                                        class="block text-gray-700 text-sm font-bold mb-2">Section B Instructions:</label>
+                                    <input type="text" id="sectionB_instructions" name="sectionB_instructions"
+                                        value="{{ $exam['sectionB_instructions'] ?? '' }}"
+                                        class="block w-full bg-white border border-gray-300 text-gray-700 py-2 px-3 rounded leading-tight focus:outline-none focus:border-gray-500">
+                                </div>
+                                <div id="sectionC_instruction_container" class="mb-4 hidden">
+                                    <label for="sectionC_instructions"
+                                        class="block text-gray-700 text-sm font-bold mb-2">Section C Instructions:</label>
+                                    <input type="text" id="sectionC_instructions" name="sectionC_instructions"
+                                        value="{{ $exam['sectionC_instructions'] ?? '' }}"
+                                        class="block w-full bg-white border border-gray-300 text-gray-700 py-2 px-3 rounded leading-tight focus:outline-none focus:border-gray-500">
+                                </div>
+                                <div class="flex justify-center">
+                                    <button type="submit"
+                                        class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex items-center transition-all duration-200"
+                                        :disabled="loading">
+                                        <template x-if="!loading">
+                                            <span><i class="fas fa-edit mr-2"></i>Update Instructions</span>
+                                        </template>
+                                        <template x-if="loading">
+                                            <span class="flex items-center"><svg
+                                                    class="animate-spin h-5 w-5 mr-2 text-white"
+                                                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                                        stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z">
+                                                    </path>
+                                                </svg>Updating Instructions...</span>
+                                        </template>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Marking Guide Tab -->
+                    <div x-show="tab === 'marking'" x-cloak>
+                        <div class="bg-white rounded-lg shadow-md p-6 max-w-xl mx-auto">
+                            <h2 class="text-lg font-semibold flex justify-center mb-4">Add Marking Guide</h2>
+                            <form action="{{ route('upload.file', ['courseUnit' => $courseUnit]) }}" method="POST"
+                                enctype="multipart/form-data" class="mb-6" x-data="{ loading: false }"
+                                x-on:submit="loading = true">
+                                @csrf
+                                <div class="mb-4">
+                                    <label for="attached_file" class="block text-sm font-bold text-gray-700">Attach a
+                                        Document (Word, PDF, Excel)</label>
+                                    <input type="file" name="attached_file" id="attached_file"
+                                        accept=".pdf,.doc,.docx,.xls,.xlsx"
+                                        class="block w-full p-2 border border-gray-300 rounded-md" required>
+                                    <small class="text-gray-500">Max file size: 3MB</small>
+                                </div>
+                                <div class="flex justify-center space-x-4">
+                                    <button type="submit"
+                                        class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex items-center transition-all duration-200"
+                                        :disabled="loading">
+                                        <span class="flex items-center">
+                                            <i class="fas fa-upload mr-2"></i>
+                                            <span x-show="!loading">Upload Marking Guide</span>
+                                            <span x-show="loading" class="flex items-center ml-2">
+                                                <svg class="animate-spin h-5 w-5 mr-2 text-white"
+                                                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                                        stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z">
+                                                    </path>
+                                                </svg>
+                                                Uploading...
+                                            </span>
+                                        </span>
+                                    </button>
+                                    <a href="{{ route('download.markingGuide', ['courseUnit' => $courseUnit]) }}"
+                                        class="bg-gray-500 hover:bg-black text-white font-bold py-2 px-4 rounded">Download
+                                        Marking Guide</a>
+                                </div>
+                                @if (session('success_file'))
+                                    <div class="text-sm text-green-600 mt-1 flex justify-center">{{ session('success_file') }}
+                                    </div>
+                                @endif
+                                @if (session('error_file'))
+                                    <div class="text-sm text-red-600 mt-1 flex justify-center">{{ session('error_file') }}</div>
+                                @endif
+                            </form>
+                        </div>
+                    </div>
                 </div>
-            </div>
-
-                                    @php
-    $sections = $exam['sections'];
-    ksort($sections); // Sort the sections by their keys
-                                    @endphp
-                                        @foreach ($sections as $sectionName => $questions)
-                                                <div class="mt-4 p-4 border-t">
-                                                                                                <h2 class="text-lg font-semibold">{{ "Section " . $sectionName }}</h2>
-
-                                                                                                <!-- Display the questions -->
-                                                                                                @foreach ($questions as $questionIndex => $question)
-                                                                                                    <div  class="mt-2">
-                                                                                                        <p>Question {{ $questionIndex + 1 }}:</p>
-                                                                                                        <form  class="update-question-form" action="{{ route('update.question', ['courseUnit' => $exam['courseUnit'], 'sectionName' => $sectionName, 'questionIndex' => $questionIndex]) }}" method="POST" class="mb-1">
-                                                                                                            @csrf
-                                                                                                            @method('PUT') <!-- Method spoofing for PUT request -->
-                                                                                                            <textarea id="questionEditor_{{ $sectionName }}_{{ $questionIndex }}" class="tinyMCEEditor" name="question">{!! $question !!}</textarea>
-
-                                                                                                            <!-- Hidden input to track previous content -->
-                                                                                                            <input type="hidden" id="previousContent_{{ $sectionName }}_{{ $questionIndex }}" name="previous_question"
-                                                                                                                value="{{ $question }}">
-
-                                                                                                            <div class="flex justify-end mt-2">
-                                                                                                                <button type="submit" class="bg-gray-500 hover:bg-green-500 text-white font-bold py-1 px-2 text-xs rounded">Update</button>
-                                                                                                            </div>
-
-                                                                                                            <!-- Check for success message for adding/updating only -->
-                                                                                                            @if (session('success') && session('updatedQuestion') == $sectionName . "_" . $questionIndex)
-                                                                                                                <div class="text-sm text-green-600 mt-1 flex justify-end">
-                                                                                                                    {{ session('success') }}
-                                                                                                                </div>
-                                                                                                            @endif
-
-                                                                                                            <!-- Check for error message on the updated/added question only -->
-                                                                                                            @if (session('error') && session('updatedQuestion') == $sectionName . "_" . $questionIndex)
-                                                                                                                <div class="text-sm text-red-600 mt-1 flex justify-end">
-                                                                                                                    {{ session('error') }}
-                                                                                                                </div>
-                                                                                                            @endif
-                                                                                                        </form>
-
-                                                                                                        <!-- Form to delete a question -->
-                                                                                                        <form action="{{ route('delete.question', ['courseUnit' => $exam['courseUnit'], 'sectionName' => $sectionName, 'questionIndex' => $questionIndex]) }}" method="POST" class="flex justify-end">
-                                                                                                            @csrf
-                                                                                                            @method('DELETE')
-                                                                                                            <button type="submit" class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 text-xs rounded">Delete</button>
-                                                                                                        </form>
-                                                                                                    </div>
-                                                                                                @endforeach
-
-                                                                                                <!-- Error message for number of questions in the section (below questions) -->
-                                                                                                @php
-        $questionCount = count($questions);
-        $errorMessage = '';
-
-        // Check faculty and determine error message based on section and question count
-        if (in_array($exam['faculty'], ['FST', 'FBM'])) {
-            // FST and FBM requirements
-            if ($sectionName == 'A' && $questionCount < 2) {
-                $errorMessage = 'Minimum required 2 Case Studies for Section A';
-            } elseif ($sectionName == 'B' && $questionCount < 12) {
-                $errorMessage = 'Minimum required 12 questions for Section B';
-            }
-        } elseif ($exam['faculty'] == 'FOE') {
-            // FOE requirements - 6 questions for both sections A and B
-            if ($sectionName == 'A' && $questionCount < 6) {
-                $errorMessage = 'Minimum required 6 questions for Section A';
-            } elseif ($sectionName == 'B' && $questionCount < 6) {
-                $errorMessage = 'Minimum required 6 questions for Section B';
-            }
-        } elseif ($exam['faculty'] == 'HEC') {
-            // HEC requirements - Section A (20 questions), Section B (10 questions)
-            if ($sectionName == 'A' && $questionCount < 20) {
-                $errorMessage = 'Minimum required 20 questions for Section A';
-            } elseif ($sectionName == 'B' && $questionCount < 10) {
-                $errorMessage = 'Minimum required 10 questions for Section B';
-            }
-        } elseif ($exam['faculty'] == 'FOL') {
-            // FOL requirements - Section A (2 questions), Section B (4 questions), Section C (5 essay questions)
-            if ($sectionName == 'A' && $questionCount < 2) {
-                $errorMessage = 'Minimum required 2 questions for Section A';
-            } elseif ($sectionName == 'B' && $questionCount < 4) {
-                $errorMessage = 'Minimum required 4 questions for Section B';
-            } elseif ($sectionName == 'C' && $questionCount < 5) {
-                $errorMessage = 'Minimum required 5 essay questions for Section C';
-            }
-        }
-
-                                                                                                @endphp
-
-                                                                                                <!-- Display error message if applicable -->
-                                                                                                @if ($errorMessage)
-                                                                                                    <p class="text-red-700 font-semibold text-md">{{ $errorMessage }}</p>
-                                                                                                @endif
-                                                                        </div>
-                                                    @endforeach
-                            </div>
-    @empty
-        <div class="mt-8 flex flex-col items-center justify-center">
-            <img src="/assets/img/404.jpeg" alt="No Data Available" class="w-1/2 max-w-sm mx-auto">
-            <p class="mt-4 text-lg font-semibold text-gray-600">No course details available.</p>
+                <!-- Status Modal (unchanged) -->
+                <div id="statusOverlay" class="hidden">
+                    <div id="statusModal">
+                        <h2 class="text-lg font-bold">Exam Status</h2>
+                        <p id="statusMessage"></p>
+                        <ul id="commentList"></ul>
+                        <button id="closeStatusModal" class="bg-red-500 text-white px-4 py-2 rounded mt-2">Close</button>
+                    </div>
+                </div>
+            @empty
+                <div class="mt-8 flex flex-col items-center justify-center">
+                    <img src="/assets/img/404.jpeg" alt="No Data Available" class="w-1/2 max-w-sm mx-auto">
+                    <p class="mt-4 text-lg font-semibold text-gray-600">No course details available.</p>
+                </div>
+            @endforelse
         </div>
-    @endforelse
-</div>
-
-
-
-    <!-- Add new question on a section or new section for FOL -->
-    <div class="mt-8 bg-white rounded-lg shadow-md p-4">
-        <h2 class="text-lg font-semibold flex justify-center">Add New Question</h2>
-        <form enctype="multipart/form-data" action="{{ route('add.question', ['courseUnit' => $exam['courseUnit']]) }}" method="POST">
-            @csrf
-            <!-- Dropdown for selecting the section -->
-            <div class="mb-4">
-                <label for="sectionSelect" class="block text-gray-700 text-sm font-bold mb-2">Select Section:</label>
-                <select id="sectionSelect" name="section"
-                    class="block appearance-none w-full bg-white border border-gray-200 text-gray-700 py-2 px-3 pr-8 rounded leading-tight focus:outline-none focus:border-gray-500"
-                    required>
-                    @foreach ($exam['sections'] as $sectionName => $questions)
-                        <option value="{{ $sectionName }}">Section {{ $sectionName }}</option>
-                    @endforeach
-                    <!-- Conditionally add Section C for FOL -->
-                    @if ($exam['faculty'] == 'FOL' && !isset($exam['sections']['C']))
-                        <option value="C">Section C</option>
-                    @endif
-                </select>
-            </div>
-            <!-- TinyMCE Editor for new question -->
-            <div class="mb-4">
-                <label for="newQuestion" class="block text-gray-700 text-sm font-bold mb-2">Question:</label>
-                <textarea id="questionEditor_new" name="newQuestion" class="tinyMCEEditor"></textarea>
-            </div>
-            <!-- Submit Button -->
-            <div class="flex justify-center">
-                <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
-                    Add Question
-                </button>
-            </div>
-        </form>
     </div>
 
-    <!-- New section for editing instructions -->
-    <div class="mt-8 bg-white rounded-lg shadow-md p-4">
-        <h2 class="text-lg font-semibold flex justify-center">Edit Instructions</h2>
-        <form action="{{ route('update.instructions', ['courseUnit' => $exam['courseUnit']]) }}" method="POST">
-            @csrf
-            @method('PUT') <!-- Method spoofing for PUT request -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            console.log("Attempting to load: {{ asset('assets/js/special-character-picker.js') }}");
 
-            <!-- Input field for Section A instructions -->
-            <div class="mb-4">
-                <label for="sectionA_instructions" class="block text-gray-700 text-sm font-bold mb-2">Section A
-                    Instructions:</label>
-                <input type="text" id="sectionA_instructions" name="sectionA_instructions"
-                    value="{{ $exam['sectionA_instructions'] ?? '' }}"
-                    class="block appearance-none w-full bg-white border border-gray-300 text-gray-700 py-2 px-3 rounded leading-tight focus:outline-none focus:border-gray-500">
-            </div>
+            $.getScript("{{ asset('assets/js/special-character-picker.js') }}")
+                .done(function () {
+                    console.log("✅ special-character-picker.js loaded successfully!");
+                    loadSpecialCharModal();
 
-            <!-- Input field for Section B instructions -->
-            <div class="mb-4">
-                <label for="sectionB_instructions" class="block text-gray-700 text-sm font-bold mb-2">Section B
-                    Instructions:</label>
-                <input type="text" id="sectionB_instructions" name="sectionB_instructions"
-                    value="{{ $exam['sectionB_instructions'] ?? '' }}"
-                    class="block appearance-none w-full bg-white border border-gray-300 text-gray-700 py-2 px-3 rounded leading-tight focus:outline-none focus:border-gray-500">
-            </div>
+                    // Initialize Summernote on all textareas with class 'tinyMCEEditor' (previous TinyMCE selector)
+                    document.querySelectorAll('textarea.tinyMCEEditor').forEach(function (textarea) {
+                        if (!textarea.id) {
+                            textarea.id = 'summernote_' + Math.random().toString(36).substr(2, 9);
+                        }
 
-            <!-- Hidden Input Field for Section C Instructions (Shown only for FOL) -->
-            <div id="sectionC_instruction_container" class="mb-4 hidden">
-                <label for="sectionC_instructions" class="block text-gray-700 text-sm font-bold mb-2">Section C
-                    Instructions:</label>
-                <input type="text" id="sectionC_instructions" name="sectionC_instructions"
-                    value="{{ $exam['sectionC_instructions'] ?? '' }}"
-                    class="block appearance-none w-full bg-white border border-gray-300 text-gray-700 py-2 px-3 rounded leading-tight focus:outline-none focus:border-gray-500">
-            </div>
+                        let hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        hiddenInput.name = textarea.name + "_content";
+                        textarea.parentNode.insertBefore(hiddenInput, textarea.nextSibling);
 
-            <!-- Submit Button -->
-            <div class="flex justify-center">
-                <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
-                    Update Instructions
-                </button>
-            </div>
-        </form>
-    </div>
-
-
-<!-- Separate form for file picker -->
-    <div class="mt-8 bg-white rounded-lg shadow-md p-4">
-        <h2 class="text-lg font-semibold flex justify-center">Add Marking Guide</h2>
-
-        <form action="{{ route('upload.file', ['courseUnit' => $courseUnit]) }}" method="POST" enctype="multipart/form-data" class="mb-6">
-            @csrf
-
-            <!-- File Picker for Upload -->
-            <div class="mb-4">
-                <label for="attached_file" class="block text-sm font-bold text-gray-700">Attach a Document (Word, PDF, Excel)</label>
-                <input type="file" name="attached_file" id="attached_file" accept=".pdf,.doc,.docx,.xls,.xlsx" class="block w-full p-2 border border-gray-300 rounded-md" required>
-                <small class="text-gray-500">Max file size: 3MB</small>
-            </div>
-
-            <!-- Submit Button for file upload -->
-            <div class="flex justify-center space-x-4">
-                <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Upload File</button>
-
-                <!-- Download Marking Guide Button -->
-                <a href="{{ route('download.markingGuide', ['courseUnit' => $courseUnit]) }}" class="bg-gray-500 hover:bg-black text-white font-bold py-2 px-4 rounded">
-                    Download Marking Guide
-                </a>
-            </div>
-
-            {{-- Display success message --}}
-            @if (session('success_file'))
-                <div class="text-sm text-green-600 mt-1 flex justify-center">
-                    {{ session('success_file') }}
-                </div>
-            @endif
-
-            {{-- Display error message --}}
-            @if (session('error_file'))
-                <div class="text-sm text-red-600 mt-1 flex justify-center">
-                    {{ session('error_file') }}
-                </div>
-            @endif
-        </form>
-    </div>
-
-</div>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        console.log("Attempting to load: {{ asset('assets/js/special-character-picker.js') }}");
-
-        $.getScript("{{ asset('assets/js/special-character-picker.js') }}")
-            .done(function () {
-                console.log("✅ special-character-picker.js loaded successfully!");
-                loadSpecialCharModal();
-
-                // Initialize Summernote on all textareas with class 'tinyMCEEditor' (previous TinyMCE selector)
-                document.querySelectorAll('textarea.tinyMCEEditor').forEach(function (textarea) {
-                    if (!textarea.id) {
-                        textarea.id = 'summernote_' + Math.random().toString(36).substr(2, 9);
-                    }
-
-                    let hiddenInput = document.createElement('input');
-                    hiddenInput.type = 'hidden';
-                    hiddenInput.name = textarea.name + "_content";
-                    textarea.parentNode.insertBefore(hiddenInput, textarea.nextSibling);
-
-                    initializeSummernote('#' + textarea.id, hiddenInput);
-                });
-            })
-            .fail(function (jqxhr, settings, exception) {
-                console.error("❌ Failed to load special-character-picker.js:", exception);
-            });
-
-        // Form Submission Handling (Ensures Content is Stored in Hidden Inputs)
-        document.querySelectorAll('.update-question-form').forEach(form => {
-            form.addEventListener('submit', function (event) {
-                event.preventDefault();
-
-                // Update all hidden inputs before submission
-                document.querySelectorAll('textarea.tinyMCEEditor').forEach(textarea => {
-                    let editorContent = $(textarea).summernote('code');
-                    let hiddenInput = textarea.nextElementSibling;
-                    if (hiddenInput && hiddenInput.type === "hidden") {
-                        hiddenInput.value = editorContent;
-                    }
+                        initializeSummernote('#' + textarea.id, hiddenInput);
+                    });
+                })
+                .fail(function (jqxhr, settings, exception) {
+                    console.error("❌ Failed to load special-character-picker.js:", exception);
                 });
 
-                console.log("✅ Submitting form...");
-                this.submit();
+            // Form Submission Handling (Ensures Content is Stored in Hidden Inputs)
+            document.querySelectorAll('.update-question-form').forEach(form => {
+                form.addEventListener('submit', function (event) {
+                    // Remove event.preventDefault() so form submits normally
+                    var btn = form.querySelector('.updateBtn');
+                    var spinner = form.querySelector('.updateSpinner');
+                    btn.disabled = true;
+                    spinner.classList.remove('hidden');
+                });
             });
         });
-    });
 
-    // **Initialize Summernote**
-    function initializeSummernote(selector, hiddenInput) {
-        $(selector).summernote({
-            height: 100,
-            minHeight: 150,
-            maxHeight: 500,
-            focus: true,
-            dialogsInBody: true,
-            placeholder: "Type your question here...",
-            fontNames: ['Arial', 'Courier New', 'Times New Roman', 'Verdana', 'Georgia', 'Comic Sans MS'],
-            fontNamesIgnoreCheck: ['Arial', 'Courier New', 'Times New Roman', 'Verdana', 'Georgia', 'Comic Sans MS'],
-            toolbar: [
-                ['style', ['style']],
-                ['fontname', ['fontname']],
-                ['fontsize', ['fontsize']],
-                ['font', ['bold', 'italic', 'underline', 'strikethrough', 'superscript', 'subscript', 'clear']],
-                ['color', ['color']],
-                ['para', ['ul', 'ol', 'paragraph']],
-                ['insert', ['link', 'picture', 'video', 'table']],
-                ['view', [ 'codeview', 'help']],
-                ['custom', ['specialCharButton']] // ✅ Custom Special Characters Button
-            ],
-            buttons: {
-                specialCharButton: SpecialCharButton
-            },
-            callbacks: {
-                onKeyup: function () {
-                    $(selector).summernote('saveRange'); // Save cursor position
+        // **Initialize Summernote**
+        function initializeSummernote(selector, hiddenInput) {
+            $(selector).summernote({
+                height: 100,
+                minHeight: 150,
+                maxHeight: 500,
+                focus: true,
+                dialogsInBody: true,
+                placeholder: "Type your question here...",
+                fontNames: ['Arial', 'Courier New', 'Times New Roman', 'Verdana', 'Georgia', 'Comic Sans MS'],
+                fontNamesIgnoreCheck: ['Arial', 'Courier New', 'Times New Roman', 'Verdana', 'Georgia', 'Comic Sans MS'],
+                toolbar: [
+                    ['style', ['style']],
+                    ['fontname', ['fontname']],
+                    ['fontsize', ['fontsize']],
+                    ['font', ['bold', 'italic', 'underline', 'strikethrough', 'superscript', 'subscript', 'clear']],
+                    ['color', ['color']],
+                    ['para', ['ul', 'ol', 'paragraph']],
+                    ['insert', ['link', 'picture', 'video', 'table']],
+                    ['view', ['codeview', 'help']],
+                    ['custom', ['specialCharButton']] // ✅ Custom Special Characters Button
+                ],
+                buttons: {
+                    specialCharButton: SpecialCharButton
                 },
-                onMouseUp: function () {
-                    $(selector).summernote('saveRange'); // Save cursor position
-                },
-                onChange: function (contents) {
-                    hiddenInput.value = contents; // Update hidden input with editor content
-                }
-            }
-        });
-    }
-
-    // **Custom Special Character Button**
-    function SpecialCharButton(context) {
-        var ui = $.summernote.ui;
-        var button = ui.button({
-            contents: '<i class="fas fa-font"></i> Special Characters',
-            tooltip: 'Insert Special Character',
-            click: function () {
-                $(context.layoutInfo.editor).summernote('saveRange');
-                showSpecialCharModal();
-            }
-        });
-        return button.render();
-    }
-</script>
-
-<!-- JavaScript to Show/Hide Section C Instructions for FOL Faculty -->
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        let faculty = "{{ $exam['faculty'] }}"; // Get faculty from backend
-        let sectionCContainer = document.getElementById('sectionC_instruction_container');
-
-        // Show Section C input only if faculty is FOL
-        if (faculty === 'FOL') {
-            sectionCContainer.classList.remove('hidden');
-        }
-    });
-</script>
-    
-
-{{-- status js  --}}
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const statusButton = document.getElementById('statusButton');
-        const statusOverlay = document.getElementById('statusOverlay');
-        const closeStatusModal = document.getElementById('closeStatusModal');
-        const statusMessage = document.getElementById('statusMessage');
-        const commentList = document.getElementById('commentList');
-        const questionForms = document.querySelectorAll('.update-question-form');
-
-        let exam = @json($exam);
-        let faculty = exam.faculty;
-        let status = exam.status?.trim().toLowerCase() || "pending";
-        let comment = exam.comment ?? null;
-
-        // Status color mapping
-        let statusColors = {
-            "p": "bg-yellow-500",
-            "a": "bg-green-500",
-            "d": "bg-red-500" // Updated from "r" to "d" for Declined
-        };
-        let firstLetter = status.charAt(0);
-        statusButton.classList.add(statusColors[firstLetter] || "bg-gray-500");
-
-        function disableScroll() {
-            document.body.classList.add('modal-open');
-            questionForms.forEach(form => form.classList.add('blur-effect'));
-        }
-
-        function enableScroll() {
-            document.body.classList.remove('modal-open');
-            questionForms.forEach(form => form.classList.remove('blur-effect'));
-        }
-
-        let minQuestions = {
-            "FST": { "A": 2, "B": 12 },
-            "FBM": { "A": 2, "B": 12 },
-            "FOE": { "A": 6, "B": 6 },
-            "HEC": { "A": 20, "B": 10 },
-            "FOL": { "A": 2, "B": 4, "C": 5 }
-        };
-
-        let missingSections = [];
-        if (faculty in minQuestions) {
-            Object.entries(minQuestions[faculty]).forEach(([section, required]) => {
-                let count = exam.sections?.[section]?.length || 0;
-                if (count < required) {
-                    missingSections.push(`Section ${section}: ${count}/${required} questions`);
+                callbacks: {
+                    onKeyup: function () {
+                        $(selector).summernote('saveRange'); // Save cursor position
+                    },
+                    onMouseUp: function () {
+                        $(selector).summernote('saveRange'); // Save cursor position
+                    },
+                    onChange: function (contents) {
+                        hiddenInput.value = contents; // Update hidden input with editor content
+                    }
                 }
             });
         }
 
-        statusButton.addEventListener('click', function () {
-            let message = `<strong>Status:</strong> <span class="font-semibold">${status.charAt(0).toUpperCase() + status.slice(1)}</span><br>`;
+        // **Custom Special Character Button**
+        function SpecialCharButton(context) {
+            var ui = $.summernote.ui;
+            var button = ui.button({
+                contents: '<i class="fas fa-font"></i> Special Characters',
+                tooltip: 'Insert Special Character',
+                click: function () {
+                    $(context.layoutInfo.editor).summernote('saveRange');
+                    showSpecialCharModal();
+                }
+            });
+            return button.render();
+        }
+    </script>
 
-            if (missingSections.length > 0) {
-                message += `<p class="text-red-500 mt-2">You need to complete the following before submission:</p><ul>`;
-                missingSections.forEach(section => {
-                    message += `<li class="text-red-500">${section}</li>`;
+    <!-- JavaScript to Show/Hide Section C Instructions for FOL Faculty -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            let faculty = "{{ $exam['faculty'] }}"; // Get faculty from backend
+            let sectionCContainer = document.getElementById('sectionC_instruction_container');
+
+            // Show Section C input only if faculty is FOL
+            if (faculty === 'FOL') {
+                sectionCContainer.classList.remove('hidden');
+            }
+        });
+    </script>
+
+
+    {{-- status js --}}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const statusButton = document.getElementById('statusButton');
+            const statusOverlay = document.getElementById('statusOverlay');
+            const closeStatusModal = document.getElementById('closeStatusModal');
+            const statusMessage = document.getElementById('statusMessage');
+            const commentList = document.getElementById('commentList');
+            const questionForms = document.querySelectorAll('.update-question-form');
+
+            let exam = @json($exam);
+            let faculty = exam.faculty;
+            let status = exam.status?.trim().toLowerCase() || "pending";
+            let comment = exam.comment ?? null;
+
+            // Status color mapping
+            let statusColors = {
+                "p": "bg-yellow-500",
+                "a": "bg-green-500",
+                "d": "bg-red-500" // Updated from "r" to "d" for Declined
+            };
+            let firstLetter = status.charAt(0);
+            statusButton.classList.add(statusColors[firstLetter] || "bg-gray-500");
+
+            function disableScroll() {
+                document.body.classList.add('modal-open');
+                questionForms.forEach(form => form.classList.add('blur-effect'));
+            }
+
+            function enableScroll() {
+                document.body.classList.remove('modal-open');
+                questionForms.forEach(form => form.classList.remove('blur-effect'));
+            }
+
+            let minQuestions = {
+                "FST": { "A": 2, "B": 12 },
+                "FBM": { "A": 2, "B": 12 },
+                "FOE": { "A": 4, "B": 4 },
+                "HEC": { "A": 20, "B": 10 },
+                "FOL": { "A": 2, "B": 4, "C": 5 }
+            };
+
+            let missingSections = [];
+            if (faculty in minQuestions) {
+                Object.entries(minQuestions[faculty]).forEach(([section, required]) => {
+                    let count = exam.sections?.[section]?.length || 0;
+                    if (count < required) {
+                        missingSections.push(`Section ${section}: ${count}/${required} questions`);
+                    }
                 });
-                message += `</ul>`;
-            } else {
-                message += `<p class="text-green-500">✅ All required questions are completed.</p>`;
             }
 
-            commentList.innerHTML = "";
-            if (comment) {
-                commentList.innerHTML = `<p class="text-gray-800 mt-2">Reviewer Comment:</p><li class="text-gray-700">${comment}</li>`;
-            }
+            statusButton.addEventListener('click', function () {
+                let message = `<strong>Status:</strong> <span class="font-semibold">${status.charAt(0).toUpperCase() + status.slice(1)}</span><br>`;
 
-            statusMessage.innerHTML = message;
-            statusOverlay.classList.add('active');
-            disableScroll();
-        });
+                if (missingSections.length > 0) {
+                    message += `<p class="text-red-500 mt-2">You need to complete the following before submission:</p><ul>`;
+                    missingSections.forEach(section => {
+                        message += `<li class="text-red-500">${section}</li>`;
+                    });
+                    message += `</ul>`;
+                } else {
+                    message += `<p class="text-green-500">✅ All required questions are completed.</p>`;
+                }
 
-        closeStatusModal.addEventListener('click', function () {
-            statusOverlay.classList.remove('active');
-            enableScroll();
-        });
+                commentList.innerHTML = "";
+                if (comment) {
+                    commentList.innerHTML = `<p class="text-gray-800 mt-2">Reviewer Comment:</p><li class="text-gray-700">${comment}</li>`;
+                }
 
-        statusOverlay.addEventListener('click', function (event) {
-            if (event.target === statusOverlay) {
+                statusMessage.innerHTML = message;
+                statusOverlay.classList.add('active');
+                disableScroll();
+            });
+
+            closeStatusModal.addEventListener('click', function () {
                 statusOverlay.classList.remove('active');
                 enableScroll();
-            }
-        });
-    });
-</script>
+            });
 
-</body>
-</html>
+            statusOverlay.addEventListener('click', function (event) {
+                if (event.target === statusOverlay) {
+                    statusOverlay.classList.remove('active');
+                    enableScroll();
+                }
+            });
+        });
+    </script>
+
+    <!-- Alpine.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>

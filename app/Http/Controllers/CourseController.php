@@ -129,35 +129,40 @@ public function CoursesList()
     public function courseDetails($courseUnit) // Display exam content based on course unit for lecturers to view questions
     {
         \Log::info("Fetching details for course unit: $courseUnit");
-
         try {
             $firestore = app('firebase.firestore')->database();
             $examsRef = $firestore->collection('Exams');
             $query = $examsRef->where('courseUnit', '==', $courseUnit);
             $examsSnapshot = $query->documents();
-
             $exams = [];
-
+            $firebaseBaseUrl = env('FIREBASE_STORAGE_BASE_URL'); // e.g. https://firebasestorage.googleapis.com/v0/b/your-bucket/o/
             foreach ($examsSnapshot as $document) {
                 if ($document->exists()) {
                     $data = $document->data();
-
-                    // Process each section's content by decoding Base64
+                    // Ensure all image src are full URLs
                     foreach ($data['sections'] as $section => $contents) {
                         foreach ($contents as $index => $content) {
-                            // Step 1: Base64 decode the content
-                            $decodedContent = base64_decode($content);
-
-                            // Step 2: Store the decoded content back
-                            $data['sections'][$section][$index] = $decodedContent;
+                            // Fix image src if needed
+                            $fixedHtml = preg_replace_callback(
+                                '/<img[^>]+src=["\']([^"\']+)["\']/i',
+                                function ($matches) use ($firebaseBaseUrl) {
+                                    $src = $matches[1];
+                                    // If already a full URL, leave as is
+                                    if (preg_match('/^https?:\/\//', $src)) {
+                                        return $matches[0];
+                                    }
+                                    // Otherwise, prepend Firebase Storage base URL
+                                    $src = rtrim($firebaseBaseUrl, '/') . '/' . ltrim($src, '/');
+                                    return str_replace($matches[1], $src, $matches[0]);
+                                },
+                                $content
+                            );
+                            $data['sections'][$section][$index] = $fixedHtml;
                         }
                     }
-
-                    // Add the exam data to the exams array
                     $exams[] = $data;
                 }
             }
-
             return view('lecturer.l-course-exams', ['exams' => $exams, 'courseUnit' => $courseUnit]);
         } catch (\Throwable $e) {
             \Log::error("Error fetching course details for unit: $courseUnit - " . $e->getMessage());
@@ -482,7 +487,7 @@ public function CoursesList()
                 $examData = $document->data();
 
                 if (isset($examData['sections'][$sectionName][$questionIndex])) {
-                    $questionToRemove = base64_decode($examData['sections'][$sectionName][$questionIndex]); // Decode question content
+                    $questionToRemove = $examData['sections'][$sectionName][$questionIndex]; // Now HTML, not base64
                     Log::info("📄 Question Content Before Deletion: " . $questionToRemove);
 
                     // Extract Image URLs from Question Content
@@ -493,16 +498,20 @@ public function CoursesList()
 
                     // Delete Images from Firebase Storage
                     foreach ($imagesToDelete as $imageUrl) {
-                        $path = urldecode(parse_url($imageUrl, PHP_URL_PATH));
-                        $path = str_replace('/v0/b/' . env('FIREBASE_STORAGE_BUCKET') . '/o/', '', $path);
-                        $path = explode('?alt=media', $path)[0];
+                        // Try to extract the storage object path from the URL
+                        $parsed = parse_url($imageUrl);
+                        $path = $parsed['path'] ?? '';
+                        $path = ltrim($path, '/');
 
-                        $object = $storage->object($path);
-                        if ($object->exists()) {
-                            $object->delete();
-                            Log::info("✅ Deleted image: " . $imageUrl);
-                        } else {
-                            Log::warning("⚠ Image not found in storage (already deleted?): " . $imageUrl);
+                        // Only try to delete if path looks like a storage object
+                        if ($path) {
+                            $object = $storage->object($path);
+                            if ($object->exists()) {
+                                $object->delete();
+                                Log::info("✅ Deleted image: " . $imageUrl);
+                            } else {
+                                Log::warning("⚠ Image not found in storage (already deleted?): " . $imageUrl);
+                            }
                         }
                     }
 
@@ -525,11 +534,37 @@ public function CoursesList()
     }
 
 
+    /**
+     * Process images in question HTML: upload base64 images to Firebase Storage and replace src with storage URL.
+     */
+    private function processQuestionImages($html, $courseUnit, $section, $index)
+    {
+        preg_match_all('/<img[^>]+src=["\']([^"\']+)["\']/i', $html, $matches);
+        $imageSources = $matches[1] ?? [];
+        $storage = app('firebase.storage');
+        $bucket = $storage->getBucket();
+        foreach ($imageSources as $imgSrc) {
+            if (strpos($imgSrc, 'data:image') === 0) {
+                if (preg_match('/data:image\/(.*?);base64,(.*)/', $imgSrc, $imgParts)) {
+                    $extension = $imgParts[1] ?? 'png';
+                    $data = $imgParts[2];
+                    $imageData = base64_decode($data);
+                    $filename = 'questions/' . $courseUnit . '_' . $section . '_' . $index . '_' . uniqid() . '.' . $extension;
+                    $object = $bucket->upload($imageData, [
+                        'name' => $filename
+                    ]);
+                    $imageUrl = $object->signedUrl(new \DateTime('+1 year'));
+                    $html = str_replace($imgSrc, $imageUrl, $html);
+                }
+            }
+        }
+        return $html;
+    }
+
     public function updateQuestion(Request $request, $courseUnit, $sectionName, $questionIndex)
     {
         Log::info("Updating question: Course Unit - {$courseUnit}, Section - {$sectionName}, Index - {$questionIndex}");
 
-        // Validate that the question field is provided
         $request->validate([
             'question' => 'required|string',
         ]);
@@ -549,19 +584,15 @@ public function CoursesList()
                 $examRef = $document->reference();
                 $examData = $document->data();
 
-                // Ensure section and index exist before updating
                 if (!isset($examData['sections'][$sectionName])) {
                     Log::error("Section '{$sectionName}' not found.");
                     return back()->withErrors(['error' => "Section '{$sectionName}' not found."]);
                 }
 
-                // Convert question content to Base64 before saving
-                $encodedQuestion = base64_encode($request->question);
+                // Process images and save as HTML
+                $processedHtml = $this->processQuestionImages($request->question, $courseUnit, $sectionName, $questionIndex);
+                $examData['sections'][$sectionName][$questionIndex] = $processedHtml;
 
-                // Store the Base64-encoded question in Firestore
-                $examData['sections'][$sectionName][$questionIndex] = $encodedQuestion;
-
-                // Update Firestore
                 try {
                     $examRef->update([
                         ['path' => "sections.{$sectionName}", 'value' => $examData['sections'][$sectionName]]
@@ -602,16 +633,16 @@ public function CoursesList()
                 $examRef = $document->reference();
                 $examData = $document->data();
 
-                // Base64 encode the new question before adding it
-                $encodedQuestion = base64_encode($request->newQuestion);
+                // Process images in the new question HTML and store as HTML (not base64)
+                $processedQuestion = $this->processQuestionImages($request->newQuestion, $courseUnit, $request->section, count($examData['sections'][$request->section] ?? []));
 
                 // Ensure Section C exists if faculty is FOL and it's selected
                 if ($examData['faculty'] == 'FOL' && $request->section == 'C' && !isset($examData['sections']['C'])) {
                     $examData['sections']['C'] = [];
                 }
 
-                // Add the new encoded question to the specified section
-                $examData['sections'][$request->section][] = $encodedQuestion;
+                // Add the processed question HTML to the specified section
+                $examData['sections'][$request->section][] = $processedQuestion;
 
                 // Update the Firestore document
                 $examRef->update([
@@ -779,18 +810,13 @@ public function CoursesList()
     public function previewPdf($courseUnit)
     {
         Log::info("📝 Generating PDF preview for Course Unit: {$courseUnit}");
-
-        // 🔹 Fetch the exam details
         $firestore = app('firebase.firestore')->database();
         $examsRef = $firestore->collection('Exams');
         $query = $examsRef->where('courseUnit', '==', $courseUnit);
         $examsSnapshot = $query->documents();
-
         if ($examsSnapshot->isEmpty()) {
             return back()->withErrors(['error' => 'No exam found for this course unit.']);
         }
-
-        // 🔹 Get the first matching document
         $examData = null;
         foreach ($examsSnapshot as $document) {
             if ($document->exists()) {
@@ -798,93 +824,61 @@ public function CoursesList()
                 break;
             }
         }
-
         if (!$examData) {
             return back()->withErrors(['error' => 'No exam data found for this course unit.']);
         }
-
-        // 🔹 Define Storage Path (`storage/app/pdf_images/`)
-        $storagePath = storage_path('app/pdf_images/');
-
-        // 🔹 Ensure the directory exists (Create if not)
-        if (!File::exists($storagePath)) {
-            File::makeDirectory($storagePath, 0755, true);
-            Log::info("📂 Created directory for storing preview images: {$storagePath}");
+        // Ensure public/pdf_images/ exists and is clean
+        $publicPath = public_path('pdf_images/');
+        if (!File::exists($publicPath)) {
+            File::makeDirectory($publicPath, 0755, true);
+            Log::info("📂 Created directory for storing preview images: {$publicPath}");
         }
-
-        // 🔹 Delete previous preview images before generating new ones
-        File::cleanDirectory($storagePath); // Remove all old preview images
-        Log::info("🗑 Cleared old preview images from storage.");
-
-        // 🔹 Process each question to replace Firebase image URLs
+        File::cleanDirectory($publicPath);
+        Log::info("🗑 Cleared old preview images from public/pdf_images.");
+        // Process each question to replace Firebase image URLs with local paths
         foreach ($examData['sections'] as $sectionName => $questions) {
-            foreach ($questions as $index => $question) {
-                $decodedQuestion = base64_decode($question);
-
-                // 🔍 Extract image URLs from the question content
-                preg_match_all('/<img[^>]+src=["\']([^"\']+)["\']/', $decodedQuestion, $matches);
+            foreach ($questions as $index => $questionHtml) {
+                $processedHtml = $questionHtml;
+                preg_match_all('/<img[^>]+src=["\']([^"\']+)["\']/i', $processedHtml, $matches);
                 $imageUrls = $matches[1] ?? [];
-
                 Log::info("🔗 Found Image URLs:", $imageUrls);
-
-                // 🔹 Replace image URLs with local paths
                 foreach ($imageUrls as $imageUrl) {
-                    // Generate a unique filename for local storage
-                    $fileName = 'pdf_' . uniqid() . '.jpg';
-                    $localPath = $storagePath . $fileName;
-
-                    // 🔻 Download and save image locally in `storage/app/pdf_images/`
-                    try {
-                        file_put_contents($localPath, file_get_contents($imageUrl));
-
-                        // 🔹 Convert storage path to Laravel storage URL
-                        $imageServePath = storage_path("app/pdf_images/{$fileName}");
-                        $decodedQuestion = str_replace($imageUrl, $imageServePath, $decodedQuestion);
-
-                        Log::info("✅ Image replaced: {$imageUrl} -> {$imageServePath}");
-                    } catch (\Exception $e) {
-                        Log::error("❌ Failed to download image: {$imageUrl}, Error: " . $e->getMessage());
+                    $relativePath = $this->downloadFirebaseImage($imageUrl);
+                    if ($relativePath) {
+                        $processedHtml = str_replace($imageUrl, $relativePath, $processedHtml);
+                        Log::info("✅ Image replaced: {$imageUrl} -> {$relativePath}");
+                    } else {
+                        Log::error("❌ Failed to download image: {$imageUrl}");
                     }
                 }
-
-                // 🔹 Update the exam data with new image paths
-                $examData['sections'][$sectionName][$index] = $decodedQuestion;
+                $examData['sections'][$sectionName][$index] = $processedHtml;
             }
         }
-
-        // 🔹 Generate the PDF with updated content
         $pdf = Pdf::loadView('lecturer.preview', [
             'courseUnit' => $examData['courseUnit'],
             'sections' => $examData['sections'],
             'sectionAInstructions' => $examData['sectionA_instructions'] ?? '',
             'sectionBInstructions' => $examData['sectionB_instructions'] ?? '',
         ]);
-
         Log::info("✅ PDF generated successfully for Course Unit: {$courseUnit}");
-
-        // Stream the PDF to the browser
         return $pdf->stream("Preview_{$courseUnit}.pdf");
     }
-
 
     private function downloadFirebaseImage($imageUrl)
     {
         try {
-            // Get Image Contents
-            $imageContent = file_get_contents($imageUrl);
+            // Decode HTML entities (e.g., &amp; to &)
+            $decodedUrl = html_entity_decode($imageUrl);
+            $imageContent = @file_get_contents($decodedUrl);
             if (!$imageContent) {
-                Log::error("⚠ Failed to download image from Firebase: {$imageUrl}");
+                Log::error("⚠ Failed to download image from Firebase: {$decodedUrl}");
                 return null;
             }
-
-            // Generate a unique filename
-            $imageName = 'pdf_images/' . uniqid() . '.jpg';
-
-            // Save Image Locally
-            Storage::disk('public')->put($imageName, $imageContent);
-
-            // Return Local Path for PDF
-            return public_path("storage/{$imageName}");
+            $fileName = 'pdf_' . uniqid() . '.jpg';
+            $publicFilePath = public_path('pdf_images/' . $fileName);
+            file_put_contents($publicFilePath, $imageContent);
+            // Return relative path for DomPDF
+            return 'pdf_images/' . $fileName;
         } catch (\Exception $e) {
             Log::error("❌ Error downloading image from Firebase: " . $e->getMessage());
             return null;

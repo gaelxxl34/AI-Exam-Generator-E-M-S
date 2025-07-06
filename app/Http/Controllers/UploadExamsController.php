@@ -11,6 +11,39 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\File;
 class UploadExamsController extends Controller
 {
+    /**
+     * Process images in question HTML: upload base64 images to Firebase Storage and replace src with storage URL.
+     */
+    private function processQuestionImages($html, $courseUnit, $section, $index)
+    {
+        // Find all <img> tags
+        preg_match_all('/<img[^>]+src=["\']([^"\']+)["\']/i', $html, $matches);
+        $imageSources = $matches[1] ?? [];
+        $storage = app('firebase.storage');
+        $bucket = $storage->getBucket();
+
+        foreach ($imageSources as $imgSrc) {
+            if (strpos($imgSrc, 'data:image') === 0) {
+                // Extract mime type and data
+                if (preg_match('/data:image\/(.*?);base64,(.*)/', $imgSrc, $imgParts)) {
+                    $extension = $imgParts[1] ?? 'png';
+                    $data = $imgParts[2];
+                    $imageData = base64_decode($data);
+                    $filename = 'questions/' . $courseUnit . '_' . $section . '_' . $index . '_' . uniqid() . '.' . $extension;
+                    // Upload to Firebase Storage
+                    $object = $bucket->upload($imageData, [
+                        'name' => $filename
+                    ]);
+                    // Get public URL (assuming bucket is public or use signedUrl if not)
+                    $imageUrl = $object->signedUrl(new \DateTime('+1 year'));
+                    // Replace src in HTML
+                    $html = str_replace($imgSrc, $imageUrl, $html);
+                }
+            }
+        }
+        return $html;
+    }
+
     public function uploadExam(Request $request)
     {
         Log::info('uploadExam method called');
@@ -68,7 +101,7 @@ class UploadExamsController extends Controller
             // Log before processing sections
             Log::info('🔍 Processing Sections: ', ['Section A' => $validatedData['sectionA'], 'Section B' => $validatedData['sectionB']]);
 
-            // Base64 encode sections before storing
+            // Process and upload images, then store HTML instead of base64
             foreach (['A', 'B'] as $section) {
                 $content = $request->input("section$section");
 
@@ -77,11 +110,11 @@ class UploadExamsController extends Controller
                     continue;
                 }
 
-                $encodedContent = array_map(function ($question) {
-                    return base64_encode($question);
-                }, $content);
-
-                $examData['sections'][$section] = $encodedContent;
+                $processedContent = [];
+                foreach ($content as $idx => $questionHtml) {
+                    $processedContent[] = $this->processQuestionImages($questionHtml, $validatedData['courseUnit'], $section, $idx);
+                }
+                $examData['sections'][$section] = $processedContent;
             }
 
             Log::info('✅ Section content processed.');
@@ -157,19 +190,9 @@ public function getRandomQuestions(Request $request)
                     if (!isset($sections[$section])) {
                         $sections[$section] = [];
                     }
-
                     foreach ($contents as $index => $content) {
-                        // Decode base64 content and convert to HTML entities
-                        $decodedContent = mb_convert_encoding(base64_decode($content), 'HTML-ENTITIES', 'UTF-8');
-
-                        // Load content into DOMDocument with UTF-8 encoding declaration
-                        libxml_use_internal_errors(true);
-                        $doc = new \DOMDocument();
-                        $doc->loadHTML('<?xml encoding="utf-8" ?>' . $decodedContent, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-                        libxml_clear_errors();
-
-                        // Save cleaned HTML
-                        $sections[$section][] = $doc->saveHTML();
+                        // Use HTML as-is (no base64 decode)
+                        $sections[$section][] = $content;
                     }
                 }
             }
@@ -178,11 +201,10 @@ public function getRandomQuestions(Request $request)
         // Shuffle and trim questions by faculty rules
         foreach ($sections as $section => $questions) {
             shuffle($questions);
-
             if ($faculty == 'FST' || $faculty == 'FBM') {
                 $count = ($section == 'A') ? 1 : 6;
             } elseif ($faculty == 'FOE') {
-                $count = 4;
+                $count = 3;
             } elseif ($faculty == 'HEC') {
                 $count = ($section == 'A') ? 10 : 6;
             } elseif ($faculty == 'FOL') {
@@ -196,7 +218,6 @@ public function getRandomQuestions(Request $request)
             } else {
                 $count = ($section == 'A') ? 4 : 6;
             }
-
             $sections[$section] = array_slice($questions, 0, $count);
         }
 
@@ -229,14 +250,12 @@ public function getRandomQuestions(Request $request)
     public function generatePdf(Request $request)
     {
         $courseUnit = $request->input('courseUnit');
-        $sections = session('sections'); // Retrieve the sections data from the session
+        $sections = session('sections');
         $facultyOf = $request->input('facultyOf');
         $examPeriod = $request->input('examPeriod');
         $date = $request->input('date');
         $time = $request->input('time');
         $generalInstructions = $request->input('generalInstructions');
-
-        // Retrieve additional session data
         $faculty = session('faculty');
         $code = session('code');
         $program = session('program');
@@ -244,57 +263,44 @@ public function getRandomQuestions(Request $request)
         $sectionAInstructions = session('sectionA_instructions');
         $sectionBInstructions = session('sectionB_instructions');
         $sectionCInstructions = session('sectionC_instructions');
-
         \Log::info('📄 Generating PDF for Course Unit: ' . $courseUnit);
-
-        // Process image replacement
+        // Ensure public/pdf_images/ exists and is clean
+        $publicPath = public_path('pdf_images/');
+        if (!File::exists($publicPath)) {
+            File::makeDirectory($publicPath, 0755, true);
+            Log::info("📂 Created directory for storing PDF images: {$publicPath}");
+        }
+        File::cleanDirectory($publicPath);
+        Log::info("🗑 Cleared old PDF images from public/pdf_images.");
         $processedSections = [];
-        $storedImages = [];
-
         foreach ($sections as $sectionName => $questions) {
             foreach ($questions as $index => $questionContent) {
-                // // Log question content
-                // \Log::info("🔍 Processing Question Content - Section: {$sectionName}, Index: {$index}");
-                // \Log::info($questionContent);
-
-                // Extract images from HTML content
-                preg_match_all('/<img[^>]+src=["\']([^"\']+)["\']/i', $questionContent, $matches);
+                $processedHtml = $questionContent;
+                preg_match_all('/<img[^>]+src=["\']([^"\']+)["\']/i', $processedHtml, $matches);
                 $imageUrls = $matches[1] ?? [];
-
-                \Log::info("🔗 Found Image URLs: " . json_encode($imageUrls));
-
+                Log::info("🔗 Found Image URLs:", $imageUrls);
                 foreach ($imageUrls as $imageUrl) {
-                    // Generate local file path
-                    $imageExtension = pathinfo(parse_url($imageUrl, PHP_URL_PATH), PATHINFO_EXTENSION);
-                    $imageFileName = uniqid() . '.' . $imageExtension;
-                    $localPath = storage_path("app/pdf_images/{$imageFileName}");
-
-                    // Check if the image is already downloaded
-                    if (!isset($storedImages[$imageUrl])) {
-                        try {
-                            \Log::info("📥 Downloading image: {$imageUrl}");
-                            $imageContents = file_get_contents($imageUrl);
-                            file_put_contents($localPath, $imageContents);
-                            $storedImages[$imageUrl] = $localPath;
-                        } catch (\Exception $e) {
-                            \Log::error("❌ Failed to download image: {$imageUrl}, Error: " . $e->getMessage());
+                    $decodedUrl = html_entity_decode($imageUrl);
+                    $fileName = 'pdf_' . uniqid() . '.jpg';
+                    $publicFilePath = $publicPath . $fileName;
+                    $relativePath = 'pdf_images/' . $fileName;
+                    try {
+                        $imgContent = @file_get_contents($decodedUrl);
+                        if ($imgContent !== false) {
+                            file_put_contents($publicFilePath, $imgContent);
+                            $processedHtml = str_replace($imageUrl, $relativePath, $processedHtml);
+                            Log::info("✅ Image replaced: {$imageUrl} -> {$relativePath}");
+                        } else {
+                            Log::error("❌ Failed to download image: {$decodedUrl} (file_get_contents returned false)");
                         }
-                    }
-
-                    // Replace Firebase URL with local path
-                    if (isset($storedImages[$imageUrl])) {
-                        $questionContent = str_replace($imageUrl, $storedImages[$imageUrl], $questionContent);
-                        \Log::info("✅ Image replaced: {$imageUrl} -> {$storedImages[$imageUrl]}");
+                    } catch (\Exception $e) {
+                        Log::error("❌ Exception downloading image: {$decodedUrl}, Error: " . $e->getMessage());
                     }
                 }
-
-                // Store updated question content
-                $processedSections[$sectionName][$index] = $questionContent;
+                $processedSections[$sectionName][$index] = $processedHtml;
             }
         }
-
-        // Generate PDF
-        $pdf = PDF::loadView('admin.exam-template', [
+        $pdf = Pdf::loadView('admin.exam-template', [
             'sections' => $processedSections,
             'courseUnit' => $courseUnit,
             'faculty' => $faculty,
@@ -309,21 +315,14 @@ public function getRandomQuestions(Request $request)
             'sectionAInstructions' => $sectionAInstructions,
             'sectionBInstructions' => $sectionBInstructions,
             'sectionCInstructions' => $sectionCInstructions,
-            'pdf' => true // ✅ Ensure this flag is passed!
+            'pdf' => true
         ]);
-
-        // Set paper size and orientation
         $pdf->setPaper('A4', 'portrait');
-        $pdf->getDomPDF()->set_option('isPhpEnabled', true); // ✅ enables PHP in scripts
+        $pdf->getDomPDF()->set_option('isPhpEnabled', true);
         $pdf->getDomPDF()->set_option('isHtml5ParserEnabled', true);
-
-        // Enable remote images
         $pdf->getDomPDF()->set_option('isRemoteEnabled', true);
-
         \Log::info("📜 Processing completed. Rendering PDF...");
-
         \Log::info("✅ PDF generated successfully for Course Unit: {$courseUnit}");
-
         return $pdf->stream("Exam_{$courseUnit}.pdf");
     }
 
