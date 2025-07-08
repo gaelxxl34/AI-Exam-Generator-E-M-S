@@ -120,9 +120,15 @@
                         class="w-full bg-purple-600 text-white p-3 rounded-lg hover:bg-purple-700 transition-all flex items-center">
                         <i class="fas fa-cog mr-3"></i>System Settings
                     </button>
-                    <button
+                    <!-- Archive Exam Quick Action -->
+                    <button id="archiveExamBtn"
+                        class="w-full bg-yellow-600 text-white p-3 rounded-lg hover:bg-yellow-700 transition-all flex items-center">
+                        <i class="fas fa-archive mr-3"></i>Archive Exam
+                    </button>
+                    <!-- Delete Exams Quick Action -->
+                    <button id="deleteExamsBtn"
                         class="w-full bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition-all flex items-center">
-                        <i class="fas fa-database mr-3"></i>Backup System
+                        <i class="fas fa-database mr-3"></i>Delete Exams
                     </button>
                 </div>
             </div>
@@ -331,6 +337,282 @@
         </div>
     </div>
 
+    <!-- Archive Exam Modal -->
+    <div id="archiveExamModal" tabindex="-1"
+        class="hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-center w-full h-full bg-black bg-opacity-40">
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
+            <button type="button" class="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+                onclick="closeArchiveModal()">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3 class="text-xl font-semibold mb-4 text-gray-800 flex items-center">
+                <i class="fas fa-archive mr-2 text-yellow-600"></i>Archive Exam
+            </h3>
+            <form id="archiveExamForm" method="POST" action="{{ route('superadmin.archive-exams') }}"
+                onsubmit="startArchive(event)">
+                @csrf
+                <div class="mb-4">
+                    <label for="archive_year" class="block text-gray-700 font-medium mb-1">Year</label>
+                    <input type="number" name="year" id="archive_year"
+                        class="w-full border border-gray-300 rounded-lg p-2" min="2000" max="2100" required>
+                </div>
+                <div class="mb-4">
+                    <label for="archive_semester" class="block text-gray-700 font-medium mb-1">Semester</label>
+                    <select name="semester" id="archive_semester" class="w-full border border-gray-300 rounded-lg p-2"
+                        required>
+                        <option value="April">April</option>
+                        <option value="August">August</option>
+                        <option value="December">December</option>
+                    </select>
+                </div>
+                <!-- Progress Bar -->
+                <div id="archiveProgressContainer" class="mb-4 hidden">
+                    <label class="block text-gray-700 font-medium mb-1">Progress</label>
+                    <div class="w-full bg-gray-200 rounded-full h-4">
+                        <div id="archiveProgressBar"
+                            class="bg-yellow-500 h-4 rounded-full text-xs text-center text-white" style="width: 0%">0%
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end">
+                    <button type="button" onclick="closeArchiveModal()"
+                        class="mr-2 px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button id="archiveSubmitBtn" type="submit"
+                        class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">Archive</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Exams Modal -->
+    <div id="deleteExamsModal" tabindex="-1"
+        class="hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-center w-full h-full bg-black bg-opacity-40">
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
+            <button type="button" class="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+                onclick="closeDeleteExamsModal()">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3 class="text-xl font-semibold mb-4 text-gray-800 flex items-center">
+                <i class="fas fa-database mr-2 text-red-600"></i>Delete Exams
+            </h3>
+            <form id="deleteExamsForm" method="POST" action="{{ route('superadmin.delete-exams') }}"
+                onsubmit="startDeleteExams(event)">
+                @csrf
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-medium mb-1">How many documents do you want to
+                        delete?</label>
+                    <select name="delete_option" id="delete_option"
+                        class="w-full border border-gray-300 rounded-lg p-2 mb-2" required
+                        onchange="toggleDeleteCountInput()">
+                        <option value="all">All</option>
+                        <option value="number">Specific Number</option>
+                    </select>
+                    <input type="number" name="delete_count" id="delete_count"
+                        class="w-full border border-gray-300 rounded-lg p-2 mt-2 hidden" min="1"
+                        placeholder="Enter number to delete">
+                </div>
+                <div id="deleteExamsProgressContainer" class="mb-4 hidden">
+                    <label class="block text-gray-700 font-medium mb-1">Progress</label>
+                    <div class="w-full bg-gray-200 rounded-full h-4">
+                        <div id="deleteExamsProgressBar"
+                            class="bg-red-500 h-4 rounded-full text-xs text-center text-white" style="width: 0%">0%
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end">
+                    <button type="button" onclick="closeDeleteExamsModal()"
+                        class="mr-2 px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button id="deleteExamsSubmitBtn" type="submit"
+                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Modal open/close logic
+        const archiveExamBtn = document.getElementById('archiveExamBtn');
+        const archiveExamModal = document.getElementById('archiveExamModal');
+        function closeArchiveModal() {
+            archiveExamModal.classList.add('hidden');
+        }
+        archiveExamBtn.addEventListener('click', function () {
+            archiveExamModal.classList.remove('hidden');
+        });
+
+        function startArchive(e) {
+            e.preventDefault();
+            const form = document.getElementById('archiveExamForm');
+            const year = document.getElementById('archive_year').value;
+            const semester = document.getElementById('archive_semester').value;
+            const progressContainer = document.getElementById('archiveProgressContainer');
+            const progressBar = document.getElementById('archiveProgressBar');
+            const submitBtn = document.getElementById('archiveSubmitBtn');
+            progressContainer.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            progressBar.innerText = '0%';
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Archiving...';
+
+            // Start archive via AJAX
+            fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value
+                },
+                body: JSON.stringify({ year, semester })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.job_id) {
+                        pollArchiveProgress(data.job_id, progressBar, submitBtn);
+                    } else {
+                        progressBar.style.width = '100%';
+                        progressBar.innerText = 'Error';
+                        submitBtn.disabled = false;
+                        submitBtn.innerText = 'Archive';
+                        alert(data.message || 'Failed to start archive.');
+                    }
+                })
+                .catch(() => {
+                    progressBar.style.width = '100%';
+                    progressBar.innerText = 'Error';
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = 'Archive';
+                    alert('Failed to start archive.');
+                });
+        }
+
+        function pollArchiveProgress(jobId, progressBar, submitBtn) {
+            fetch(`/superadmin/archive-exams/progress/${jobId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.progress !== undefined) {
+                        progressBar.style.width = data.progress + '%';
+                        progressBar.innerText = data.progress + '%';
+                        if (data.progress < 100) {
+                            setTimeout(() => pollArchiveProgress(jobId, progressBar, submitBtn), 1000);
+                        } else {
+                            submitBtn.disabled = false;
+                            submitBtn.innerText = 'Archive';
+                            alert('Archive complete!');
+                            closeArchiveModal();
+                            location.reload();
+                        }
+                    } else {
+                        progressBar.style.width = '100%';
+                        progressBar.innerText = 'Error';
+                        submitBtn.disabled = false;
+                        submitBtn.innerText = 'Archive';
+                        alert(data.message || 'Failed to get progress.');
+                    }
+                })
+                .catch(() => {
+                    progressBar.style.width = '100%';
+                    progressBar.innerText = 'Error';
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = 'Archive';
+                    alert('Failed to get progress.');
+                });
+        }
+
+        // Modal logic for delete exams
+        const deleteExamsBtn = document.getElementById('deleteExamsBtn');
+        const deleteExamsModal = document.getElementById('deleteExamsModal');
+        function closeDeleteExamsModal() {
+            deleteExamsModal.classList.add('hidden');
+        }
+        deleteExamsBtn.addEventListener('click', function () {
+            deleteExamsModal.classList.remove('hidden');
+        });
+        function toggleDeleteCountInput() {
+            const option = document.getElementById('delete_option').value;
+            const countInput = document.getElementById('delete_count');
+            if (option === 'number') {
+                countInput.classList.remove('hidden');
+                countInput.required = true;
+            } else {
+                countInput.classList.add('hidden');
+                countInput.required = false;
+            }
+        }
+        function startDeleteExams(e) {
+            e.preventDefault();
+            const form = document.getElementById('deleteExamsForm');
+            const option = document.getElementById('delete_option').value;
+            const count = document.getElementById('delete_count').value;
+            const progressContainer = document.getElementById('deleteExamsProgressContainer');
+            const progressBar = document.getElementById('deleteExamsProgressBar');
+            const submitBtn = document.getElementById('deleteExamsSubmitBtn');
+            progressContainer.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            progressBar.innerText = '0%';
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Deleting...';
+            let body = { delete_option: option };
+            if (option === 'number') body.delete_count = count;
+            fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value
+                },
+                body: JSON.stringify(body)
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.job_id) {
+                        pollDeleteExamsProgress(data.job_id, progressBar, submitBtn);
+                    } else {
+                        progressBar.style.width = '100%';
+                        progressBar.innerText = 'Error';
+                        submitBtn.disabled = false;
+                        submitBtn.innerText = 'Delete';
+                        alert(data.message || 'Failed to start delete.');
+                    }
+                })
+                .catch(() => {
+                    progressBar.style.width = '100%';
+                    progressBar.innerText = 'Error';
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = 'Delete';
+                    alert('Failed to start delete.');
+                });
+        }
+        function pollDeleteExamsProgress(jobId, progressBar, submitBtn) {
+            fetch(`/superadmin/delete-exams/progress/${jobId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.progress !== undefined) {
+                        progressBar.style.width = data.progress + '%';
+                        progressBar.innerText = data.progress + '%';
+                        if (data.progress < 100) {
+                            setTimeout(() => pollDeleteExamsProgress(jobId, progressBar, submitBtn), 1000);
+                        } else {
+                            submitBtn.disabled = false;
+                            submitBtn.innerText = 'Delete';
+                            alert('Delete complete!');
+                            closeDeleteExamsModal();
+                            location.reload();
+                        }
+                    } else {
+                        progressBar.style.width = '100%';
+                        progressBar.innerText = 'Error';
+                        submitBtn.disabled = false;
+                        submitBtn.innerText = 'Delete';
+                        alert(data.message || 'Failed to get progress.');
+                    }
+                })
+                .catch(() => {
+                    progressBar.style.width = '100%';
+                    progressBar.innerText = 'Error';
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = 'Delete';
+                    alert('Failed to get progress.');
+                });
+        }
+    </script>
 </body>
 
 </html>

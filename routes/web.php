@@ -327,3 +327,15 @@ Route::get('/fetch-law-bachelor-exams', [PastExamController::class, 'fetchLawBac
 
 Route::get('/fetch-hec-exams', [PastExamController::class, 'fetchHECExams'])
     ->name('fetch.hec.exams');
+
+Route::post('/superadmin/archive-exams', [SuperAdminController::class, 'startArchiveExams'])
+    ->middleware(EnsureSuperAdminRole::class)
+    ->name('superadmin.archive-exams');
+Route::get('/superadmin/archive-exams/progress/{jobId}', [SuperAdminController::class, 'archiveExamsProgress'])
+    ->middleware(EnsureSuperAdminRole::class);
+
+Route::post('/superadmin/delete-exams', [SuperAdminController::class, 'startDeleteExams'])
+    ->middleware(EnsureSuperAdminRole::class)
+    ->name('superadmin.delete-exams');
+Route::get('/superadmin/delete-exams/progress/{jobId}', [SuperAdminController::class, 'deleteExamsProgress'])
+    ->middleware(EnsureSuperAdminRole::class);

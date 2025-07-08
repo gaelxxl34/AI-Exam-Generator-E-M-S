@@ -35,6 +35,28 @@
             </div>
         </div>
 
+        <!-- User Tip -->
+        <div class="mb-6">
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg flex items-start">
+                <div class="flex-shrink-0 mt-1">
+                    <i class="fas fa-lightbulb text-yellow-400 text-xl"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-yellow-900 font-semibold mb-1">Tip for Creating Exam Template</p>
+                    <ul class="list-disc list-inside text-yellow-800 text-sm space-y-1">
+                        <li>Select <span class="font-medium">one question</span> in <span class="font-medium">Section
+                                A</span> and <span class="font-medium">one question</span> in <span
+                                class="font-medium">Section B</span> to start.</li>
+                        <li>Fill in some sample data and add the required instructions to create your exam template.
+                        </li>
+                        <li>After saving, you can <span class="font-medium">edit and add more questions later</span> by
+                            visiting the <span class="font-medium">Review Exams</span> page.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <!-- End User Tip -->
+
         <!-- Main Form Container -->
         <div class="max-w-4xl mx-auto">
             <form id="uploadForm" enctype="multipart/form-data" action="{{ route('upload.exam') }}" method="post"

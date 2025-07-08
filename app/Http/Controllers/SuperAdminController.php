@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use Kreait\Firebase\Factory;
 use Illuminate\Support\Facades\Log;
 use Kreait\Firebase\Auth as FirebaseAuth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 
 class SuperAdminController extends Controller
 {
@@ -605,4 +607,142 @@ class SuperAdminController extends Controller
 
     // Control Lecturers ends here
 
+    /**
+     * Archive all exams to a collection named by year and semester (e.g., archive_April_2025)
+     */
+    public function archiveExams(Request $request)
+    {
+        $request->validate([
+            'year' => 'required|integer|min:2000|max:2100',
+            'semester' => 'required|in:April,August,December',
+        ]);
+
+        $year = $request->input('year');
+        $semester = $request->input('semester');
+        $archiveCollection = 'archive_' . $semester . '_' . $year;
+
+        try {
+            $firestore = app('firebase.firestore')->database();
+            $examsRef = $firestore->collection('Exams');
+            $exams = $examsRef->documents();
+            $archiveRef = $firestore->collection($archiveCollection);
+
+            $archivedCount = 0;
+            foreach ($exams as $exam) {
+                if ($exam->exists()) {
+                    $archiveRef->document($exam->id())->set($exam->data());
+                    $archivedCount++;
+                }
+            }
+
+            // Optionally, clear the Exams collection after archiving
+            // foreach ($exams as $exam) {
+            //     if ($exam->exists()) {
+            //         $examsRef->document($exam->id())->delete();
+            //     }
+            // }
+
+            return redirect()->back()->with('success', "Archived {$archivedCount} exams to {$archiveCollection}.");
+        } catch (\Exception $e) {
+            \Log::error('Error archiving exams: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Failed to archive exams: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Start archiving exams (AJAX, returns job id)
+     */
+    public function startArchiveExams(Request $request)
+    {
+        $request->validate([
+            'year' => 'required|integer|min:2000|max:2100',
+            'semester' => 'required|in:April,August,December',
+        ]);
+        $year = $request->input('year');
+        $semester = $request->input('semester');
+        $archiveCollection = 'archive_' . $semester . '_' . $year;
+        $jobId = Str::uuid()->toString();
+        // Start the archive process (sync for now, but chunked with progress)
+        try {
+            set_time_limit(600); // 10 minutes
+            ini_set('max_execution_time', 600);
+            $firestore = app('firebase.firestore')->database();
+            $examsRef = $firestore->collection('Exams');
+            $exams = $examsRef->documents();
+            $archiveRef = $firestore->collection($archiveCollection);
+            $examsArray = iterator_to_array($exams);
+            $total = count($examsArray);
+            $archived = 0;
+            Cache::put('archive_progress_' . $jobId, 0, 600);
+            foreach ($examsArray as $exam) {
+                if ($exam->exists()) {
+                    $archiveRef->document($exam->id())->set($exam->data());
+                    $archived++;
+                    $progress = $total > 0 ? intval(($archived / $total) * 100) : 100;
+                    Cache::put('archive_progress_' . $jobId, $progress, 600);
+                }
+            }
+            Cache::put('archive_progress_' . $jobId, 100, 600);
+            return response()->json(['job_id' => $jobId, 'message' => 'Archive started.']);
+        } catch (\Exception $e) {
+            Cache::put('archive_progress_' . $jobId, 100, 600);
+            return response()->json(['message' => 'Failed: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Poll archive progress by job id
+     */
+    public function archiveExamsProgress($jobId)
+    {
+        $progress = Cache::get('archive_progress_' . $jobId, 0);
+        return response()->json(['progress' => $progress]);
+    }
+
+    /**
+     * Start deleting exams (AJAX, returns job id)
+     */
+    public function startDeleteExams(Request $request)
+    {
+        $request->validate([
+            'delete_option' => 'required|in:all,number',
+            'delete_count' => 'nullable|integer|min:1',
+        ]);
+        $option = $request->input('delete_option');
+        $count = $request->input('delete_count');
+        $jobId = Str::uuid()->toString();
+        try {
+            set_time_limit(600);
+            ini_set('max_execution_time', 600);
+            $firestore = app('firebase.firestore')->database();
+            $examsRef = $firestore->collection('Exams');
+            $exams = iterator_to_array($examsRef->documents());
+            $total = ($option === 'number' && $count) ? min($count, count($exams)) : count($exams);
+            $deleted = 0;
+            Cache::put('delete_exams_progress_' . $jobId, 0, 600);
+            foreach ($exams as $exam) {
+                if ($deleted >= $total) break;
+                if ($exam->exists()) {
+                    $examsRef->document($exam->id())->delete();
+                    $deleted++;
+                    $progress = $total > 0 ? intval(($deleted / $total) * 100) : 100;
+                    Cache::put('delete_exams_progress_' . $jobId, $progress, 600);
+                }
+            }
+            Cache::put('delete_exams_progress_' . $jobId, 100, 600);
+            return response()->json(['job_id' => $jobId, 'message' => 'Delete started.']);
+        } catch (\Exception $e) {
+            Cache::put('delete_exams_progress_' . $jobId, 100, 600);
+            return response()->json(['message' => 'Failed: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Poll delete exams progress by job id
+     */
+    public function deleteExamsProgress($jobId)
+    {
+        $progress = Cache::get('delete_exams_progress_' . $jobId, 0);
+        return response()->json(['progress' => $progress]);
+    }
 }

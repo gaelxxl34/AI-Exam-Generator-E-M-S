@@ -94,6 +94,79 @@
     <div class="p-4 sm:ml-64 mt-20">
         <div class="container mx-auto px-4">
             @forelse ($exams as $index => $exam)
+                @php
+                    // Define minimum questions per section by faculty
+                    $minQuestions = [
+                        'FST' => ['A' => 2, 'B' => 12],
+                        'FBM' => ['A' => 2, 'B' => 12],
+                        'FOE' => ['A' => 4, 'B' => 4],
+                        'HEC' => ['A' => 20, 'B' => 10],
+                        'FOL' => ['A' => 2, 'B' => 4, 'C' => 5],
+                    ];
+                    $faculty = $exam['faculty'];
+                    $sections = $exam['sections'] ?? [];
+                    $requirementsMet = true;
+                    if (isset($minQuestions[$faculty])) {
+                        foreach ($minQuestions[$faculty] as $section => $required) {
+                            $count = isset($sections[$section]) ? count($sections[$section]) : 0;
+                            if ($count < $required) {
+                                $requirementsMet = false;
+                                break;
+                            }
+                        }
+                    }
+                @endphp
+                <!-- Preview Requirement Info (always show) -->
+                <div class="mb-6">
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg flex items-start">
+                        <div class="flex-shrink-0 mt-1">
+                            <i class="fas fa-info-circle text-yellow-400 text-xl"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-yellow-900 font-semibold mb-1">Preview Requirement</p>
+                            <p class="text-yellow-800 text-sm mb-1">
+                                For your exam to be eligible for submission, you must preview it at least <span
+                                    class="font-bold">3 times</span>.<br>
+                                This helps ensure you carefully review your exam before sending it for review.
+                            </p>
+                            <p class="text-yellow-900 text-sm font-medium mt-2">
+                                Previewed: <span id="previewCountDisplay_{{ $index }}" class="font-bold">0</span> / 3 times
+                            </p>
+                            @if (!$requirementsMet)
+                                <p class="text-red-600 text-xs mt-1">You must complete all required questions before previewing will count.</p>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function () {
+                        var requirementsMet = @json($requirementsMet);
+                        var courseKey = 'preview_count_' + @json($exam['courseUnit']);
+                        var display = document.getElementById('previewCountDisplay_{{ $index }}');
+                        var previewForm = document.getElementById('previewForm_{{ $index }}');
+                        if (requirementsMet) {
+                            var count = parseInt(localStorage.getItem(courseKey) || '0');
+                            if (display) display.textContent = count;
+                            if (previewForm) {
+                                previewForm.addEventListener('submit', function (e) {
+                                    count = parseInt(localStorage.getItem(courseKey) || '0');
+                                    count++;
+                                    localStorage.setItem(courseKey, count);
+                                    if (display) display.textContent = count;
+                                }, true);
+                            }
+                        } else {
+                            if (display) display.textContent = 0;
+                            if (previewForm) {
+                                previewForm.addEventListener('submit', function (e) {
+                                    // Prevent incrementing if requirements not met
+                                    localStorage.setItem(courseKey, 0);
+                                    if (display) display.textContent = 0;
+                                }, true);
+                            }
+                        }
+                    });
+                </script>
                 <!-- Header with course info and status -->
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
                     <div>
@@ -105,7 +178,7 @@
                             class="inline-flex items-center px-4 py-2 text-white text-sm font-bold rounded-full">
                             <i class="fas fa-info-circle mr-2"></i> Status
                         </button>
-                        <form action="{{ route('preview.pdf', ['courseUnit' => $exam['courseUnit']]) }}" method="GET"
+                        <form id="previewForm_{{ $index }}" action="{{ route('preview.pdf', ['courseUnit' => $exam['courseUnit']]) }}" method="GET"
                             x-data="{ loading: false }" x-on:submit="loading = true" class="inline">
                             <button type="submit"
                                 class="inline-flex items-center px-4 py-2 bg-gray-500 text-white text-sm font-bold rounded-full hover:bg-black focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-700"
@@ -284,35 +357,35 @@
                                         @endforeach
                                         <!-- Error message for number of questions in the section (below questions) -->
                                         @php
-                                            $questionCount = count($questions);
-                                            $errorMessage = '';
-                                            if (in_array($exam['faculty'], ['FST', 'FBM'])) {
-                                                if ($sectionName == 'A' && $questionCount < 2) {
-                                                    $errorMessage = 'Minimum required 2 Case Studies for Section A';
-                                                } elseif ($sectionName == 'B' && $questionCount < 12) {
-                                                    $errorMessage = 'Minimum required 12 questions for Section B';
-                                                }
-                                            } elseif ($exam['faculty'] == 'FOE') {
-                                                if ($sectionName == 'A' && $questionCount < 4) {
-                                                    $errorMessage = 'Minimum required 6 questions for Section A';
-                                                } elseif ($sectionName == 'B' && $questionCount < 4) {
-                                                    $errorMessage = 'Minimum required 4 questions for Section B';
-                                                }
-                                            } elseif ($exam['faculty'] == 'HEC') {
-                                                if ($sectionName == 'A' && $questionCount < 20) {
-                                                    $errorMessage = 'Minimum required 20 questions for Section A';
-                                                } elseif ($sectionName == 'B' && $questionCount < 10) {
-                                                    $errorMessage = 'Minimum required 10 questions for Section B';
-                                                }
-                                            } elseif ($exam['faculty'] == 'FOL') {
-                                                if ($sectionName == 'A' && $questionCount < 2) {
-                                                    $errorMessage = 'Minimum required 2 questions for Section A';
-                                                } elseif ($sectionName == 'B' && $questionCount < 4) {
-                                                    $errorMessage = 'Minimum required 4 questions for Section B';
-                                                } elseif ($sectionName == 'C' && $questionCount < 5) {
-                                                    $errorMessage = 'Minimum required 5 essay questions for Section C';
-                                                }
-                                            }
+                    $questionCount = count($questions);
+                    $errorMessage = '';
+                    if (in_array($exam['faculty'], ['FST', 'FBM'])) {
+                        if ($sectionName == 'A' && $questionCount < 2) {
+                            $errorMessage = 'Minimum required 2 Case Studies for Section A';
+                        } elseif ($sectionName == 'B' && $questionCount < 12) {
+                            $errorMessage = 'Minimum required 12 questions for Section B';
+                        }
+                    } elseif ($exam['faculty'] == 'FOE') {
+                        if ($sectionName == 'A' && $questionCount < 4) {
+                            $errorMessage = 'Minimum required 4 questions for Section A';
+                        } elseif ($sectionName == 'B' && $questionCount < 4) {
+                            $errorMessage = 'Minimum required 4 questions for Section B';
+                        }
+                    } elseif ($exam['faculty'] == 'HEC') {
+                        if ($sectionName == 'A' && $questionCount < 20) {
+                            $errorMessage = 'Minimum required 20 questions for Section A';
+                        } elseif ($sectionName == 'B' && $questionCount < 10) {
+                            $errorMessage = 'Minimum required 10 questions for Section B';
+                        }
+                    } elseif ($exam['faculty'] == 'FOL') {
+                        if ($sectionName == 'A' && $questionCount < 2) {
+                            $errorMessage = 'Minimum required 2 questions for Section A';
+                        } elseif ($sectionName == 'B' && $questionCount < 4) {
+                            $errorMessage = 'Minimum required 4 questions for Section B';
+                        } elseif ($sectionName == 'C' && $questionCount < 5) {
+                            $errorMessage = 'Minimum required 5 essay questions for Section C';
+                        }
+                    }
                                         @endphp
                                         @if ($errorMessage)
                                             <p class="text-red-700 font-semibold text-md mt-2">{{ $errorMessage }}</p>
