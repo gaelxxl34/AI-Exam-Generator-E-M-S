@@ -53,7 +53,7 @@
                     <img src="https://img.freepik.com/free-vector/error-404-concept-illustration_114360-1811.jpg"
                         alt="No Data Available" class="w-full max-w-lg">
                     <p class="mt-4 text-lg font-semibold text-gray-600">No exams available yet.</p>
-                    <a href="{{ route('lecturer.l-upload-questions') }}"
+                    <a href="{{ route('lecturer.list') }}"
                         class="mt-2 px-5 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 font-medium transition-all flex items-center">
                         <i class="fas fa-plus mr-2"></i> Upload Your First Exam
                     </a>

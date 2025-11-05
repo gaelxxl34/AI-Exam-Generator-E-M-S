@@ -22,6 +22,53 @@ Route::get('/', function () {
     return view('welcome');
 })->name('welcome');
 
+// Sitemap for SEO
+Route::get('/sitemap.xml', function () {
+    $sitemap = '<?xml version="1.0" encoding="UTF-8"?>';
+    $sitemap .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
+    
+    // Homepage
+    $sitemap .= '<url>';
+    $sitemap .= '<loc>' . url('/') . '</loc>';
+    $sitemap .= '<lastmod>' . date('Y-m-d') . '</lastmod>';
+    $sitemap .= '<changefreq>daily</changefreq>';
+    $sitemap .= '<priority>1.0</priority>';
+    $sitemap .= '</url>';
+    
+    // Login page
+    $sitemap .= '<url>';
+    $sitemap .= '<loc>' . url('/login') . '</loc>';
+    $sitemap .= '<lastmod>' . date('Y-m-d') . '</lastmod>';
+    $sitemap .= '<changefreq>monthly</changefreq>';
+    $sitemap .= '<priority>0.9</priority>';
+    $sitemap .= '</url>';
+    
+    // Faculty program pages
+    $faculties = [
+        ['faculty' => 'fst', 'name' => 'Faculty of Science and Technology'],
+        ['faculty' => 'fbm', 'name' => 'Faculty of Business'],
+        ['faculty' => 'foe', 'name' => 'Faculty of Engineering'],
+        ['faculty' => 'fol', 'name' => 'Faculty of Law']
+    ];
+    
+    $degrees = ['master', 'bachelor', 'diploma', 'hec'];
+    
+    foreach ($faculties as $faculty) {
+        foreach ($degrees as $degree) {
+            $sitemap .= '<url>';
+            $sitemap .= '<loc>' . route('exams.program', ['faculty' => $faculty['faculty'], 'degree' => $degree]) . '</loc>';
+            $sitemap .= '<lastmod>' . date('Y-m-d') . '</lastmod>';
+            $sitemap .= '<changefreq>weekly</changefreq>';
+            $sitemap .= '<priority>0.8</priority>';
+            $sitemap .= '</url>';
+        }
+    }
+    
+    $sitemap .= '</urlset>';
+    
+    return response($sitemap)->header('Content-Type', 'application/xml');
+})->name('sitemap');
+
 Route::get('/fst/fstmaster-common-page', function () {
     return view('fst.fstmaster-common-page');
 })->name('fst.fstmaster-common-page');
@@ -301,32 +348,51 @@ Route::delete('/admin/{adminId}', [SuperAdminController::class, 'deleteAdmin'])
     
 // -- USERS NORMAL ROUTINGS 
 
-Route::get('/fetch-mit-exams', [PastExamController::class, 'fetchMITExams'])
-    ->name('fst.fstmaster');
+// ✨ NEW: Unified dynamic route for all faculty programs
+Route::get('/exams/{faculty}/{degree}', [PastExamController::class, 'fetchProgramExams'])
+    ->name('exams.program')
+    ->where(['faculty' => 'fst|fbm|foe|fol', 'degree' => 'master|bachelor|diploma|hec']);
 
-Route::get('/fetch-bachelor-exams', [PastExamController::class, 'fetchBachelorExams'])
-    ->name('fst.fstbachelor');
+// 🔄 LEGACY ROUTES: Keep for backward compatibility (redirects to new route)
+Route::get('/fetch-mit-exams', function() {
+    return redirect()->route('exams.program', ['faculty' => 'fst', 'degree' => 'master']);
+})->name('fst.fstmaster');
 
-Route::get('/fetch-dcs-diploma-exams', [PastExamController::class, 'fetchDiplomaDCSExams'])
-    ->name('fst.fstdiploma');
+Route::get('/fetch-bachelor-exams', function() {
+    return redirect()->route('exams.program', ['faculty' => 'fst', 'degree' => 'bachelor']);
+})->name('fst.fstbachelor');
 
-Route::get('/fetch-fbm-bachelor-exams', [PastExamController::class, 'fetchFBMBachelorExams'])
-    ->name('fbm.bachelor');
+Route::get('/fetch-dcs-diploma-exams', function() {
+    return redirect()->route('exams.program', ['faculty' => 'fst', 'degree' => 'diploma']);
+})->name('fst.fstdiploma');
 
-Route::get('/fetch-diploma-business-public-exams', [PastExamController::class, 'fetchDiplomaBusinessAndPublicExams'])
-    ->name('fetch.diploma.business.public.exams');
+Route::get('/fetch-fbm-bachelor-exams', function() {
+    return redirect()->route('exams.program', ['faculty' => 'fbm', 'degree' => 'bachelor']);
+})->name('fbm.bachelor');
 
-Route::get('/fetch-foe-bachelor-exams', [PastExamController::class, 'fetchFOEBachelorExams'])
-    ->name('fetch.foe.bachelor.exams');
+Route::get('/fetch-diploma-business-public-exams', function() {
+    return redirect()->route('exams.program', ['faculty' => 'fbm', 'degree' => 'diploma']);
+})->name('fetch.diploma.business.public.exams');
 
-Route::get('/fetch-foe-diploma-exams', [PastExamController::class, 'fetchFOEDiplomaExams'])
-    ->name('fetch.foe.diploma.exams');
+Route::get('/fetch-foe-bachelor-exams', function() {
+    return redirect()->route('exams.program', ['faculty' => 'foe', 'degree' => 'bachelor']);
+})->name('fetch.foe.bachelor.exams');
 
-Route::get('/fetch-law-bachelor-exams', [PastExamController::class, 'fetchLawBachelorExams'])
-    ->name('fetch.law.bachelor.exams');
+Route::get('/fetch-foe-diploma-exams', function() {
+    return redirect()->route('exams.program', ['faculty' => 'foe', 'degree' => 'diploma']);
+})->name('fetch.foe.diploma.exams');
 
-Route::get('/fetch-hec-exams', [PastExamController::class, 'fetchHECExams'])
-    ->name('fetch.hec.exams');
+Route::get('/fetch-law-bachelor-exams', function() {
+    return redirect()->route('exams.program', ['faculty' => 'fol', 'degree' => 'bachelor']);
+})->name('fetch.law.bachelor.exams');
+
+Route::get('/fetch-hec-exams', function() {
+    return redirect()->route('exams.program', ['faculty' => 'fbm', 'degree' => 'hec']);
+})->name('fetch.hec.exams');
+
+// Lazy load PDF files on demand
+Route::get('/fetch-pdf/{id}', [PastExamController::class, 'fetchPdfFile'])
+    ->name('fetch.pdf');
 
 Route::post('/superadmin/archive-exams', [SuperAdminController::class, 'startArchiveExams'])
     ->middleware(EnsureSuperAdminRole::class)

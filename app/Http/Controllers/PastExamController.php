@@ -143,8 +143,10 @@ class PastExamController extends Controller
         $firestore = app('firebase.firestore');
         $database = $firestore->database();
 
-        // Query to fetch past exams for 'MIT'
-        $pastExamsQuery = $database->collection('pastExams')->where('program', '==', 'MIT');
+        // Query to fetch past exams for 'MIT' - only load metadata
+        $pastExamsQuery = $database->collection('pastExams')
+            ->where('program', '==', 'MIT')
+            ->select(['courseUnit', 'year']);
         $pastExams = $pastExamsQuery->documents();
 
         $groupedData = [];
@@ -156,8 +158,8 @@ class PastExamController extends Controller
                     $groupedData[$courseUnit] = [];
                 }
                 $groupedData[$courseUnit][] = [
+                    'id' => $exam->id(), // Store document ID for lazy loading
                     'year' => $data['year'],
-                    'file' => $data['file'], // Base64 encoded PDF
                 ];
             }
         }
@@ -178,7 +180,9 @@ class PastExamController extends Controller
 
         foreach ($programs as $program) {
             Log::info("Querying past exams for program: {$program}");
-            $query = $database->collection('pastExams')->where('program', '==', $program);
+            $query = $database->collection('pastExams')
+                ->where('program', '==', $program)
+                ->select(['courseUnit', 'year']); // Only fetch minimal fields
             $exams = $query->documents();
 
             foreach ($exams as $exam) {
@@ -195,8 +199,8 @@ class PastExamController extends Controller
                     }
 
                     $groupedData[$program][$courseUnit][] = [
+                        'id' => $exam->id(), // Store document ID for lazy loading
                         'year' => $data['year'],
-                        'file' => $data['file'], // Base64 encoded PDF
                     ];
                 }
             }
@@ -216,7 +220,9 @@ class PastExamController extends Controller
 
         // Define the DCS program identifier
         $program = 'DCS';
-        $query = $database->collection('pastExams')->where('program', '==', $program);
+        $query = $database->collection('pastExams')
+            ->where('program', '==', $program)
+            ->select(['courseUnit', 'year']);
         $exams = $query->documents();
 
         $groupedData = [];
@@ -229,8 +235,8 @@ class PastExamController extends Controller
                     $groupedData[$courseUnit] = [];
                 }
                 $groupedData[$courseUnit][] = [
+                    'id' => $exam->id(),
                     'year' => $data['year'],
-                    'file' => $data['file'], // Base64 encoded PDF
                 ];
             }
         }
@@ -254,7 +260,9 @@ class PastExamController extends Controller
 
         foreach ($programs as $program) {
             Log::info("Querying past exams for FBM program: {$program}");
-            $query = $database->collection('pastExams')->where('program', '==', $program);
+            $query = $database->collection('pastExams')
+                ->where('program', '==', $program)
+                ->select(['courseUnit', 'year']);
             $exams = $query->documents();
 
             foreach ($exams as $exam) {
@@ -271,8 +279,8 @@ class PastExamController extends Controller
                     }
 
                     $groupedData[$program][$courseUnit][] = [
+                        'id' => $exam->id(),
                         'year' => $data['year'],
-                        'file' => $data['file'], // Base64 encoded PDF
                     ];
                 }
             }
@@ -297,7 +305,9 @@ class PastExamController extends Controller
 
         foreach ($programs as $program) {
             Log::info("Querying past exams for program: {$program}");
-            $query = $database->collection('pastExams')->where('program', '==', $program);
+            $query = $database->collection('pastExams')
+                ->where('program', '==', $program)
+                ->select(['courseUnit', 'year']);
             $exams = $query->documents();
 
             foreach ($exams as $exam) {
@@ -314,8 +324,8 @@ class PastExamController extends Controller
                     }
 
                     $groupedData[$program][$courseUnit][] = [
+                        'id' => $exam->id(),
                         'year' => $data['year'],
-                        'file' => $data['file'], // Base64 encoded PDF
                     ];
                 }
             }
@@ -339,7 +349,9 @@ class PastExamController extends Controller
 
         foreach ($programs as $program) {
             Log::info("Querying past exams for FOE program: {$program}");
-            $query = $database->collection('pastExams')->where('program', '==', $program);
+            $query = $database->collection('pastExams')
+                ->where('program', '==', $program)
+                ->select(['courseUnit', 'year']);
             $exams = $query->documents();
 
             foreach ($exams as $exam) {
@@ -356,8 +368,8 @@ class PastExamController extends Controller
                     }
 
                     $groupedData[$program][$courseUnit][] = [
+                        'id' => $exam->id(),
                         'year' => $data['year'],
-                        'file' => $data['file'], // Base64 encoded PDF
                     ];
                 }
             }
@@ -382,7 +394,9 @@ class PastExamController extends Controller
 
         foreach ($programs as $program) {
             Log::info("Querying past exams for FOE diploma program: {$program}");
-            $query = $database->collection('pastExams')->where('program', '==', $program);
+            $query = $database->collection('pastExams')
+                ->where('program', '==', $program)
+                ->select(['courseUnit', 'year']);
             $exams = $query->documents();
 
             foreach ($exams as $exam) {
@@ -399,8 +413,8 @@ class PastExamController extends Controller
                     }
 
                     $groupedData[$program][$courseUnit][] = [
+                        'id' => $exam->id(),
                         'year' => $data['year'],
-                        'file' => $data['file'], // Base64 encoded PDF
                     ];
                 }
             }
@@ -421,7 +435,9 @@ class PastExamController extends Controller
 
         // The LLB program identifier
         $program = 'LLB';
-        $query = $database->collection('pastExams')->where('program', '==', $program);
+        $query = $database->collection('pastExams')
+            ->where('program', '==', $program)
+            ->select(['courseUnit', 'year']);
         $exams = $query->documents();
 
         $groupedData = [];
@@ -435,8 +451,8 @@ class PastExamController extends Controller
                 }
 
                 $groupedData[$courseUnit][] = [
+                    'id' => $exam->id(),
                     'year' => $data['year'],
-                    'file' => $data['file'], // Base64 encoded PDF
                 ];
             }
         }
@@ -456,7 +472,9 @@ class PastExamController extends Controller
 
         // The HEC program identifier
         $program = 'HEC';
-        $query = $database->collection('pastExams')->where('program', '==', $program);
+        $query = $database->collection('pastExams')
+            ->where('program', '==', $program)
+            ->select(['courseUnit', 'year']);
         $exams = $query->documents();
 
         $groupedData = [];
@@ -470,8 +488,8 @@ class PastExamController extends Controller
                 }
 
                 $groupedData[$courseUnit][] = [
+                    'id' => $exam->id(),
                     'year' => $data['year'],
-                    'file' => $data['file'], // Base64 encoded PDF
                 ];
             }
         }
@@ -479,6 +497,166 @@ class PastExamController extends Controller
         Log::info('Completed fetching HEC exams', ['groupedDataCount' => count($groupedData)]);
 
         return view('fbm.hec', ['examsData' => $groupedData]);
+    }
+
+    // New method to fetch a single PDF file on demand
+    public function fetchPdfFile($id)
+    {
+        $firestore = app('firebase.firestore');
+        $database = $firestore->database();
+
+        try {
+            $document = $database->collection('pastExams')->document($id)->snapshot();
+            
+            if ($document->exists()) {
+                $data = $document->data();
+                $file = $data['file'] ?? null;
+                
+                if ($file) {
+                    // Decode base64 PDF and return as response
+                    $pdfContent = base64_decode($file);
+                    
+                    return response($pdfContent)
+                        ->header('Content-Type', 'application/pdf')
+                        ->header('Content-Disposition', 'inline; filename="exam.pdf"');
+                }
+            }
+            
+            return response()->json(['error' => 'PDF not found'], 404);
+        } catch (\Exception $e) {
+            Log::error('Error fetching PDF: ' . $e->getMessage());
+            return response()->json(['error' => 'Error loading PDF'], 500);
+        }
+    }
+
+    /**
+     * Unified method to fetch exams dynamically based on faculty and degree
+     * 
+     * @param string $faculty - Faculty code (fst, fbm, foe, fol)
+     * @param string $degree - Degree level (master, bachelor, diploma, hec)
+     * @return \Illuminate\View\View
+     */
+    public function fetchProgramExams($faculty, $degree)
+    {
+        Log::info("Starting to fetch {$degree} exams for {$faculty}");
+
+        $firestore = app('firebase.firestore');
+        $database = $firestore->database();
+
+        // Configuration mapping for each faculty and degree combination
+        $config = [
+            'fst' => [
+                'name' => 'Faculty of Science and Technology',
+                'color' => 'blue',
+                'icon' => 'laptop-code',
+                'master' => [
+                    'title' => 'FST Master\'s Degree',
+                    'programs' => ['MIT']
+                ],
+                'bachelor' => [
+                    'title' => 'FST Bachelor\'s Degree',
+                    'programs' => ['BIT', 'BSCS', 'BSSE', 'BSEM']
+                ],
+                'diploma' => [
+                    'title' => 'FST Diploma',
+                    'programs' => ['DCS']
+                ]
+            ],
+            'fbm' => [
+                'name' => 'Faculty of Business & Management',
+                'color' => 'amber',
+                'icon' => 'briefcase',
+                'master' => [
+                    'title' => 'FBM Master\'s Degree',
+                    'programs' => ['MBA']
+                ],
+                'bachelor' => [
+                    'title' => 'FBM Bachelor\'s Degree',
+                    'programs' => ['BBA', 'BHRM', 'BPA', 'BPALM', 'BTHM']
+                ],
+                'diploma' => [
+                    'title' => 'FBM Diploma',
+                    'programs' => ['DBA', 'DPA']
+                ],
+                'hec' => [
+                    'title' => 'Higher Education Certificate',
+                    'programs' => ['HEC']
+                ]
+            ],
+            'foe' => [
+                'name' => 'Faculty of Engineering',
+                'color' => 'orange',
+                'icon' => 'cogs',
+                'bachelor' => [
+                    'title' => 'FOE Bachelor\'s Degree',
+                    'programs' => ['BSPE', 'BARC', 'BSCE', 'BSEE']
+                ],
+                'diploma' => [
+                    'title' => 'FOE Diploma',
+                    'programs' => ['DCE', 'DEE', 'DARC']
+                ]
+            ],
+            'fol' => [
+                'name' => 'Faculty of Law',
+                'color' => 'red',
+                'icon' => 'balance-scale',
+                'bachelor' => [
+                    'title' => 'Faculty of Law - LLB',
+                    'programs' => ['LLB']
+                ]
+            ]
+        ];
+
+        // Validate faculty and degree
+        if (!isset($config[$faculty]) || !isset($config[$faculty][$degree])) {
+            abort(404, 'Program not found');
+        }
+
+        $facultyConfig = $config[$faculty];
+        $degreeConfig = $facultyConfig[$degree];
+        $programs = $degreeConfig['programs'];
+
+        $groupedData = [];
+
+        // Fetch exams for each program
+        foreach ($programs as $program) {
+            Log::info("Querying past exams for program: {$program}");
+            $query = $database->collection('pastExams')
+                ->where('program', '==', $program)
+                ->select(['courseUnit', 'year']);
+            $exams = $query->documents();
+
+            foreach ($exams as $exam) {
+                if ($exam->exists()) {
+                    $data = $exam->data();
+                    $courseUnit = $data['courseUnit'];
+
+                    if (!isset($groupedData[$program])) {
+                        $groupedData[$program] = [];
+                    }
+
+                    if (!isset($groupedData[$program][$courseUnit])) {
+                        $groupedData[$program][$courseUnit] = [];
+                    }
+
+                    $groupedData[$program][$courseUnit][] = [
+                        'id' => $exam->id(),
+                        'year' => $data['year'],
+                    ];
+                }
+            }
+        }
+
+        Log::info("Completed fetching {$degree} exams for {$faculty}", ['programCount' => count($groupedData)]);
+
+        // Return unified view with dynamic data
+        return view('exams.programs', [
+            'examsData' => $groupedData,
+            'pageTitle' => $degreeConfig['title'],
+            'facultyName' => $facultyConfig['name'],
+            'facultyColor' => $facultyConfig['color'],
+            'facultyIcon' => $facultyConfig['icon']
+        ]);
     }
 
 

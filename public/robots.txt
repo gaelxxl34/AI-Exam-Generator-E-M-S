@@ -1,2 +1,34 @@
+# IUEA Past Papers & Exam Library - Robots.txt
+# Allow search engines to index all public content
+
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /admin/
+Disallow: /superadmin/
+Disallow: /lecturer/
+Disallow: /deans/
+Disallow: /genadmin/
+Disallow: /api/
+Disallow: /storage/
+Disallow: /vendor/
+
+# Sitemap location
+Sitemap: https://ems.iuea.ac.ug/sitemap.xml
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1
+
+# Popular search engines
+User-agent: Googlebot
+Allow: /
+Disallow: /admin/
+Disallow: /superadmin/
+
+User-agent: Bingbot
+Allow: /
+Disallow: /admin/
+Disallow: /superadmin/
+
+User-agent: Slurp
+Allow: /
+Disallow: /admin/
