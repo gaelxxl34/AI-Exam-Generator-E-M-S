@@ -258,19 +258,13 @@ public function updateLecturer(Request $request, $id)
             return back()->withErrors(['error' => 'Lecturer not found in Firestore.']);
         }
 
-        $lecturerData = $lecturerSnapshot->data();
-        $existingCourses = $lecturerData['courses'] ?? [];
-
-        // **Merge Courses Instead of Replacing**
-        $updatedCourses = array_unique(array_merge($existingCourses, $validatedData['courses']));
-
         // Update lecturer data
         $lecturerRef->update([
             ['path' => 'firstName', 'value' => $validatedData['firstName']],
             ['path' => 'lastName', 'value' => $validatedData['lastName']],
             ['path' => 'email', 'value' => $validatedData['email']], // Update email
             ['path' => 'faculties', 'value' => $validatedData['faculties']], // Update faculties
-            ['path' => 'courses', 'value' => $updatedCourses], // **Only Add New Courses**
+            ['path' => 'courses', 'value' => $validatedData['courses']], // Replace with selected courses
         ]);
 
         // Update Firebase Authentication Email
