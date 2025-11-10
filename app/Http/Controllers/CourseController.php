@@ -41,7 +41,8 @@ public function CoursesList()
 
         if (empty($lecturerCourses)) {
             \Log::info('No courses found for the current user: ' . $currentUserEmail);
-            throw new \Exception('No courses found for the current user.');
+            // Instead of throwing error, pass empty courses array to view
+            return view('lecturer.l-upload-questions', ['courses' => []]);
         }
 
         // Fetch only the courses that belong to this lecturer from Firestore "Courses" collection
@@ -67,7 +68,8 @@ public function CoursesList()
 
     } catch (\Exception $e) {
         \Log::error('Error in CoursesList: ' . $e->getMessage());
-        return 'Error: ' . $e->getMessage();
+        // Return view with empty courses instead of showing error message
+        return view('lecturer.l-upload-questions', ['courses' => [], 'error' => $e->getMessage()]);
     }
 }
 
@@ -89,14 +91,15 @@ public function CoursesList()
 
             foreach ($snapshot as $doc) {
                 if ($doc->exists() && $doc['email'] === $lecturerEmail) {
-                    $lecturerCourses = $doc['courses'];
+                    $lecturerCourses = $doc['courses'] ?? [];
                     break; // Assuming one match, we can break the loop once found
                 }
             }
 
             if (empty($lecturerCourses)) {
-                \Log::error("Lecturer not found or no courses assigned");
-                return back()->withErrors(['fetch_error' => 'Lecturer not found or no courses assigned.']);
+                \Log::info("Lecturer not found or no courses assigned for: $lecturerEmail");
+                // Instead of returning error, pass empty courses array to view
+                return view('lecturer.l-dashboard', ['courses' => []]);
             }
 
             $examsRef = $firestore->collection('Exams');
@@ -119,7 +122,8 @@ public function CoursesList()
 
         } catch (\Throwable $e) {
             \Log::error("Error fetching courses: " . $e->getMessage());
-            return back()->withErrors(['fetch_error' => 'Error fetching courses.'])->with('message', 'Error fetching courses: ' . $e->getMessage());
+            // Return view with empty courses instead of error
+            return view('lecturer.l-dashboard', ['courses' => [], 'error' => $e->getMessage()]);
         }
     }
 

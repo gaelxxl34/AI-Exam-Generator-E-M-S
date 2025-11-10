@@ -50,13 +50,36 @@
                 </div>
             @empty
                 <div class="col-span-full flex flex-col items-center justify-center ">
-                    <img src="https://img.freepik.com/free-vector/error-404-concept-illustration_114360-1811.jpg"
-                        alt="No Data Available" class="w-full max-w-lg">
-                    <p class="mt-4 text-lg font-semibold text-gray-600">No exams available yet.</p>
-                    <a href="{{ route('lecturer.list') }}"
-                        class="mt-2 px-5 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 font-medium transition-all flex items-center">
-                        <i class="fas fa-plus mr-2"></i> Upload Your First Exam
-                    </a>
+                    @if(isset($courses) && empty($courses))
+                        <!-- No courses assigned at all -->
+                        <div class="bg-blue-50 border-l-4 border-blue-400 p-6 rounded-lg max-w-2xl">
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-info-circle text-blue-400 text-3xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <h3 class="text-blue-900 font-bold text-xl mb-2">No Courses Assigned</h3>
+                                    <p class="text-blue-800 mb-4">
+                                        You currently have no courses assigned to your account. Please contact your faculty
+                                        administrator to assign courses to your profile before you can upload exam questions.
+                                    </p>
+                                    <div class="flex items-center text-blue-700 text-sm">
+                                        <i class="fas fa-envelope mr-2"></i>
+                                        <span>Contact your faculty admin for assistance</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @else
+                        <!-- Courses assigned but no exams uploaded yet -->
+                        <img src="https://img.freepik.com/free-vector/error-404-concept-illustration_114360-1811.jpg"
+                            alt="No Data Available" class="w-full max-w-lg">
+                        <p class="mt-4 text-lg font-semibold text-gray-600">No exams available yet.</p>
+                        <a href="{{ route('lecturer.list') }}"
+                            class="mt-2 px-5 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 font-medium transition-all flex items-center">
+                            <i class="fas fa-plus mr-2"></i> Upload Your First Exam
+                        </a>
+                    @endif
                 </div>
             @endforelse
         </div>

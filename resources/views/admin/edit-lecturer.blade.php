@@ -18,6 +18,39 @@
 <body class="bg-gray-100">
 
     @include('partials.admin-navbar')
+
+    <!-- Success Notification -->
+    @if(session('success'))
+        <div id="successNotification" class="fixed top-20 right-4 z-50 animate-slide-in">
+            <div class="bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3">
+                <i class="fas fa-check-circle text-2xl"></i>
+                <div>
+                    <p class="font-semibold">Success!</p>
+                    <p class="text-sm">{{ session('success') }}</p>
+                </div>
+                <button onclick="closeNotification()" class="ml-4 text-white hover:text-gray-200">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    @endif
+
+    <!-- Error Notification -->
+    @if($errors->any())
+        <div id="errorNotification" class="fixed top-20 right-4 z-50 animate-slide-in">
+            <div class="bg-red-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3">
+                <i class="fas fa-exclamation-circle text-2xl"></i>
+                <div>
+                    <p class="font-semibold">Error!</p>
+                    <p class="text-sm">{{ $errors->first() }}</p>
+                </div>
+                <button onclick="closeErrorNotification()" class="ml-4 text-white hover:text-gray-200">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    @endif
+
     <div class="p-4 sm:ml-64 mt-20">
         <div class="container mx-auto mt-3 mb-3">
             <div class="flex justify-center items-center">
@@ -273,27 +306,91 @@
         }
 
         document.getElementById('editLecturerForm').addEventListener('submit', function (e) {
-            const checkboxes = document.querySelectorAll('#courseList input[type="checkbox"]');
-            const isChecked = Array.from(checkboxes).some(checkbox => checkbox.checked);
+            // Remove course validation - allow updating even with no courses
+            document.getElementById('courseError').classList.add('hidden');
 
-            if (!isChecked) {
-                e.preventDefault(); // Stop form submission
-                document.getElementById('courseError').classList.remove('hidden');
-            } else {
-                document.getElementById('courseError').classList.add('hidden');
+            // Show loading indicator
+            const updateButton = document.getElementById('updateButton');
+            const buttonText = document.getElementById('buttonText');
+            const loadingSpinner = document.getElementById('loadingSpinner');
 
-                // Show loading indicator
-                const updateButton = document.getElementById('updateButton');
-                const buttonText = document.getElementById('buttonText');
-                const loadingSpinner = document.getElementById('loadingSpinner');
+            updateButton.disabled = true;
+            updateButton.classList.add('opacity-75', 'cursor-not-allowed');
+            buttonText.textContent = 'Updating...';
+            loadingSpinner.classList.remove('hidden');
+        });
 
-                updateButton.disabled = true;
-                updateButton.classList.add('opacity-75', 'cursor-not-allowed');
-                buttonText.textContent = 'Updating...';
-                loadingSpinner.classList.remove('hidden');
+        // Notification functions
+        function closeNotification() {
+            const notification = document.getElementById('successNotification');
+            if (notification) {
+                notification.classList.add('animate-slide-out');
+                setTimeout(() => notification.remove(), 300);
+            }
+        }
+
+        function closeErrorNotification() {
+            const notification = document.getElementById('errorNotification');
+            if (notification) {
+                notification.classList.add('animate-slide-out');
+                setTimeout(() => notification.remove(), 300);
+            }
+        }
+
+        // Auto-hide notifications after 5 seconds
+        window.addEventListener('DOMContentLoaded', function () {
+            const successNotification = document.getElementById('successNotification');
+            const errorNotification = document.getElementById('errorNotification');
+
+            if (successNotification) {
+                setTimeout(() => {
+                    successNotification.classList.add('animate-slide-out');
+                    setTimeout(() => successNotification.remove(), 300);
+                }, 5000);
+            }
+
+            if (errorNotification) {
+                setTimeout(() => {
+                    errorNotification.classList.add('animate-slide-out');
+                    setTimeout(() => errorNotification.remove(), 300);
+                }, 5000);
             }
         });
     </script>
+
+    <style>
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+
+        .animate-slide-in {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+
+        .animate-slide-out {
+            animation: slideOut 0.3s ease-in forwards;
+        }
+    </style>
 </body>
 
 </html>

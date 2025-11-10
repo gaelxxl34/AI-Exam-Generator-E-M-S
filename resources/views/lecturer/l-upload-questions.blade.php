@@ -86,127 +86,149 @@
                             <h2 class="text-lg font-semibold text-gray-900">Course Information</h2>
                         </div>
 
-                        <div>
-                            <label for="courseUnit" class="block text-sm font-medium text-gray-700 mb-2">
-                                Course Unit <span class="text-red-500">*</span>
-                            </label>
-                            <select id="courseUnit" name="courseUnit"
-                                class="block w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                                required>
-                                <option value="">Select a course unit</option>
-                                @foreach ($courses as $course)
-                                    <option value="{{ $course['name'] }}" data-faculty="{{ $course['faculty'] }}">
-                                        {{ $course['name'] }} ({{ $course['code'] }})
-                                    </option>
-                                @endforeach
-                            </select>
-
-                            <!-- Faculty Field (Hidden) -->
-                            <input type="hidden" id="facultyField" name="faculty" value="">
-
-                            @if ($errors->has('faculty'))
-                                <div class="text-red-500 mt-2 text-sm flex items-center">
-                                    <i class="fas fa-exclamation-triangle mr-1"></i>
-                                    {{ $errors->first('faculty') }}
+                        @if(empty($courses))
+                            <!-- No Courses Message -->
+                            <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg">
+                                <div class="flex items-start">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-info-circle text-blue-400 text-xl"></i>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h3 class="text-blue-900 font-semibold mb-1">No Courses Assigned</h3>
+                                        <p class="text-blue-800 text-sm">
+                                            You currently have no courses assigned to your account. Please contact your
+                                            faculty administrator to assign courses to your profile.
+                                        </p>
+                                    </div>
                                 </div>
-                            @endif
-                        </div>
-                    </div>
+                            </div>
+                        @else
+                            <div>
+                                <label for="courseUnit" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Course Unit <span class="text-red-500">*</span>
+                                </label>
+                                <select id="courseUnit" name="courseUnit"
+                                    class="block w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                    required>
+                                    <option value="">Select a course unit</option>
+                                    @foreach ($courses as $course)
+                                        <option value="{{ $course['name'] }}" data-faculty="{{ $course['faculty'] }}">
+                                            {{ $course['name'] }} ({{ $course['code'] }})
+                                        </option>
+                                    @endforeach
+                                </select>
 
-                    <!-- Hidden Format Input -->
-                    <input type="hidden" name="format" value="AB">
+                                <!-- Faculty Field (Hidden) -->
+                                <input type="hidden" id="facultyField" name="faculty" value="">
 
-                    <!-- Section A -->
-                    <div class="bg-green-50 rounded-lg p-6 border border-green-200">
-                        <div class="flex items-center mb-4">
-                            <i class="fas fa-list-ol text-green-600 mr-2"></i>
-                            <h2 class="text-lg font-semibold text-gray-900">Section A</h2>
-                            <span class="ml-2 text-sm text-gray-500">(Multiple Choice / Short Answer)</span>
-                        </div>
-
-                        <div class="mb-4">
-                            <label for="dropdownA" class="block text-sm font-medium text-gray-700 mb-2">
-                                Number of Questions <span class="text-red-500">*</span>
-                            </label>
-                            <select id="dropdownA" name="sectionA_count"
-                                class="block w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                                required>
-                                <option value="">Select number of questions for Section A</option>
-                            </select>
-                        </div>
-
-                        <div id="inputFieldsA" class="space-y-4"></div>
-
-                        @if ($errors->has('sectionA'))
-                            <div class="text-red-500 mt-2 text-sm flex items-center">
-                                <i class="fas fa-exclamation-triangle mr-1"></i>
-                                {{ $errors->first('sectionA') }}
+                                @if ($errors->has('faculty'))
+                                    <div class="text-red-500 mt-2 text-sm flex items-center">
+                                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                                        {{ $errors->first('faculty') }}
+                                    </div>
+                                @endif
                             </div>
                         @endif
                     </div>
 
-                    <!-- Section B -->
-                    <div class="bg-purple-50 rounded-lg p-6 border border-purple-200">
-                        <div class="flex items-center mb-4">
-                            <i class="fas fa-list-alt text-purple-600 mr-2"></i>
-                            <h2 class="text-lg font-semibold text-gray-900">Section B</h2>
-                            <span class="ml-2 text-sm text-gray-500">(Essay / Long Answer)</span>
-                        </div>
+                    @if(!empty($courses))
+                            <!-- Hidden Format Input -->
+                            <input type="hidden" name="format" value="AB">
 
-                        <div class="mb-4">
-                            <label for="dropdownB" class="block text-sm font-medium text-gray-700 mb-2">
-                                Number of Questions <span class="text-red-500">*</span>
-                            </label>
-                            <select id="dropdownB" name="sectionB_count"
-                                class="block w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                                required>
-                                <option value="">Select number of questions for Section B</option>
-                            </select>
-                        </div>
+                            <!-- Section A -->
+                            <div class="bg-green-50 rounded-lg p-6 border border-green-200">
+                                <div class="flex items-center mb-4">
+                                    <i class="fas fa-list-ol text-green-600 mr-2"></i>
+                                    <h2 class="text-lg font-semibold text-gray-900">Section A</h2>
+                                    <span class="ml-2 text-sm text-gray-500">(Multiple Choice / Short Answer)</span>
+                                </div>
 
-                        <div id="inputFieldsB" class="space-y-4"></div>
+                                <div class="mb-4">
+                                    <label for="dropdownA" class="block text-sm font-medium text-gray-700 mb-2">
+                                        Number of Questions <span class="text-red-500">*</span>
+                                    </label>
+                                    <select id="dropdownA" name="sectionA_count"
+                                        class="block w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                                        required>
+                                        <option value="">Select number of questions for Section A</option>
+                                    </select>
+                                </div>
 
-                        @if ($errors->has('sectionB'))
-                            <div class="text-red-500 mt-2 text-sm flex items-center">
-                                <i class="fas fa-exclamation-triangle mr-1"></i>
-                                {{ $errors->first('sectionB') }}
+                                <div id="inputFieldsA" class="space-y-4"></div>
+
+                                @if ($errors->has('sectionA'))
+                                    <div class="text-red-500 mt-2 text-sm flex items-center">
+                                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                                        {{ $errors->first('sectionA') }}
+                                    </div>
+                                @endif
                             </div>
-                        @endif
-                    </div>
 
-                    <!-- Instructions Section -->
-                    <div class="bg-orange-50 rounded-lg p-6 border border-orange-200">
-                        <div class="flex items-center mb-4">
-                            <i class="fas fa-clipboard-list text-orange-600 mr-2"></i>
-                            <h2 class="text-lg font-semibold text-gray-900">Exam Instructions</h2>
-                        </div>
+                            <!-- Section B -->
+                            <div class="bg-purple-50 rounded-lg p-6 border border-purple-200">
+                                <div class="flex items-center mb-4">
+                                    <i class="fas fa-list-alt text-purple-600 mr-2"></i>
+                                    <h2 class="text-lg font-semibold text-gray-900">Section B</h2>
+                                    <span class="ml-2 text-sm text-gray-500">(Essay / Long Answer)</span>
+                                </div>
 
-                        <div id="instructionsContainer" class="space-y-4">
-                            <!-- Instructions fields populated by JavaScript -->
-                        </div>
+                                <div class="mb-4">
+                                    <label for="dropdownB" class="block text-sm font-medium text-gray-700 mb-2">
+                                        Number of Questions <span class="text-red-500">*</span>
+                                    </label>
+                                    <select id="dropdownB" name="sectionB_count"
+                                        class="block w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                                        required>
+                                        <option value="">Select number of questions for Section B</option>
+                                    </select>
+                                </div>
 
-                        @if ($errors->has('instructions'))
-                            <div class="text-red-500 mt-2 text-sm flex items-center">
-                                <i class="fas fa-exclamation-triangle mr-1"></i>
-                                {{ $errors->first('instructions') }}
+                                <div id="inputFieldsB" class="space-y-4"></div>
+
+                                @if ($errors->has('sectionB'))
+                                    <div class="text-red-500 mt-2 text-sm flex items-center">
+                                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                                        {{ $errors->first('sectionB') }}
+                                    </div>
+                                @endif
                             </div>
-                        @endif
-                    </div>
-                </div>
 
+                            <!-- Instructions Section -->
+                            <div class="bg-orange-50 rounded-lg p-6 border border-orange-200">
+                                <div class="flex items-center mb-4">
+                                    <i class="fas fa-clipboard-list text-orange-600 mr-2"></i>
+                                    <h2 class="text-lg font-semibold text-gray-900">Exam Instructions</h2>
+                                </div>
+
+                                <div id="instructionsContainer" class="space-y-4">
+                                    <!-- Instructions fields populated by JavaScript -->
+                                </div>
+
+                                @if ($errors->has('instructions'))
+                                    <div class="text-red-500 mt-2 text-sm flex items-center">
+                                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                                        {{ $errors->first('instructions') }}
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+
+                    @endif
                 <!-- Submit Section -->
                 <div class="bg-gray-50 px-6 py-4 border-t border-gray-200">
-                    <div class="flex justify-between items-center">
-                        <div class="text-sm text-gray-500">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            Please review all sections before submitting
+                    @if(!empty($courses))
+                        <div class="flex justify-between items-center">
+                            <div class="text-sm text-gray-500">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Please review all sections before submitting
+                            </div>
+                            <button type="submit"
+                                class="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-lg shadow-lg transform transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                                <i class="fas fa-paper-plane mr-2"></i>
+                                Submit Questions
+                            </button>
                         </div>
-                        <button type="submit"
-                            class="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-lg shadow-lg transform transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                            <i class="fas fa-paper-plane mr-2"></i>
-                            Submit Questions
-                        </button>
-                    </div>
+                    @endif
                 </div>
             </form>
         </div>

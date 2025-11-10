@@ -244,7 +244,7 @@ public function updateLecturer(Request $request, $id)
             'lastName' => 'required',
             'email' => 'required|email',
             'faculties' => 'required|array|min:1', // Ensure at least one faculty is selected
-            'courses' => 'required|array|min:1', // Ensure at least one course is selected
+            'courses' => 'nullable|array', // Allow empty courses - lecturers can have no courses assigned
         ]);
 
         $firestore = app('firebase.firestore')->database();
@@ -258,13 +258,52 @@ public function updateLecturer(Request $request, $id)
             return back()->withErrors(['error' => 'Lecturer not found in Firestore.']);
         }
 
+        // Get the current user's faculty (admin making the update)
+        $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
+        $usersRef = $firestore->collection('Users');
+        $userQuery = $usersRef->where('email', '==', $currentUserEmail);
+        $currentUserSnapshots = $userQuery->documents();
+
+        if ($currentUserSnapshots->isEmpty()) {
+            return back()->withErrors(['error' => 'Current user not found.']);
+        }
+
+        $currentUserData = iterator_to_array($currentUserSnapshots)[0]->data();
+        $adminFaculty = $currentUserData['faculty'] ?? null;
+
+        // Get existing lecturer data
+        $existingData = $lecturerSnapshot->data();
+        $existingCourses = $existingData['courses'] ?? [];
+
+        // Get courses from admin's faculty to identify which ones to manage
+        $coursesRef = $firestore->collection('Courses');
+        $coursesQuery = $coursesRef->where('faculty', '==', $adminFaculty);
+        $coursesSnapshot = $coursesQuery->documents();
+
+        $adminFacultyCourses = [];
+        foreach ($coursesSnapshot as $course) {
+            if ($course->exists()) {
+                $courseData = $course->data();
+                $adminFacultyCourses[] = $courseData['name'];
+            }
+        }
+
+        // Remove courses from admin's faculty that are no longer selected
+        $coursesToKeep = array_filter($existingCourses, function($course) use ($adminFacultyCourses) {
+            return !in_array($course, $adminFacultyCourses);
+        });
+
+        // Merge with newly selected courses from admin's faculty (handle empty courses)
+        $newCourses = $validatedData['courses'] ?? [];
+        $mergedCourses = array_unique(array_merge(array_values($coursesToKeep), $newCourses));
+
         // Update lecturer data
         $lecturerRef->update([
             ['path' => 'firstName', 'value' => $validatedData['firstName']],
             ['path' => 'lastName', 'value' => $validatedData['lastName']],
             ['path' => 'email', 'value' => $validatedData['email']], // Update email
             ['path' => 'faculties', 'value' => $validatedData['faculties']], // Update faculties
-            ['path' => 'courses', 'value' => $validatedData['courses']], // Replace with selected courses
+            ['path' => 'courses', 'value' => $mergedCourses], // Merge courses instead of replacing
         ]);
 
         // Update Firebase Authentication Email
