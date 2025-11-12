@@ -160,6 +160,57 @@
         .logo-container img {
             filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
         }
+
+        /* Alert Styles */
+        .alert {
+            border-radius: 0.5rem;
+            font-size: 0.95rem;
+            position: relative;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert i {
+            margin-right: 0.5rem;
+        }
+
+        .alert-warning {
+            background-color: #fff3cd;
+            border-color: #ffc107;
+            color: #856404;
+        }
+
+        .alert-danger {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+
+        .alert .close {
+            padding: 0.75rem 1.25rem;
+            color: inherit;
+            opacity: 0.5;
+        }
+
+        .alert .close:hover {
+            opacity: 1;
+        }
+
+        /* Ensure login container has consistent sizing */
+        .bg-white.rounded-5 {
+            min-height: auto;
+        }
     </style>
 
 </head>
@@ -189,11 +240,35 @@
                             <p class="text-center text-muted mb-3">Access your exam management portal</p>
 
                             <form id="loginForm" action="{{ route('authenticate') }}" method="POST"
-                                class="bg-white rounded-5 shadow-5-strong p-5">
+                                class="bg-white rounded-5 shadow-5-strong p-5 pt-3">
                                 @csrf
+
+                                <!-- Session Expired Alert -->
+                                @if (session('session_expired'))
+                                    <div class="alert alert-warning alert-dismissible fade show mb-3" role="alert">
+                                        <i class="fas fa-clock"></i> <strong>Session Expired!</strong><br>
+                                        {{ session('session_expired') }}
+                                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                            <span aria-hidden="true">&times;</span>
+                                        </button>
+                                    </div>
+                                @endif
+
+                                <!-- Error Messages -->
+                                @if ($errors->has('login_error'))
+                                    <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+                                        <i class="fas fa-exclamation-triangle"></i> <strong>Login Failed!</strong><br>
+                                        {{ $errors->first('login_error') }}
+                                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                            <span aria-hidden="true">&times;</span>
+                                        </button>
+                                    </div>
+                                @endif
+
                                 <!-- Email input -->
                                 <div class="form-outline mb-4">
-                                    <input type="email" id="email" name="email" class="form-control" required />
+                                    <input type="email" id="email" name="email" class="form-control"
+                                        value="{{ old('email') }}" required />
                                     <label class="form-label" for="email">Email address</label>
                                 </div>
 
@@ -215,13 +290,6 @@
                                         <i class="fas fa-spinner fa-spin"></i> Signing in...
                                     </span>
                                 </button>
-
-
-                                @if ($errors->has('login_error'))
-                                    <p class="mt-3 text-danger">{{ $errors->first('login_error') }}</p>
-                                @endif
-
-
 
                             </form>
 
@@ -245,6 +313,8 @@
 
 
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
 
     <script>
         $(document).ready(function () {
@@ -263,6 +333,13 @@
                     $('#btnSpinner').addClass('d-none');
                 }, 10000);
             });
+
+            // Auto-dismiss alerts after 8 seconds
+            setTimeout(function () {
+                $('.alert').fadeOut('slow', function () {
+                    $(this).remove();
+                });
+            }, 8000);
         });
     </script>
 

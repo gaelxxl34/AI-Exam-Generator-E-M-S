@@ -84,7 +84,7 @@ class AuthController extends Controller
     * Authenticate the user using Firebase.
     *
     * @param  \Illuminate\Http\Request  $request
-    * @return \Illuminate\Http\Response
+    * @return \Illuminate\Http\RedirectResponse
     */
 
     public function authenticate(Request $request)
@@ -113,14 +113,14 @@ class AuthController extends Controller
                 
                 if (!$userSnapshot->exists()) {
                     Log::warning('User document not found in Firestore for UID: ' . $uid);
-                    return redirect()->route('login')->withErrors(['login_error' => 'Account not found in our database.']);
+                    return redirect()->route('login')->withErrors(['login_error' => 'Account not found in our database. Please contact support.']);
                 }
                 
                 $userData = $userSnapshot->data();
                 Log::info('User data retrieved from Firestore: ' . json_encode(array_keys($userData)));
             
                 if (!empty($userData['disabled'])) {
-                    return redirect()->route('login')->withErrors(['login_error' => 'Your account is disabled.']);
+                    return redirect()->route('login')->withErrors(['login_error' => 'Your account has been disabled. Please contact the administrator for assistance.']);
                 }
         
                 $faculty = [];
@@ -131,7 +131,7 @@ class AuthController extends Controller
                 }
         
                 if (empty($faculty)) {
-                    return redirect()->route('login')->withErrors(['login_error' => 'Faculty info missing.']);
+                    return redirect()->route('login')->withErrors(['login_error' => 'Your account is incomplete. Faculty information is missing. Please contact support.']);
                 }
         
                 session()->put([
@@ -154,18 +154,39 @@ class AuthController extends Controller
             } catch (\Exception $firestoreException) {
                 Log::error('Firestore error: ' . $firestoreException->getMessage());
                 Log::error('Firestore error trace: ' . $firestoreException->getTraceAsString());
-                return redirect()->route('login')->withErrors(['login_error' => 'Error accessing user data: ' . $firestoreException->getMessage()]);
+                return redirect()->route('login')->withErrors(['login_error' => 'Unable to access your account data. Please try again later.']);
             }
             
+        } catch (\Kreait\Firebase\Exception\Auth\InvalidPassword $e) {
+            Log::warning('Invalid password for user: ' . $credentials['email']);
+            return redirect()->route('login')->withErrors(['login_error' => 'The password you entered is incorrect. Please try again.'])->withInput($request->only('email'));
+        
         } catch (\Kreait\Firebase\Exception\Auth\UserNotFound $e) {
             Log::warning('User not found: ' . $credentials['email']);
-            return redirect()->route('login')->withErrors(['login_error' => 'Your account does not exist.']);
+            return redirect()->route('login')->withErrors(['login_error' => 'No account found with this email address. Please check your email and try again.'])->withInput($request->only('email'));
+        
+        } catch (\Kreait\Firebase\Exception\Auth\FailedToVerifyToken $e) {
+            Log::error('Token verification failed: ' . $e->getMessage());
+            return redirect()->route('login')->withErrors(['login_error' => 'Authentication failed. Please try again.']);
         
         } catch (\Throwable $e) {
             Log::error('Authentication error: ' . $e->getMessage());
             Log::error('Error class: ' . get_class($e));
             Log::error('Stack trace: ' . $e->getTraceAsString());
-            return redirect()->route('login')->withErrors(['login_error' => 'Authentication error: ' . $e->getMessage()]);
+            
+            // Check for common Firebase authentication errors
+            $errorMessage = $e->getMessage();
+            if (stripos($errorMessage, 'INVALID_PASSWORD') !== false || stripos($errorMessage, 'wrong password') !== false) {
+                return redirect()->route('login')->withErrors(['login_error' => 'The password you entered is incorrect. Please try again.'])->withInput($request->only('email'));
+            } elseif (stripos($errorMessage, 'EMAIL_NOT_FOUND') !== false || stripos($errorMessage, 'user not found') !== false) {
+                return redirect()->route('login')->withErrors(['login_error' => 'No account found with this email address. Please check your email and try again.'])->withInput($request->only('email'));
+            } elseif (stripos($errorMessage, 'TOO_MANY_ATTEMPTS') !== false) {
+                return redirect()->route('login')->withErrors(['login_error' => 'Too many failed login attempts. Please try again later.']);
+            } elseif (stripos($errorMessage, 'USER_DISABLED') !== false) {
+                return redirect()->route('login')->withErrors(['login_error' => 'Your account has been disabled. Please contact the administrator.']);
+            }
+            
+            return redirect()->route('login')->withErrors(['login_error' => 'Unable to sign in. Please check your credentials and try again.']);
         }
     }
     
@@ -210,11 +231,12 @@ class AuthController extends Controller
      * 
      * Log out the user.
      *
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function logout()
     {
         session()->forget('user');
+        session()->flush(); // Clear all session data
         // You can also sign out the Firebase user if needed using $this->firebaseAuth->signOut()
         
         return redirect('/login');

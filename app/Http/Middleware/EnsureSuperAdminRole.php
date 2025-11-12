@@ -15,10 +15,17 @@ class EnsureSuperAdminRole
      */
     public function handle(Request $request, Closure $next)
     {
-        // Check if the user is an admin
+        // Check if user session exists
+        if (!session()->has('user') || !session()->has('user_role')) {
+            // Clear session and redirect with session expired message
+            session()->flush();
+            return redirect('/login')->with('session_expired', 'Your session has expired. Please login again to continue.');
+        }
+
+        // Check if the user is a superadmin
         if (session()->get('user_role') !== 'superadmin') {
-            // Redirect if not an admin
-            return redirect('/login')->withErrors(['login_error' => 'Please login']);
+            // Redirect if not a superadmin
+            return redirect('/login')->withErrors(['login_error' => 'Access denied. You need super admin privileges to access this page.']);
         }
 
         return $next($request);

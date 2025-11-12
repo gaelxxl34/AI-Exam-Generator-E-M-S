@@ -3,15 +3,33 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>Exam - {{ $courseUnit }}</title>
     <style>
+        @font-face {
+            font-family: 'DejaVu Sans';
+            src: url('{{ storage_path('fonts/DejaVuSans.ttf') }}') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
         * {
-            font-family: "Times New Roman", Times, serif !important;
+            font-family: 'Times New Roman', 'DejaVu Sans', serif !important;
         }
 
         body {
-            font-size: 14px;
+            font-size: 13px;
             margin: 15px;
+        }
+
+        h1 {
+            font-size: 20px;
+        }
+
+        h2 {
+            font-size: 18px;
+            margin-top: 15px;
+            margin-bottom: 10px;
         }
 
         h1,
@@ -32,7 +50,7 @@
         textarea,
         input,
         label {
-            font-family: "Times New Roman", Times, serif !important;
+            font-family: 'Times New Roman', 'DejaVu Sans', serif !important;
         }
 
         .exam-cover {
@@ -55,26 +73,48 @@
             margin: 0 auto 8px auto;
         }
 
-        /* Ensure tables fit the page and do not overflow */
-        .question-content table,
-        .question-content th,
-        .question-content td {
+        /* ✅ Enhanced table styling for proper border rendering in PDF */
+        table {
+            border-collapse: collapse !important;
             width: 100% !important;
+            margin: 10px 0 !important;
+            border: 1px solid #000000 !important;
+        }
+
+        table th,
+        table td {
+            border: 1px solid #000000 !important;
+            padding: 8px !important;
+            text-align: left !important;
+            vertical-align: top !important;
+        }
+
+        table thead th {
+            background-color: #f2f2f2 !important;
+            font-weight: bold !important;
+        }
+
+        /* Ensure tables in question content have proper borders */
+        .question-content table,
+        .question-content table th,
+        .question-content table td {
+            border: 1px solid #000000 !important;
+            width: auto !important;
             max-width: 100% !important;
-            word-break: break-word;
-            box-sizing: border-box;
+            word-break: break-word !important;
+            box-sizing: border-box !important;
         }
 
         .question-content {
             overflow-x: auto;
         }
 
-        .faculty-name,
-        {
-        margin-bottom: 10px;
-        margin-top: 40px;
-        text-transform: uppercase;
-        font-weight: bold;
+        .faculty-name {
+            margin-bottom: 10px;
+            margin-top: 40px;
+            text-transform: uppercase;
+            font-weight: bold;
+            font-size: 16px;
         }
 
         .uppercase {
@@ -85,6 +125,7 @@
             margin-bottom: 30px;
             margin-top: 10px;
             font-weight: bold;
+            font-size: 14px;
         }
 
         .info-left,
@@ -92,15 +133,17 @@
             /* margin: 20px 50px; */
             text-align: left;
             font-weight: bold;
+            font-size: 13px;
         }
 
         .info-right {
             text-align: right;
+            font-size: 12px;
         }
 
         .instructions {
             font-weight: bold;
-
+            font-size: 14px;
             margin-top: 18px;
             text-transform: uppercase;
             text-decoration: underline;
@@ -114,44 +157,60 @@
 
         .section {
             padding: 8px;
-            /* Increased padding for questions */
+            margin-bottom: 15px;
+        }
+
+        .section>p {
+            font-size: 13px;
+            margin-bottom: 10px;
         }
 
         .question {
-            margin-top: 6px;
-            /* Increased margin above each question for readability */
+            margin-top: 20px;
             margin-bottom: 10px;
-            /* Added margin below each question */
         }
 
         .question p {
-            font-weight: normal;
-            /* Only the question number should be bold */
             margin: 0;
-            /* Keep margins tight around text */
+            font-size: 15px;
+            font-weight: bold;
         }
 
         .question-content {
-            padding: 12px;
-            /* Small padding around content for visual separation */
+            padding-left: 20px;
+            margin-top: 5px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            line-height: 1.5;
+            font-weight: normal;
         }
 
-        h2 {
-            font-weight: bold;
-            /* Ensure section headers are bold */
+        .question-content p,
+        .question-content div,
+        .question-content span,
+        .question-content li {
+            font-weight: normal !important;
         }
 
+        .question-content strong,
+        .question-content b {
+            font-weight: bold !important;
+        }
+
+        .question-content img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 10px 0;
+        }
+
+        /* Remove duplicate table styling */
         .table {
             width: 100%;
             border-collapse: collapse;
         }
 
         .table-bordered {
-            border: 1px solid black;
-        }
-
-        td,
-        th {
             border: 1px solid black;
         }
 
@@ -192,24 +251,20 @@
 
     @foreach ($sections as $sectionName => $questions)
         <div class="section">
-            <h2>
-                Section {{ $sectionName }}
-                {{-- Inline instructions for each section --}}
-                @if ($sectionName == 'A' && isset($sectionAInstructions))
-                    <span>{!! strip_tags($sectionAInstructions, '<b><strong><i><em><u><span><br><img>') !!}</span>
-                @elseif ($sectionName == 'B' && isset($sectionBInstructions))
-                    <span>{!! strip_tags($sectionBInstructions, '<b><strong><i><em><u><span><br><img>') !!}</span>
-                @elseif ($sectionName == 'C' && isset($sectionCInstructions))
-                    <span>{!! strip_tags($sectionCInstructions, '<b><strong><i><em><u><span><br><img>') !!}</span>
-                @endif
-            </h2>
+            <h2>Section {{ $sectionName }}</h2>
+            {{-- Display section instructions --}}
+            @if ($sectionName == 'A' && isset($sectionAInstructions))
+                <p>{!! $sectionAInstructions !!}</p>
+            @elseif ($sectionName == 'B' && isset($sectionBInstructions))
+                <p>{!! $sectionBInstructions !!}</p>
+            @elseif ($sectionName == 'C' && isset($sectionCInstructions))
+                <p>{!! $sectionCInstructions !!}</p>
+            @endif
 
             @foreach ($questions as $questionIndex => $question)
                 <div class="question">
-                    <p style="font-weight: bold; font-size: 16px">Question {{ $questionIndex + 1 }}:</p>
-                    <div class="question-content p-4 rounded">
-                        {!! strip_tags($question, '<b><strong><i><em><u><span><br><ul><ol><li><table><tr><td><th><sup><sub><img>') !!}
-                    </div>
+                    <p>Question {{ $questionIndex + 1 }}:</p>
+                    <div class="question-content">{!! $question !!}</div>
                 </div>
             @endforeach
         </div>
@@ -218,17 +273,17 @@
 
     @if (isset($pdf))
         <script type="text/php">
-                if (isset($pdf)) {
-                    $font = $fontMetrics->getFont("Times New Roman", "normal");
-                    $size = 10;
-                    $pdf->page_script('
-                        if ($PAGE_COUNT > 1) {
-                            $font = $fontMetrics->getFont("Times New Roman", "normal");
-                            $pdf->text(520, 820, "Page $PAGE_NUM of $PAGE_COUNT", $font, 10);
-                        }
-                    ');
-                }
-            </script>
+                                    if (isset($pdf)) {
+                                        $font = $fontMetrics->getFont("Times New Roman", "normal");
+                                        $size = 10;
+                                        $pdf->page_script('
+                                            if ($PAGE_COUNT > 1) {
+                                                $font = $fontMetrics->getFont("Times New Roman", "normal");
+                                                $pdf->text(520, 820, "Page $PAGE_NUM of $PAGE_COUNT", $font, 10);
+                                            }
+                                        ');
+                                    }
+                                </script>
     @endif
 
 

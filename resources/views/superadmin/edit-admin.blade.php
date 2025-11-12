@@ -69,9 +69,11 @@
                                         </div>
                                         <div>
                                             <h3 class="text-lg font-medium text-gray-900">{{ $admin['firstName'] }}
-                                                {{ $admin['lastName'] }}</h3>
+                                                {{ $admin['lastName'] }}
+                                            </h3>
                                             <p class="text-sm text-gray-500">Administrator ID:
-                                                {{ substr($admin['id'], 0, 8) }}...</p>
+                                                {{ substr($admin['id'], 0, 8) }}...
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
@@ -152,14 +154,16 @@
                                             </label>
                                             <select id="faculty" name="faculty" required
                                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                                                <option value="HEC" {{ $admin['faculty'] == 'HEC' ? 'selected' : '' }}>
+                                                    Higher Education Certificate</option>
+                                                <option value="FOE" {{ $admin['faculty'] == 'FOE' ? 'selected' : '' }}>
+                                                    Faculty of Engineering</option>
+                                                <option value="FOL" {{ $admin['faculty'] == 'FOL' ? 'selected' : '' }}>
+                                                    Faculty of Law</option>
                                                 <option value="FST" {{ $admin['faculty'] == 'FST' ? 'selected' : '' }}>
                                                     Faculty of Science and Technology</option>
                                                 <option value="FBM" {{ $admin['faculty'] == 'FBM' ? 'selected' : '' }}>
                                                     Faculty of Business and Management</option>
-                                                <option value="FOE" {{ $admin['faculty'] == 'FOE' ? 'selected' : '' }}>
-                                                    Faculty of Education</option>
-                                                <option value="FOL" {{ $admin['faculty'] == 'FOL' ? 'selected' : '' }}>
-                                                    Faculty of Law</option>
                                             </select>
                                             @error('faculty')
                                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -172,10 +176,12 @@
                             <!-- Action Buttons -->
                             <div
                                 class="mt-8 pt-6 border-t border-gray-200 flex flex-col sm:flex-row sm:justify-between gap-3">
-                                <button type="submit" class="inline-flex justify-center items-center px-6 py-3 bg-indigo-600 text-white rounded-lg
+                                <button type="submit" id="updateBtn" class="inline-flex justify-center items-center px-6 py-3 bg-indigo-600 text-white rounded-lg
                                            hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
-                                           font-medium transition-all">
-                                    <i class="fas fa-save mr-2"></i>Update Administrator
+                                           font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <i class="fas fa-save mr-2" id="saveIcon"></i>
+                                    <i class="fas fa-spinner fa-spin mr-2 hidden" id="loadingIcon"></i>
+                                    <span id="btnText">Update Administrator</span>
                                 </button>
 
                                 <div class="flex gap-3">
@@ -220,6 +226,21 @@
     </div>
 
     <script>
+        // Handle form submission with loading indicator
+        const form = document.querySelector('form');
+        const updateBtn = document.getElementById('updateBtn');
+        const saveIcon = document.getElementById('saveIcon');
+        const loadingIcon = document.getElementById('loadingIcon');
+        const btnText = document.getElementById('btnText');
+
+        form.addEventListener('submit', function (e) {
+            // Show loading state
+            updateBtn.disabled = true;
+            saveIcon.classList.add('hidden');
+            loadingIcon.classList.remove('hidden');
+            btnText.textContent = 'Updating...';
+        });
+
         function confirmDelete() {
             if (confirm('Are you sure you want to delete this administrator? This action cannot be undone.')) {
                 document.getElementById('deleteForm').submit();

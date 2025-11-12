@@ -310,7 +310,15 @@ return array(
         "default_paper_size" => "a4",
         'default_paper_orientation' => "portrait",
 
-        "default_font" => "serif",
+        // ✅ Use DejaVu Sans for UTF-8 special characters support
+                /**
+         * The default font family
+         *
+         * Used if no suitable fonts can be found. This must exist in the font folder.
+         * Using 'times' for Times New Roman as default font.
+         * @var string
+         */
+        "default_font" => "times",
         "dpi" => 96,
         "enable_php" => false,
         "enable_javascript" => true,

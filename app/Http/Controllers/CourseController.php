@@ -864,6 +864,13 @@ public function CoursesList()
             'sectionAInstructions' => $examData['sectionA_instructions'] ?? '',
             'sectionBInstructions' => $examData['sectionB_instructions'] ?? '',
         ]);
+        
+        // ✅ Enable UTF-8 support for special characters
+        $pdf->getDomPDF()->set_option('isPhpEnabled', true);
+        $pdf->getDomPDF()->set_option('isHtml5ParserEnabled', true);
+        $pdf->getDomPDF()->set_option('isRemoteEnabled', true);
+        $pdf->getDomPDF()->set_option('defaultFont', 'DejaVu Sans');
+        
         Log::info("✅ PDF generated successfully for Course Unit: {$courseUnit}");
         return $pdf->stream("Preview_{$courseUnit}.pdf");
     }

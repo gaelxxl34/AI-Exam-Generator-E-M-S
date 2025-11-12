@@ -49,37 +49,22 @@
                     </div>
                 </div>
             @empty
-                <div class="col-span-full flex flex-col items-center justify-center ">
-                    @if(isset($courses) && empty($courses))
-                        <!-- No courses assigned at all -->
-                        <div class="bg-blue-50 border-l-4 border-blue-400 p-6 rounded-lg max-w-2xl">
-                            <div class="flex items-start">
-                                <div class="flex-shrink-0">
-                                    <i class="fas fa-info-circle text-blue-400 text-3xl"></i>
-                                </div>
-                                <div class="ml-4">
-                                    <h3 class="text-blue-900 font-bold text-xl mb-2">No Courses Assigned</h3>
-                                    <p class="text-blue-800 mb-4">
-                                        You currently have no courses assigned to your account. Please contact your faculty
-                                        administrator to assign courses to your profile before you can upload exam questions.
-                                    </p>
-                                    <div class="flex items-center text-blue-700 text-sm">
-                                        <i class="fas fa-envelope mr-2"></i>
-                                        <span>Contact your faculty admin for assistance</span>
-                                    </div>
-                                </div>
-                            </div>
+                <div class="col-span-full flex flex-col items-center justify-center py-12">
+                    <!-- No exams uploaded yet -->
+                    <div class="text-center max-w-md">
+                        <div class="mb-6">
+                            <i class="fas fa-file-upload text-gray-300 text-8xl"></i>
                         </div>
-                    @else
-                        <!-- Courses assigned but no exams uploaded yet -->
-                        <img src="https://img.freepik.com/free-vector/error-404-concept-illustration_114360-1811.jpg"
-                            alt="No Data Available" class="w-full max-w-lg">
-                        <p class="mt-4 text-lg font-semibold text-gray-600">No exams available yet.</p>
+                        <h3 class="text-2xl font-bold text-gray-700 mb-3">No Exams Uploaded Yet</h3>
+                        <p class="text-gray-600 mb-6">
+                            You haven't uploaded any exam questions yet. Get started by uploading your first exam template
+                            to begin managing your course assessments.
+                        </p>
                         <a href="{{ route('lecturer.list') }}"
-                            class="mt-2 px-5 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 font-medium transition-all flex items-center">
+                            class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg shadow-lg hover:from-blue-700 hover:to-indigo-700 font-medium transition-all transform hover:scale-105">
                             <i class="fas fa-plus mr-2"></i> Upload Your First Exam
                         </a>
-                    @endif
+                    </div>
                 </div>
             @endforelse
         </div>

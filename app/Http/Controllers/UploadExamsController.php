@@ -46,6 +46,9 @@ class UploadExamsController extends Controller
 
     public function uploadExam(Request $request)
     {
+        // ✅ Ensure UTF-8 encoding for incoming data
+        mb_internal_encoding('UTF-8');
+        
         Log::info('uploadExam method called');
 
         // Log incoming request data (excluding sensitive fields)
@@ -317,10 +320,15 @@ public function getRandomQuestions(Request $request)
             'sectionCInstructions' => $sectionCInstructions,
             'pdf' => true
         ]);
+        
         $pdf->setPaper('A4', 'portrait');
+        
+        // ✅ Enable UTF-8 support for special characters
         $pdf->getDomPDF()->set_option('isPhpEnabled', true);
         $pdf->getDomPDF()->set_option('isHtml5ParserEnabled', true);
         $pdf->getDomPDF()->set_option('isRemoteEnabled', true);
+        $pdf->getDomPDF()->set_option('defaultFont', 'DejaVu Sans');
+        
         \Log::info("📜 Processing completed. Rendering PDF...");
         \Log::info("✅ PDF generated successfully for Course Unit: {$courseUnit}");
         return $pdf->stream("Exam_{$courseUnit}.pdf");

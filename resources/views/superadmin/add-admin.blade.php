@@ -137,10 +137,11 @@
                                             <select id="faculty" name="faculty" required
                                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
                                                 <option value="">Select Faculty</option>
+                                                <option value="HEC">Higher Education Certificate</option>
+                                                <option value="FOE">Faculty of Engineering</option>
+                                                <option value="FOL">Faculty of Law</option>
                                                 <option value="FST">Faculty of Science and Technology</option>
                                                 <option value="FBM">Faculty of Business and Management</option>
-                                                <option value="FOE">Faculty of Education</option>
-                                                <option value="FOL">Faculty of Law</option>
                                             </select>
                                             @error('faculty')
                                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>

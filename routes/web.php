@@ -14,6 +14,7 @@ use App\Http\Controllers\CourseController;
 use App\Http\Controllers\PastExamController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ImageUploadController;
+use App\Http\Controllers\TestPdfController;
 //
 
 
@@ -21,6 +22,10 @@ use App\Http\Controllers\ImageUploadController;
 Route::get('/', function () {
     return view('welcome');
 })->name('welcome');
+
+// Test PDF Generator Page
+Route::get('/test-pdf-generator', [TestPdfController::class, 'showTestPage'])->name('test.pdf-generator');
+Route::post('/test-pdf-generator/generate', [TestPdfController::class, 'generatePdf'])->name('test.generate-pdf');
 
 // Sitemap for SEO
 Route::get('/sitemap.xml', function () {

@@ -177,7 +177,7 @@ private function getDashboardData(): array
     $minQuestions = [
         "FST" => ["A" => 2, "B" => 12],
         "FBM" => ["A" => 2, "B" => 12],
-        "FOE" => ["A" => 6, "B" => 6],
+        "FOE" => ["A" => 4, "B" => 4],
         "HEC" => ["A" => 20, "B" => 10],
         "FOL" => ["A" => 2, "B" => 4, "C" => 5]
     ];
@@ -384,7 +384,7 @@ public function index()
         $minQuestions = [
             "FST" => ["A" => 2, "B" => 12],
             "FBM" => ["A" => 2, "B" => 12],
-            "FOE" => ["A" => 6, "B" => 6],
+            "FOE" => ["A" => 4, "B" => 4],
             "HEC" => ["A" => 20, "B" => 10],
             "FOL" => ["A" => 2, "B" => 4, "C" => 5]
         ];

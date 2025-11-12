@@ -16,6 +16,8 @@
 
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.js"></script>
     <style>
@@ -83,6 +85,48 @@
         /* Prevent scrolling when modal is open */
         body.modal-open {
             overflow: hidden;
+        }
+
+        /* ✅ Fix z-index for Summernote toolbar and dropdowns */
+        .note-editor {
+            position: relative;
+            z-index: 10;
+        }
+
+        .note-toolbar {
+            z-index: 50 !important;
+            position: relative !important;
+        }
+
+        .note-toolbar .note-btn-group {
+            z-index: 51 !important;
+        }
+
+        .note-popover {
+            z-index: 60 !important;
+        }
+
+        .dropdown-menu,
+        .note-dropdown-menu {
+            z-index: 70 !important;
+            pointer-events: auto !important;
+        }
+
+        /* Ensure buttons are clickable */
+        .note-toolbar button {
+            pointer-events: auto !important;
+            cursor: pointer !important;
+        }
+
+        /* Tailwind resets list styling; restore bullets inside editors */
+        .note-editable ul {
+            list-style: disc !important;
+            margin-left: 1.5rem !important;
+        }
+
+        .note-editable ol {
+            list-style: decimal !important;
+            margin-left: 1.5rem !important;
         }
     </style>
 </head>
@@ -561,8 +605,6 @@
                 height: 100,
                 minHeight: 150,
                 maxHeight: 500,
-                focus: true,
-                dialogsInBody: true,
                 placeholder: "Type your question here...",
                 fontNames: ['Arial', 'Courier New', 'Times New Roman', 'Verdana', 'Georgia', 'Comic Sans MS'],
                 fontNamesIgnoreCheck: ['Arial', 'Courier New', 'Times New Roman', 'Verdana', 'Georgia', 'Comic Sans MS'],

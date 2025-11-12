@@ -19,3 +19,4 @@ yarn-error.log
 /.vscode
 firebase_credentials.json
 database/database.sqlite
+resources/views/test-pdf-generator.blade.php
