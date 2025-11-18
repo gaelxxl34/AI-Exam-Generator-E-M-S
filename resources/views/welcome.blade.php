@@ -596,7 +596,7 @@
 
                 <div class="grid md:grid-cols-3 gap-8">
                     <!-- Master -->
-                    <a href=""
+                    <a href="{{ route('exams.program', ['faculty' => 'fbm', 'degree' => 'master']) }}"
                         class="group relative bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-purple-200 transform hover:-translate-y-2">
                         <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-purple-600">
                         </div>

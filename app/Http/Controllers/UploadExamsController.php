@@ -90,6 +90,13 @@ class UploadExamsController extends Controller
 
             Log::info('🆕 Creating new exam entry.');
 
+            // Get current user information from session
+            $uploadedBy = session()->get('user_email') ?? 'unknown@unknown.com';
+            $uploadedByName = session()->get('user_firstName') ?? 'Unknown User';
+            $uploadedByUid = session()->get('user') ?? 'unknown';
+
+            Log::info("📝 Exam being uploaded by: {$uploadedBy} ({$uploadedByName})");
+
             // Prepare exam data for Firestore
             $examData = [
                 'created_at' => new \DateTime(),
@@ -99,6 +106,9 @@ class UploadExamsController extends Controller
                 'sections' => [],
                 'sectionA_instructions' => $validatedData['instructions'][1],
                 'sectionB_instructions' => $validatedData['instructions'][2],
+                'uploaded_by_email' => $uploadedBy,
+                'uploaded_by_name' => $uploadedByName,
+                'uploaded_by_uid' => $uploadedByUid,
             ];
 
             // Log before processing sections
