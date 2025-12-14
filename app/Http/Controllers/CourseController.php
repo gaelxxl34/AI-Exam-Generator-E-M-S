@@ -99,11 +99,25 @@ public function CoursesList()
             if (empty($lecturerCourses)) {
                 \Log::info("Lecturer not found or no courses assigned for: $lecturerEmail");
                 // Instead of returning error, pass empty courses array to view
-                return view('lecturer.l-dashboard', ['courses' => []]);
+                return view('lecturer.l-dashboard', [
+                    'courses' => [],
+                    'statistics' => $this->getEmptyStatistics()
+                ]);
             }
 
             $examsRef = $firestore->collection('Exams');
             $courses = [];
+            
+            // Initialize statistics
+            $statistics = [
+                'totalCourses' => count($lecturerCourses),
+                'totalExams' => 0,
+                'submitted' => 0,
+                'pendingReview' => 0,
+                'approved' => 0,
+                'declined' => 0,
+                'draft' => 0,
+            ];
 
             foreach ($lecturerCourses as $courseUnit) {
                 $courseExams = $examsRef->where('courseUnit', '=', $courseUnit)->documents();
@@ -111,19 +125,126 @@ public function CoursesList()
                     if ($document->exists()) {
                         $data = $document->data();
                         if (!isset($courses[$courseUnit])) {
-                            $courses[$courseUnit] = [];
+                            $courses[$courseUnit] = [
+                                'exams' => [],
+                                'status' => 'draft', // Default status
+                                'statusLabel' => 'Draft',
+                                'statusColor' => 'gray'
+                            ];
                         }
-                        $courses[$courseUnit][] = $data;
+                        $courses[$courseUnit]['exams'][] = $data;
+                        $statistics['totalExams']++;
+                        
+                        // Track exam status - use the most recent/relevant status for the course
+                        $examStatus = strtolower($data['status'] ?? 'draft');
+                        $this->updateCourseStatus($courses[$courseUnit], $examStatus);
+                        $this->updateStatistics($statistics, $examStatus);
                     }
                 }
             }
+            
+            // Add courses that have no exams yet
+            foreach ($lecturerCourses as $courseUnit) {
+                if (!isset($courses[$courseUnit])) {
+                    $courses[$courseUnit] = [
+                        'exams' => [],
+                        'status' => 'no_exam',
+                        'statusLabel' => 'No Exam',
+                        'statusColor' => 'gray'
+                    ];
+                }
+            }
 
-            return view('lecturer.l-dashboard', ['courses' => $courses]);
+            return view('lecturer.l-dashboard', [
+                'courses' => $courses,
+                'statistics' => $statistics
+            ]);
 
         } catch (\Throwable $e) {
             \Log::error("Error fetching courses: " . $e->getMessage());
             // Return view with empty courses instead of error
-            return view('lecturer.l-dashboard', ['courses' => [], 'error' => $e->getMessage()]);
+            return view('lecturer.l-dashboard', [
+                'courses' => [], 
+                'statistics' => $this->getEmptyStatistics(),
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+    
+    /**
+     * Get empty statistics array
+     */
+    private function getEmptyStatistics(): array
+    {
+        return [
+            'totalCourses' => 0,
+            'totalExams' => 0,
+            'submitted' => 0,
+            'pendingReview' => 0,
+            'approved' => 0,
+            'declined' => 0,
+            'draft' => 0,
+        ];
+    }
+    
+    /**
+     * Update course status based on exam status
+     */
+    private function updateCourseStatus(array &$course, string $examStatus): void
+    {
+        $statusPriority = [
+            'declined' => 5,
+            'pending' => 4,
+            'pending_review' => 4,
+            'submitted' => 3,
+            'approved' => 2,
+            'draft' => 1,
+            'no_exam' => 0
+        ];
+        
+        $statusConfig = [
+            'approved' => ['label' => 'Approved', 'color' => 'green'],
+            'declined' => ['label' => 'Declined', 'color' => 'red'],
+            'pending' => ['label' => 'Pending Review', 'color' => 'yellow'],
+            'pending_review' => ['label' => 'Pending Review', 'color' => 'yellow'],
+            'submitted' => ['label' => 'Submitted', 'color' => 'blue'],
+            'draft' => ['label' => 'Draft', 'color' => 'gray'],
+            'no_exam' => ['label' => 'No Exam', 'color' => 'gray']
+        ];
+        
+        $currentPriority = $statusPriority[$course['status']] ?? 0;
+        $newPriority = $statusPriority[$examStatus] ?? 0;
+        
+        if ($newPriority > $currentPriority) {
+            $course['status'] = $examStatus;
+            $config = $statusConfig[$examStatus] ?? $statusConfig['draft'];
+            $course['statusLabel'] = $config['label'];
+            $course['statusColor'] = $config['color'];
+        }
+    }
+    
+    /**
+     * Update statistics based on exam status
+     */
+    private function updateStatistics(array &$statistics, string $examStatus): void
+    {
+        switch ($examStatus) {
+            case 'approved':
+                $statistics['approved']++;
+                break;
+            case 'declined':
+                $statistics['declined']++;
+                break;
+            case 'pending':
+            case 'pending_review':
+                $statistics['pendingReview']++;
+                break;
+            case 'submitted':
+                $statistics['submitted']++;
+                break;
+            default:
+                $statistics['draft']++;
+                break;
         }
     }
 
@@ -843,6 +964,10 @@ public function CoursesList()
         foreach ($examData['sections'] as $sectionName => $questions) {
             foreach ($questions as $index => $questionHtml) {
                 $processedHtml = $questionHtml;
+                
+                // 🔤 FORCE TIMES NEW ROMAN: Strip any font-family styles from HTML
+                $processedHtml = $this->stripFontFamilyStyles($processedHtml);
+                
                 preg_match_all('/<img[^>]+src=["\']([^"\']+)["\']/i', $processedHtml, $matches);
                 $imageUrls = $matches[1] ?? [];
                 Log::info("🔗 Found Image URLs:", $imageUrls);
@@ -896,6 +1021,37 @@ public function CoursesList()
         }
     }
 
+    /**
+     * Strip font-family styles from HTML to enforce Times New Roman in PDF
+     * This ensures consistent typography regardless of editor font choices
+     */
+    private function stripFontFamilyStyles($html)
+    {
+        if (empty($html)) {
+            return $html;
+        }
+        
+        // Remove font-family from inline styles (handles quoted values with commas)
+        // Pattern: font-family: 'Arial', sans-serif; OR font-family: Arial, Helvetica;
+        $html = preg_replace('/font-family\s*:\s*[^;"<>]+;?/i', '', $html);
+        
+        // Remove face attribute from font tags
+        $html = preg_replace('/<font([^>]*)\sface=["\'][^"\']*["\']([^>]*)>/i', '<font$1$2>', $html);
+        
+        // Remove font tags entirely (they often carry font info)
+        $html = preg_replace('/<\/?font[^>]*>/i', '', $html);
+        
+        // Remove data-font attributes that some editors add
+        $html = preg_replace('/data-font[^=]*=["\'][^"\']*["\']\s*/i', '', $html);
+        
+        // Clean up empty style attributes
+        $html = preg_replace('/style\s*=\s*["\']\s*["\']/i', '', $html);
+        
+        // Clean up styles with only whitespace/semicolons left
+        $html = preg_replace('/style\s*=\s*["\'][\s;]*["\']/i', '', $html);
+        
+        return $html;
+    }
 
 
 }

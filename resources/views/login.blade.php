@@ -74,66 +74,10 @@
     }
     </script>
 
-    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-    <!-- Font Awesome -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/all.min.css" rel="stylesheet">
 
-    <link href="../assets/css/navbar.css" rel="stylesheet">
-    <!-- Custom CSS to override Bootstrap primary color -->
     <style>
-        .btn-primary {
-            background-color: black;
-            border-color: black;
-            transition: all 0.3s ease;
-        }
-
-        .btn-primary:hover {
-            background-color: #7a0000;
-            border-color: #7a0000;
-        }
-
-        .btn-primary:disabled {
-            background-color: #666;
-            border-color: #666;
-            cursor: not-allowed;
-            opacity: 0.8;
-        }
-
-        .text-primary {
-            color: red !important;
-        }
-
-        .back-to-top {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-        }
-
-        /* Custom CSS to make text bolder */
-        .navbar-brand h1,
-        .footer-brand h3 {
-            font-weight: 600;
-            /* Adjust the weight as needed */
-        }
-
-        .navbar {
-            box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
-            /* Adjust as needed */
-        }
-
-        #intro {
-            background-image: url(../assets/img/login.webp);
-
-            height: 100vh;
-        }
-
-
-        .navbar .nav-link {
-            color: #fff !important;
-        }
-
-        /* Loading spinner animation */
         @keyframes spin {
             0% {
                 transform: rotate(0deg);
@@ -144,29 +88,8 @@
             }
         }
 
-        .fa-spinner {
+        .animate-spin {
             animation: spin 1s linear infinite;
-        }
-
-        /* Logo container styling */
-        .logo-container {
-            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-            padding: 1.5rem;
-            border-radius: 1rem;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-            margin-bottom: 1rem;
-        }
-
-        .logo-container img {
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
-        }
-
-        /* Alert Styles */
-        .alert {
-            border-radius: 0.5rem;
-            font-size: 0.95rem;
-            position: relative;
-            animation: slideDown 0.3s ease-out;
         }
 
         @keyframes slideDown {
@@ -181,174 +104,178 @@
             }
         }
 
-        .alert i {
-            margin-right: 0.5rem;
-        }
-
-        .alert-warning {
-            background-color: #fff3cd;
-            border-color: #ffc107;
-            color: #856404;
-        }
-
-        .alert-danger {
-            background-color: #f8d7da;
-            border-color: #f5c6cb;
-            color: #721c24;
-        }
-
-        .alert .close {
-            padding: 0.75rem 1.25rem;
-            color: inherit;
-            opacity: 0.5;
-        }
-
-        .alert .close:hover {
-            opacity: 1;
-        }
-
-        /* Ensure login container has consistent sizing */
-        .bg-white.rounded-5 {
-            min-height: auto;
+        .animate-slideDown {
+            animation: slideDown 0.3s ease-out;
         }
     </style>
-
 </head>
 
-<body>
-
-
-
-
-    <!-- login.blade.php -->
-
+<body class="font-sans">
     <!-- Background image -->
-    <div id="intro" class="bg-image shadow-2-strong">
-        <div class="mask d-flex align-items-center h-100" style="background-color: rgba(0, 0, 0, 0.8);">
-            <div class="container">
-                <div class="row justify-content-center">
-                    <div class="col-xl-5 col-md-8">
-                        <div class="bg-white rounded-5 shadow-5-strong p-1" style="font-family: 'Montserrat';">
+    <div class="min-h-screen bg-cover bg-center" style="background-image: url(/assets/img/login.webp);">
+        <div class="min-h-screen flex items-center justify-center" style="background-color: rgba(0, 0, 0, 0.8);">
+            <div class="container mx-auto px-4">
+                <div class="flex justify-center">
+                    <div class="w-full max-w-md">
+                        <div class="bg-white rounded-2xl shadow-2xl p-6">
                             <!-- Logo with white background -->
-                            <div class="text-center logo-container">
+                            <div
+                                class="text-center bg-gradient-to-br from-white to-gray-50 p-6 rounded-xl shadow-sm mb-4">
                                 <img src="/assets/img/iuea logo.png"
-                                    alt="IUEA Logo - International University of East Africa" class="img-fluid"
-                                    style="height: 100px; max-width: 100%; object-fit: contain;">
+                                    alt="IUEA Logo - International University of East Africa"
+                                    class="h-24 mx-auto object-contain drop-shadow-md">
                             </div>
 
-                            <h2 class="text-center mt-2">Lecturer Sign In</h2>
-                            <p class="text-center text-muted mb-3">Access your exam management portal</p>
+                            <h2 class="text-2xl font-semibold text-center text-gray-800 mt-4">Lecturer Sign In</h2>
+                            <p class="text-center text-gray-500 mb-6">Access your exam management portal</p>
 
-                            <form id="loginForm" action="{{ route('authenticate') }}" method="POST"
-                                class="bg-white rounded-5 shadow-5-strong p-5 pt-3">
+                            <form id="loginForm" action="{{ route('authenticate') }}" method="POST" class="space-y-6">
                                 @csrf
 
                                 <!-- Session Expired Alert -->
                                 @if (session('session_expired'))
-                                    <div class="alert alert-warning alert-dismissible fade show mb-3" role="alert">
-                                        <i class="fas fa-clock"></i> <strong>Session Expired!</strong><br>
-                                        {{ session('session_expired') }}
-                                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                            <span aria-hidden="true">&times;</span>
+                                    <div class="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg animate-slideDown relative"
+                                        role="alert" id="sessionAlert">
+                                        <div class="flex items-start">
+                                            <svg class="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            <div>
+                                                <strong class="font-semibold">Session Expired!</strong><br>
+                                                <span class="text-sm">{{ session('session_expired') }}</span>
+                                            </div>
+                                        </div>
+                                        <button type="button" onclick="this.parentElement.remove()"
+                                            class="absolute top-2 right-2 text-yellow-600 hover:text-yellow-800">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M6 18L18 6M6 6l12 12"></path>
+                                            </svg>
                                         </button>
                                     </div>
                                 @endif
 
                                 <!-- Error Messages -->
                                 @if ($errors->has('login_error'))
-                                    <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
-                                        <i class="fas fa-exclamation-triangle"></i> <strong>Login Failed!</strong><br>
-                                        {{ $errors->first('login_error') }}
-                                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                            <span aria-hidden="true">&times;</span>
+                                    <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg animate-slideDown relative"
+                                        role="alert" id="errorAlert">
+                                        <div class="flex items-start">
+                                            <svg class="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                                                </path>
+                                            </svg>
+                                            <div>
+                                                <strong class="font-semibold">Login Failed!</strong><br>
+                                                <span class="text-sm">{{ $errors->first('login_error') }}</span>
+                                            </div>
+                                        </div>
+                                        <button type="button" onclick="this.parentElement.remove()"
+                                            class="absolute top-2 right-2 text-red-600 hover:text-red-800">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M6 18L18 6M6 6l12 12"></path>
+                                            </svg>
                                         </button>
                                     </div>
                                 @endif
 
                                 <!-- Email input -->
-                                <div class="form-outline mb-4">
-                                    <input type="email" id="email" name="email" class="form-control"
-                                        value="{{ old('email') }}" required />
-                                    <label class="form-label" for="email">Email address</label>
+                                <div>
+                                    <label for="email" class="block text-sm font-medium text-gray-700 mb-2">Email
+                                        address</label>
+                                    <input type="email" id="email" name="email"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
+                                        value="{{ old('email') }}" required placeholder="Enter your email" />
                                 </div>
 
                                 <!-- Password input -->
-                                <div class="form-outline mb-4">
-                                    <input type="password" id="password" name="password" class="form-control"
-                                        required />
-                                    <label class="form-label" for="password">Password</label>
+                                <div>
+                                    <label for="password"
+                                        class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                                    <input type="password" id="password" name="password"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
+                                        required placeholder="Enter your password" />
                                 </div>
 
                                 <!-- Forgot Password Link -->
-                                <p class="text-center mb-3">
-                                    <a class="a-moi" href="{{ route('forget-password') }}">Forgot Password?</a>
+                                <p class="text-center">
+                                    <a class="text-red-600 hover:text-red-800 text-sm font-medium transition-colors"
+                                        href="{{ route('forget-password') }}">Forgot Password?</a>
                                 </p>
+
                                 <!-- Submit button -->
-                                <button type="submit" id="loginBtn" class="btn btn-primary btn-block">
+                                <button type="submit" id="loginBtn"
+                                    class="w-full bg-gray-900 text-white py-3 px-4 rounded-lg font-semibold hover:bg-red-800 disabled:bg-gray-500 disabled:cursor-not-allowed transition-all duration-300">
                                     <span id="btnText">Sign in</span>
-                                    <span id="btnSpinner" class="d-none">
-                                        <i class="fas fa-spinner fa-spin"></i> Signing in...
+                                    <span id="btnSpinner" class="hidden">
+                                        <svg class="animate-spin inline w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                                stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor"
+                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                            </path>
+                                        </svg>
+                                        Signing in...
                                     </span>
                                 </button>
-
                             </form>
-
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <!-- Background image -->
-
-
 
     <!-- Footer Start -->
     @include('partials.footer')
     <!-- Footer End -->
 
-
     <!-- Back to Top -->
-    <a href="#" class="btn btn-dark back-to-top"><i class="fa fa-angle-up"></i></a>
-
-
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <a href="#"
+        class="fixed bottom-5 right-5 bg-gray-900 text-white p-3 rounded-full shadow-lg hover:bg-gray-700 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+        </svg>
+    </a>
 
     <script>
-        $(document).ready(function () {
-            $('#loginForm').on('submit', function (e) {
+        document.addEventListener('DOMContentLoaded', function () {
+            const loginForm = document.getElementById('loginForm');
+            const loginBtn = document.getElementById('loginBtn');
+            const btnText = document.getElementById('btnText');
+            const btnSpinner = document.getElementById('btnSpinner');
+
+            loginForm.addEventListener('submit', function (e) {
                 // Disable the button to prevent multiple submissions
-                $('#loginBtn').prop('disabled', true);
+                loginBtn.disabled = true;
 
                 // Hide the normal text and show the spinner
-                $('#btnText').addClass('d-none');
-                $('#btnSpinner').removeClass('d-none');
+                btnText.classList.add('hidden');
+                btnSpinner.classList.remove('hidden');
 
-                // Optional: Re-enable button after 10 seconds as a failsafe
+                // Re-enable button after 10 seconds as a failsafe
                 setTimeout(function () {
-                    $('#loginBtn').prop('disabled', false);
-                    $('#btnText').removeClass('d-none');
-                    $('#btnSpinner').addClass('d-none');
+                    loginBtn.disabled = false;
+                    btnText.classList.remove('hidden');
+                    btnSpinner.classList.add('hidden');
                 }, 10000);
             });
 
             // Auto-dismiss alerts after 8 seconds
             setTimeout(function () {
-                $('.alert').fadeOut('slow', function () {
-                    $(this).remove();
+                const alerts = document.querySelectorAll('[role="alert"]');
+                alerts.forEach(function (alert) {
+                    alert.style.transition = 'opacity 0.5s';
+                    alert.style.opacity = '0';
+                    setTimeout(() => alert.remove(), 500);
                 });
             }, 8000);
         });
     </script>
-
-
-
-
-
-
-
 </body>
 
 </html>

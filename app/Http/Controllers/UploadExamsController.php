@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Log;
-// use PDF;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\File;
+use App\Services\AuditService;
+use App\Services\DownloadLogService;
+
 class UploadExamsController extends Controller
 {
     /**
@@ -58,6 +60,7 @@ class UploadExamsController extends Controller
         try {
             $validatedData = $request->validate([
                 'courseUnit' => 'required|string',
+                'courseCode' => 'required|string', // Course code for unique identification
                 'faculty' => 'required|string', // Faculty must be submitted in the form
                 'format' => 'required|string',
                 'sectionA' => 'required|array|min:1',
@@ -79,13 +82,13 @@ class UploadExamsController extends Controller
             $firestore = app('firebase.firestore')->database();
             $examsRef = $firestore->collection('Exams');
 
-            // Check if an exam with the same courseUnit already exists
-            $existingExamQuery = $examsRef->where('courseUnit', '==', $validatedData['courseUnit']);
+            // Check if an exam with the same courseCode already exists (courseCode is unique identifier)
+            $existingExamQuery = $examsRef->where('courseCode', '==', $validatedData['courseCode']);
             $existingExamSnapshots = $existingExamQuery->documents();
 
             if (!$existingExamSnapshots->isEmpty()) {
-                Log::warning('⚠ Exam already exists for course unit: ' . $validatedData['courseUnit']);
-                return back()->with('error', 'An exam with this course unit already exists. Please review the existing exam.');
+                Log::warning('⚠ Exam already exists for course code: ' . $validatedData['courseCode']);
+                return back()->with('error', 'An exam for this course already exists. Please review the existing exam.');
             }
 
             Log::info('🆕 Creating new exam entry.');
@@ -98,17 +101,23 @@ class UploadExamsController extends Controller
             Log::info("📝 Exam being uploaded by: {$uploadedBy} ({$uploadedByName})");
 
             // Prepare exam data for Firestore
+            // Store courseCode and lecturer info directly to avoid extra queries later
             $examData = [
                 'created_at' => new \DateTime(),
                 'courseUnit' => $validatedData['courseUnit'],
-                'faculty' => $validatedData['faculty'], // Faculty is now taken from the form
+                'courseCode' => $validatedData['courseCode'], // Unique identifier
+                'faculty' => $validatedData['faculty'],
                 'format' => $validatedData['format'],
                 'sections' => [],
                 'sectionA_instructions' => $validatedData['instructions'][1],
                 'sectionB_instructions' => $validatedData['instructions'][2],
+                // Store lecturer info directly (no extra query needed when loading)
+                'lecturerEmail' => $uploadedBy,
+                'lecturerName' => $uploadedByName,
                 'uploaded_by_email' => $uploadedBy,
                 'uploaded_by_name' => $uploadedByName,
                 'uploaded_by_uid' => $uploadedByUid,
+                'status' => 'Pending Review', // Default status
             ];
 
             // Log before processing sections
@@ -133,7 +142,14 @@ class UploadExamsController extends Controller
             Log::info('✅ Section content processed.');
 
             // Save exam data to Firestore
-            $examsRef->add($examData);
+            $docRef = $examsRef->add($examData);
+
+            // Log the exam creation
+            app(AuditService::class)->logExamCreated(
+                $docRef->id(),
+                $validatedData['courseUnit'],
+                $validatedData['faculty']
+            );
 
             Log::info('🎉 Exam successfully uploaded.');
 
@@ -289,6 +305,10 @@ public function getRandomQuestions(Request $request)
         foreach ($sections as $sectionName => $questions) {
             foreach ($questions as $index => $questionContent) {
                 $processedHtml = $questionContent;
+                
+                // 🔤 FORCE TIMES NEW ROMAN: Strip any font-family styles from HTML
+                $processedHtml = $this->stripFontFamilyStyles($processedHtml);
+                
                 preg_match_all('/<img[^>]+src=["\']([^"\']+)["\']/i', $processedHtml, $matches);
                 $imageUrls = $matches[1] ?? [];
                 Log::info("🔗 Found Image URLs:", $imageUrls);
@@ -344,6 +364,36 @@ public function getRandomQuestions(Request $request)
         return $pdf->stream("Exam_{$courseUnit}.pdf");
     }
 
-
+    /**
+     * Strip font-family styles from HTML to enforce Times New Roman in PDF
+     * This ensures consistent typography regardless of editor font choices
+     */
+    private function stripFontFamilyStyles($html)
+    {
+        if (empty($html)) {
+            return $html;
+        }
+        
+        // Remove font-family from inline styles (handles quoted values with commas)
+        // Pattern: font-family: 'Arial', sans-serif; OR font-family: Arial, Helvetica;
+        $html = preg_replace('/font-family\s*:\s*[^;"<>]+;?/i', '', $html);
+        
+        // Remove face attribute from font tags
+        $html = preg_replace('/<font([^>]*)\sface=["\'][^"\']*["\']([^>]*)>/i', '<font$1$2>', $html);
+        
+        // Remove font tags entirely (they often carry font info)
+        $html = preg_replace('/<\/?font[^>]*>/i', '', $html);
+        
+        // Remove data-font attributes that some editors add
+        $html = preg_replace('/data-font[^=]*=["\'][^"\']*["\']\s*/i', '', $html);
+        
+        // Clean up empty style attributes
+        $html = preg_replace('/style\s*=\s*["\']\s*["\']/i', '', $html);
+        
+        // Clean up styles with only whitespace/semicolons left
+        $html = preg_replace('/style\s*=\s*["\'][\s;]*["\']/i', '', $html);
+        
+        return $html;
+    }
 
 }

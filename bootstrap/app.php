@@ -11,7 +11,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        //
+        // Register session activity tracking middleware for web routes
+        $middleware->web(append: [
+            \App\Http\Middleware\TrackSessionActivity::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

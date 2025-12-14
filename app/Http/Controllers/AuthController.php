@@ -9,6 +9,8 @@ use Kreait\Firebase\Exception\Auth\UserNotFound;
 use Illuminate\Support\Facades\Session;
 use Kreait\Firebase\Exception\Auth\InvalidPassword;
 use Illuminate\Support\Facades\Log;
+use App\Services\AuditService;
+use App\Services\SessionService;
 
 
 class AuthController extends Controller
@@ -141,6 +143,10 @@ class AuthController extends Controller
                     'user_firstName' => $userData['firstName'] ?? 'Unknown',
                     'user_role'      => $userData['role'] ?? 'unknown',
                 ]);
+
+                // Log successful login and track session
+                app(AuditService::class)->logLogin(true, $credentials['email']);
+                app(SessionService::class)->trackSession($uid);
         
                 return match ($userData['role'] ?? '') {
                     'admin'      => redirect('/admin/dashboard'),
@@ -159,10 +165,12 @@ class AuthController extends Controller
             
         } catch (\Kreait\Firebase\Exception\Auth\InvalidPassword $e) {
             Log::warning('Invalid password for user: ' . $credentials['email']);
+            app(AuditService::class)->logLogin(false, $credentials['email'], 'invalid_password');
             return redirect()->route('login')->withErrors(['login_error' => 'The password you entered is incorrect. Please try again.'])->withInput($request->only('email'));
         
         } catch (\Kreait\Firebase\Exception\Auth\UserNotFound $e) {
             Log::warning('User not found: ' . $credentials['email']);
+            app(AuditService::class)->logLogin(false, $credentials['email'], 'user_not_found');
             return redirect()->route('login')->withErrors(['login_error' => 'No account found with this email address. Please check your email and try again.'])->withInput($request->only('email'));
         
         } catch (\Kreait\Firebase\Exception\Auth\FailedToVerifyToken $e) {
@@ -177,15 +185,20 @@ class AuthController extends Controller
             // Check for common Firebase authentication errors
             $errorMessage = $e->getMessage();
             if (stripos($errorMessage, 'INVALID_PASSWORD') !== false || stripos($errorMessage, 'wrong password') !== false) {
+                app(AuditService::class)->logLogin(false, $credentials['email'], 'invalid_password');
                 return redirect()->route('login')->withErrors(['login_error' => 'The password you entered is incorrect. Please try again.'])->withInput($request->only('email'));
             } elseif (stripos($errorMessage, 'EMAIL_NOT_FOUND') !== false || stripos($errorMessage, 'user not found') !== false) {
+                app(AuditService::class)->logLogin(false, $credentials['email'], 'email_not_found');
                 return redirect()->route('login')->withErrors(['login_error' => 'No account found with this email address. Please check your email and try again.'])->withInput($request->only('email'));
             } elseif (stripos($errorMessage, 'TOO_MANY_ATTEMPTS') !== false) {
+                app(AuditService::class)->logLogin(false, $credentials['email'], 'too_many_attempts');
                 return redirect()->route('login')->withErrors(['login_error' => 'Too many failed login attempts. Please try again later.']);
             } elseif (stripos($errorMessage, 'USER_DISABLED') !== false) {
+                app(AuditService::class)->logLogin(false, $credentials['email'], 'user_disabled');
                 return redirect()->route('login')->withErrors(['login_error' => 'Your account has been disabled. Please contact the administrator.']);
             }
             
+            app(AuditService::class)->logLogin(false, $credentials['email'], 'unknown_error');
             return redirect()->route('login')->withErrors(['login_error' => 'Unable to sign in. Please check your credentials and try again.']);
         }
     }
@@ -215,6 +228,9 @@ class AuthController extends Controller
             // If the user exists, send the password reset link
             $this->firebaseAuth->sendPasswordResetLink($request->email);
 
+            // Log password reset request
+            app(AuditService::class)->logPasswordResetRequest($request->email);
+
             return back()->with('status', 'Password reset link sent to your email.');
         } catch (UserNotFound $e) {
             // User not found in Firebase
@@ -235,6 +251,10 @@ class AuthController extends Controller
      */
     public function logout()
     {
+        // Log the logout event and end the session tracking
+        app(AuditService::class)->logLogout();
+        app(SessionService::class)->endSession();
+
         session()->forget('user');
         session()->flush(); // Clear all session data
         // You can also sign out the Firebase user if needed using $this->firebaseAuth->signOut()

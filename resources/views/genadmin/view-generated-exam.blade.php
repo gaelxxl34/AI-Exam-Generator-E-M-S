@@ -73,7 +73,7 @@
 
         <div class="flex justify-center mt-8">
             <div class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4 max-w-2xl w-full">
-                <form action="{{ route('download.exam') }}" method="POST" class="space-y-4">
+                <form action="{{ route('download.exam') }}" method="POST" target="_blank" class="space-y-4">
                     @csrf
                     <input type="hidden" name="courseUnit" value="{{ $courseUnit }}">
 

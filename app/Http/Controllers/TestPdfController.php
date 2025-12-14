@@ -117,6 +117,9 @@ class TestPdfController extends Controller
             foreach ($questions as $index => $questionContent) {
                 $processedHtml = $questionContent;
                 
+                // 🔤 FORCE TIMES NEW ROMAN: Strip any font-family styles from HTML
+                $processedHtml = $this->stripFontFamilyStyles($processedHtml);
+                
                 // Find all image URLs in the question
                 preg_match_all('/<img[^>]+src=["\']([^"\']+)["\']/i', $processedHtml, $matches);
                 $imageUrls = $matches[1] ?? [];
@@ -153,5 +156,37 @@ class TestPdfController extends Controller
         }
         
         return $processedSections;
+    }
+
+    /**
+     * Strip font-family styles from HTML to enforce Times New Roman in PDF
+     * This ensures consistent typography regardless of editor font choices
+     */
+    private function stripFontFamilyStyles($html)
+    {
+        if (empty($html)) {
+            return $html;
+        }
+        
+        // Remove font-family from inline styles (handles quoted values with commas)
+        // Pattern: font-family: 'Arial', sans-serif; OR font-family: Arial, Helvetica;
+        $html = preg_replace('/font-family\s*:\s*[^;"<>]+;?/i', '', $html);
+        
+        // Remove face attribute from font tags
+        $html = preg_replace('/<font([^>]*)\sface=["\'][^"\']*["\']([^>]*)>/i', '<font$1$2>', $html);
+        
+        // Remove font tags entirely (they often carry font info)
+        $html = preg_replace('/<\/?font[^>]*>/i', '', $html);
+        
+        // Remove data-font attributes that some editors add
+        $html = preg_replace('/data-font[^=]*=["\'][^"\']*["\']\s*/i', '', $html);
+        
+        // Clean up empty style attributes
+        $html = preg_replace('/style\s*=\s*["\']\s*["\']/i', '', $html);
+        
+        // Clean up styles with only whitespace/semicolons left
+        $html = preg_replace('/style\s*=\s*["\'][\s;]*["\']/i', '', $html);
+        
+        return $html;
     }
 }

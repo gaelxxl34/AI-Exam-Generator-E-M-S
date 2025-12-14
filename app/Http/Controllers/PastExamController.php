@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use App\Services\AuditService;
+use App\Services\DownloadLogService;
 
 
 class PastExamController extends Controller
@@ -12,20 +14,18 @@ class PastExamController extends Controller
     public function store(Request $request)
     {
         $messages = [
-            'fileUpload.max' => 'The file should not be greater than 2MB.',
+            'fileUpload.max' => 'The file should not be greater than 10MB.',
         ];
 
-        // ✅ Fix: Remove created_at from validation
         $validatedData = $request->validate([
             'courseUnit' => 'required',
             'year' => 'required',
             'program' => 'required|string',
-            'examPeriod' => 'required|string',  // Validate the new exam period field
-            'fileUpload' => 'required|file|mimes:pdf|max:2048',
+            'examPeriod' => 'required|string',
+            'fileUpload' => 'required|file|mimes:pdf|max:10240', // Increased to 10MB since we're using Storage
         ], $messages);
 
         $file = $request->file('fileUpload');
-        $base64File = base64_encode(file_get_contents($file));
 
         $firestore = app('firebase.firestore');
         $database = $firestore->database();
@@ -48,18 +48,56 @@ class PastExamController extends Controller
         $facultyField = $currentUserData['faculty'] ?? 'default_faculty';
         \Log::info("Faculty fetched: $facultyField");
 
-        // ✅ Fix: Convert DateTime to string
+        // Upload PDF to Firebase Storage instead of storing as Base64
+        try {
+            $storage = app('firebase.storage');
+            $bucket = $storage->getBucket();
+            
+            // Create a unique filename
+            $filename = 'past_exams/' . $validatedData['program'] . '/' . $validatedData['year'] . '/' . 
+                        str_replace(' ', '_', $validatedData['courseUnit']) . '_' . 
+                        $validatedData['examPeriod'] . '_' . uniqid() . '.pdf';
+            
+            // Upload file to Firebase Storage
+            $bucket->upload(
+                file_get_contents($file->getRealPath()),
+                ['name' => $filename]
+            );
+            
+            // Generate a signed URL (valid for 10 years)
+            $object = $bucket->object($filename);
+            $signedUrl = $object->signedUrl(new \DateTime('+10 years'));
+            
+            \Log::info("File uploaded to Firebase Storage: $filename");
+            
+        } catch (\Exception $e) {
+            \Log::error("Firebase Storage upload failed: " . $e->getMessage());
+            return back()->withErrors(['upload_error' => 'Failed to upload file. Please try again.']);
+        }
+
+        // Store metadata in Firestore (no Base64, just the storage path)
         $data = [
             'courseUnit' => $validatedData['courseUnit'],
             'year' => $validatedData['year'],
             'program' => $validatedData['program'],
-            'examPeriod' => $validatedData['examPeriod'],  // Store exam period
-            'file' => $base64File,
-            'created_at' => now()->toDateTimeString(), // Convert DateTime to string
-            'faculty' => $facultyField
+            'examPeriod' => $validatedData['examPeriod'],
+            'file_path' => $filename,           // Store the storage path
+            'file_url' => $signedUrl,           // Store the signed URL
+            'created_at' => now()->toDateTimeString(),
+            'faculty' => $facultyField,
+            'uploaded_by' => $currentUserEmail,
+            'download_count' => 0,
         ];
 
-        $database->collection('pastExams')->add($data);
+        $docRef = $database->collection('pastExams')->add($data);
+
+        // Log the upload action
+        app(AuditService::class)->logPastExamUploaded(
+            $docRef->id(),
+            $validatedData['courseUnit'],
+            $validatedData['program'],
+            $validatedData['year']
+        );
 
         return redirect()->intended('admin.view-past-exams')->with('success', 'Exam uploaded successfully!');
     }
@@ -131,6 +169,29 @@ class PastExamController extends Controller
         $database = $firestore->database();
 
         try {
+            // Get the document first to retrieve file path for deletion from Storage
+            $document = $database->collection('pastExams')->document($id)->snapshot();
+            
+            if ($document->exists()) {
+                $data = $document->data();
+                $courseUnit = $data['courseUnit'] ?? 'Unknown';
+                
+                // Delete from Firebase Storage if file_path exists
+                if (isset($data['file_path'])) {
+                    try {
+                        $storage = app('firebase.storage');
+                        $bucket = $storage->getBucket();
+                        $bucket->object($data['file_path'])->delete();
+                        \Log::info("Deleted file from Firebase Storage: " . $data['file_path']);
+                    } catch (\Exception $e) {
+                        \Log::warning("Could not delete file from Storage: " . $e->getMessage());
+                    }
+                }
+                
+                // Log the deletion
+                app(AuditService::class)->logPastExamDeleted($id, $courseUnit);
+            }
+            
             $database->collection('pastExams')->document($id)->delete();
             return back()->with('success', 'Exam deleted successfully.');
         } catch (\Throwable $e) {
@@ -510,15 +571,26 @@ class PastExamController extends Controller
             
             if ($document->exists()) {
                 $data = $document->data();
-                $file = $data['file'] ?? null;
+                $courseUnit = $data['courseUnit'] ?? 'exam';
+                $program = $data['program'] ?? '';
+                $year = $data['year'] ?? '';
                 
-                if ($file) {
-                    // Decode base64 PDF and return as response
-                    $pdfContent = base64_decode($file);
+                // Log the download
+                app(DownloadLogService::class)->logPastExamDownload($id, $courseUnit, $program, $year);
+                
+                // Check if we have a file_url (new Storage-based files)
+                if (isset($data['file_url'])) {
+                    // Redirect to the signed URL
+                    return redirect($data['file_url']);
+                }
+                
+                // Fallback for old Base64 files (backward compatibility)
+                if (isset($data['file'])) {
+                    $pdfContent = base64_decode($data['file']);
                     
                     return response($pdfContent)
                         ->header('Content-Type', 'application/pdf')
-                        ->header('Content-Disposition', 'inline; filename="exam.pdf"');
+                        ->header('Content-Disposition', 'inline; filename="' . $courseUnit . '.pdf"');
                 }
             }
             

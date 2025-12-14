@@ -15,6 +15,7 @@ use App\Http\Controllers\PastExamController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ImageUploadController;
 use App\Http\Controllers\TestPdfController;
+use App\Http\Controllers\AuditController;
 //
 
 
@@ -128,8 +129,22 @@ Route::get('/genadmin/ai-exam-generator', [CourseController::class, 'AllCourses'
 Route::middleware([EnsureDeanRole::class])->group(function () {
     Route::get('/deans/dean-dashboard', [DashboardController::class, 'dashboardStats'])->name('dean.dashboard');
     Route::get('/deans/dean-moderation', [DashboardController::class, 'index'])->name('dean.moderation');
+    Route::get('/deans/dean-moderation/exams', [DashboardController::class, 'loadExamsAjax'])->name('dean.moderation.exams');
     Route::get('/deans/dashboard/report', [DashboardController::class, 'exportDashboardReport'])
-    ->name('dashboard.export-report');
+        ->name('dashboard.export-report');
+    
+    // Dean Security & Activity Monitoring Routes
+    Route::get('/deans/activity/downloads', [DashboardController::class, 'getFacultyDownloadActivity'])->name('dean.activity.downloads');
+    Route::get('/deans/activity/exams', [DashboardController::class, 'getFacultyExamActivity'])->name('dean.activity.exams');
+    Route::get('/deans/activity/security', [DashboardController::class, 'getFacultySecurityActivity'])->name('dean.activity.security');
+    Route::post('/deans/dashboard/refresh', [DashboardController::class, 'refreshDashboardCache'])->name('dean.dashboard.refresh');
+    
+    // Dean Review Routes
+    Route::get('/deans/review/{examId}', [DashboardController::class, 'showReviewExam'])->name('dean.review.exam');
+    Route::put('/deans/review/{courseUnit}/{sectionName}/{questionIndex}/update', [DashboardController::class, 'deanUpdateQuestion'])
+        ->name('dean.update.question');
+    Route::post('/deans/review/log', [DashboardController::class, 'logReview'])->name('dean.log.review');
+    Route::post('/deans/review/comment', [DashboardController::class, 'addDeanComment'])->name('dean.add.comment');
 });
 
 Route::post('/course/update-status/{id}', [DashboardController::class, 'updateStatus'])->name('course.updateStatus');
@@ -301,6 +316,27 @@ Route::get('/superadmin/super-adm-dashboard', function () {
     return view('superadmin.super-adm-dashboard');
 })->middleware(EnsureSuperAdminRole::class)->name('superadmin.super-admin-dashboard');
 
+// Audit Logs and Active Sessions Routes
+Route::get('/superadmin/audit-logs', [AuditController::class, 'auditLogs'])
+    ->middleware(EnsureSuperAdminRole::class)
+    ->name('superadmin.audit-logs');
+
+Route::get('/superadmin/active-sessions', [AuditController::class, 'activeSessions'])
+    ->middleware(EnsureSuperAdminRole::class)
+    ->name('superadmin.active-sessions');
+
+Route::delete('/superadmin/terminate-session/{sessionId}', [AuditController::class, 'terminateSession'])
+    ->middleware(EnsureSuperAdminRole::class)
+    ->name('superadmin.terminate-session');
+
+Route::post('/superadmin/cleanup-sessions', [AuditController::class, 'cleanupSessions'])
+    ->middleware(EnsureSuperAdminRole::class)
+    ->name('superadmin.cleanup-sessions');
+
+Route::get('/superadmin/download-logs', [AuditController::class, 'downloadLogs'])
+    ->middleware(EnsureSuperAdminRole::class)
+    ->name('superadmin.download-logs');
+
 Route::get('/superadmin/lecturer-control', [SuperAdminController::class, 'manageLecturers'])
     ->middleware(EnsureSuperAdminRole::class)
     ->name('superadmin.lecturerControl');
@@ -410,3 +446,14 @@ Route::post('/superadmin/delete-exams', [SuperAdminController::class, 'startDele
     ->name('superadmin.delete-exams');
 Route::get('/superadmin/delete-exams/progress/{jobId}', [SuperAdminController::class, 'deleteExamsProgress'])
     ->middleware(EnsureSuperAdminRole::class);
+
+// =============================================================================
+// AI ASSISTANT ROUTES
+// =============================================================================
+use App\Http\Controllers\AIAssistantController;
+
+Route::prefix('ai-assistant')->group(function () {
+    Route::post('/process', [AIAssistantController::class, 'process'])->name('ai.process');
+    Route::get('/actions', [AIAssistantController::class, 'actions'])->name('ai.actions');
+    Route::get('/health', [AIAssistantController::class, 'health'])->name('ai.health');
+});

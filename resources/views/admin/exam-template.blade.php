@@ -13,46 +13,220 @@
             font-style: normal;
         }
 
-        * {
-            font-family: 'Times New Roman', 'DejaVu Sans', serif !important;
+        /* ============================================
+           🔤 FORCE TIMES NEW ROMAN ON ALL ELEMENTS
+           Override any inline font styles from HTML editor
+           ============================================ */
+        *,
+        *::before,
+        *::after {
+            font-family: 'Times New Roman', 'DejaVu Sans', Times, serif !important;
+            box-sizing: border-box;
         }
 
-        body {
-            font-size: 13px;
-            margin: 15px;
+        /* Override any inline styles that might use other fonts */
+        [style*="font-family"] {
+            font-family: 'Times New Roman', 'DejaVu Sans', Times, serif !important;
         }
 
-        h1 {
-            font-size: 20px;
+        /* Target common font-family patterns from rich text editors */
+        [style*="arial"],
+        [style*="Arial"],
+        [style*="helvetica"],
+        [style*="Helvetica"],
+        [style*="sans-serif"],
+        [style*="verdana"],
+        [style*="Verdana"],
+        [style*="georgia"],
+        [style*="Georgia"],
+        [style*="courier"],
+        [style*="Courier"],
+        [style*="Comic"],
+        [style*="Impact"],
+        [style*="Trebuchet"],
+        [style*="Tahoma"],
+        [style*="Calibri"],
+        [style*="Segoe"] {
+            font-family: 'Times New Roman', 'DejaVu Sans', Times, serif !important;
         }
 
-        h2 {
-            font-size: 18px;
-            margin-top: 15px;
-            margin-bottom: 10px;
-        }
-
+        span,
+        div,
+        p,
+        td,
+        th,
+        li,
+        a,
+        strong,
+        em,
+        b,
+        i,
+        u,
         h1,
         h2,
         h3,
         h4,
         h5,
         h6,
-        p,
-        span,
-        div,
-        td,
-        th,
-        strong,
-        b,
-        em,
-        i,
-        textarea,
-        input,
-        label {
-            font-family: 'Times New Roman', 'DejaVu Sans', serif !important;
+        font {
+            font-family: 'Times New Roman', 'DejaVu Sans', Times, serif !important;
         }
 
+        body {
+            font-size: 12px;
+            margin: 15mm;
+            padding: 0;
+            line-height: 1.15;
+            color: #000;
+            background: white;
+        }
+
+        /* ============================================
+           📄 PAGE & TYPOGRAPHY
+           ============================================ */
+        h1 {
+            font-size: 18px;
+            margin: 0 0 10px 0;
+        }
+
+        h2 {
+            font-size: 16px;
+            margin-top: 15px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            border-bottom: 1px solid #000;
+            padding-bottom: 5px;
+        }
+
+        h3,
+        h4,
+        h5,
+        h6 {
+            font-size: 14px;
+            margin: 10px 0 5px 0;
+        }
+
+        p {
+            margin: 0;
+            line-height: 1.15;
+        }
+
+        /* ============================================
+           📋 TABLE STYLING - Professional Print
+           ============================================ */
+        table {
+            border-collapse: collapse !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 10px 0 !important;
+            table-layout: fixed !important;
+            page-break-inside: avoid;
+        }
+
+        table th,
+        table td {
+            border: 1px solid #000000 !important;
+            padding: 6px 8px !important;
+            text-align: left !important;
+            vertical-align: top !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            font-size: 11px !important;
+        }
+
+        table thead th {
+            background-color: #f0f0f0 !important;
+            font-weight: bold !important;
+            text-align: center !important;
+        }
+
+        /* Nested tables */
+        table table {
+            margin: 5px 0 !important;
+        }
+
+        /* ============================================
+           📝 LIST STYLING - Clean & Professional
+           ============================================ */
+        ul,
+        ol {
+            margin: 0 !important;
+            padding-left: 25px !important;
+        }
+
+        ul {
+            list-style-type: disc !important;
+        }
+
+        ol {
+            list-style-type: decimal !important;
+        }
+
+        li {
+            margin-bottom: 0 !important;
+            line-height: 1.15 !important;
+            padding-left: 5px !important;
+        }
+
+        /* Nested lists */
+        ul ul,
+        ol ul {
+            list-style-type: circle !important;
+            margin: 4px 0 4px 0 !important;
+        }
+
+        ul ul ul,
+        ol ul ul {
+            list-style-type: square !important;
+        }
+
+        ol ol,
+        ul ol {
+            list-style-type: lower-alpha !important;
+            margin: 4px 0 4px 0 !important;
+        }
+
+        ol ol ol,
+        ul ol ol {
+            list-style-type: lower-roman !important;
+        }
+
+        /* Alphabetical lists (a, b, c) */
+        ol[type="a"],
+        ol.lower-alpha {
+            list-style-type: lower-alpha !important;
+        }
+
+        ol[type="A"],
+        ol.upper-alpha {
+            list-style-type: upper-alpha !important;
+        }
+
+        ol[type="i"],
+        ol.lower-roman {
+            list-style-type: lower-roman !important;
+        }
+
+        ol[type="I"],
+        ol.upper-roman {
+            list-style-type: upper-roman !important;
+        }
+
+        /* ============================================
+           🖼️ IMAGE HANDLING
+           ============================================ */
+        img {
+            max-width: 100% !important;
+            height: auto !important;
+            display: block;
+            margin: 8px auto;
+            page-break-inside: avoid;
+        }
+
+        /* ============================================
+           📑 EXAM COVER PAGE
+           ============================================ */
         .exam-cover {
             text-align: center;
             page-break-after: always;
@@ -63,50 +237,6 @@
             display: block;
             width: 220px;
             height: 70px;
-        }
-
-        /* Ensure all images in content fit the page and are not cut off */
-        img {
-            max-width: 100% !important;
-            height: auto !important;
-            display: block;
-            margin: 0 auto 8px auto;
-        }
-
-        /* ✅ Enhanced table styling for proper border rendering in PDF */
-        table {
-            border-collapse: collapse !important;
-            width: 100% !important;
-            margin: 10px 0 !important;
-            border: 1px solid #000000 !important;
-        }
-
-        table th,
-        table td {
-            border: 1px solid #000000 !important;
-            padding: 8px !important;
-            text-align: left !important;
-            vertical-align: top !important;
-        }
-
-        table thead th {
-            background-color: #f2f2f2 !important;
-            font-weight: bold !important;
-        }
-
-        /* Ensure tables in question content have proper borders */
-        .question-content table,
-        .question-content table th,
-        .question-content table td {
-            border: 1px solid #000000 !important;
-            width: auto !important;
-            max-width: 100% !important;
-            word-break: break-word !important;
-            box-sizing: border-box !important;
-        }
-
-        .question-content {
-            overflow-x: auto;
         }
 
         .faculty-name {
@@ -130,7 +260,6 @@
 
         .info-left,
         .info-right {
-            /* margin: 20px 50px; */
             text-align: left;
             font-weight: bold;
             font-size: 13px;
@@ -149,30 +278,37 @@
             text-decoration: underline;
         }
 
-        .instructions p:first-child {}
-
         .clear {
             clear: both;
         }
 
+        /* ============================================
+           📖 SECTION STYLING
+           ============================================ */
         .section {
-            padding: 8px;
-            margin-bottom: 15px;
+            padding: 0;
+            margin-bottom: 20px;
+            page-break-inside: avoid;
         }
 
         .section>p {
-            font-size: 13px;
+            font-size: 12px;
             margin-bottom: 10px;
+            font-style: italic;
         }
 
+        /* ============================================
+           ❓ QUESTION STYLING
+           ============================================ */
         .question {
-            margin-top: 20px;
+            margin-top: 15px;
             margin-bottom: 10px;
+            page-break-inside: avoid;
         }
 
-        .question p {
-            margin: 0;
-            font-size: 15px;
+        .question>p {
+            margin: 0 0 5px 0;
+            font-size: 12px;
             font-weight: bold;
         }
 
@@ -181,13 +317,17 @@
             margin-top: 5px;
             margin-bottom: 10px;
             font-size: 12px;
-            line-height: 1.5;
+            line-height: 1.15;
             font-weight: normal;
         }
 
         .question-content p,
         .question-content div,
-        .question-content span,
+        .question-content span {
+            font-weight: normal !important;
+            margin-bottom: 6px;
+        }
+
         .question-content li {
             font-weight: normal !important;
         }
@@ -197,6 +337,26 @@
             font-weight: bold !important;
         }
 
+        .question-content em,
+        .question-content i {
+            font-style: italic !important;
+        }
+
+        .question-content u {
+            text-decoration: underline !important;
+        }
+
+        /* Subscript and Superscript */
+        .question-content sub {
+            vertical-align: sub;
+            font-size: 0.8em;
+        }
+
+        .question-content sup {
+            vertical-align: super;
+            font-size: 0.8em;
+        }
+
         .question-content img {
             max-width: 100%;
             height: auto;
@@ -204,7 +364,22 @@
             margin: 10px 0;
         }
 
-        /* Remove duplicate table styling */
+        /* Question content table specific styling */
+        .question-content table {
+            width: 100% !important;
+            max-width: 100% !important;
+            table-layout: fixed !important;
+        }
+
+        .question-content table th,
+        .question-content table td {
+            border: 1px solid #000000 !important;
+            word-break: break-word !important;
+        }
+
+        /* ============================================
+           🔧 UTILITY CLASSES
+           ============================================ */
         .table {
             width: 100%;
             border-collapse: collapse;
@@ -216,8 +391,18 @@
 
         .table td,
         .table th {
-            padding: .75rem;
+            padding: 6px 8px;
             vertical-align: top;
+            border: 1px solid #000;
+        }
+
+        /* Page break controls */
+        .page-break {
+            page-break-after: always;
+        }
+
+        .no-break {
+            page-break-inside: avoid;
         }
     </style>
 </head>
@@ -273,17 +458,17 @@
 
     @if (isset($pdf))
         <script type="text/php">
-                                    if (isset($pdf)) {
-                                        $font = $fontMetrics->getFont("Times New Roman", "normal");
-                                        $size = 10;
-                                        $pdf->page_script('
-                                            if ($PAGE_COUNT > 1) {
-                                                $font = $fontMetrics->getFont("Times New Roman", "normal");
-                                                $pdf->text(520, 820, "Page $PAGE_NUM of $PAGE_COUNT", $font, 10);
-                                            }
-                                        ');
-                                    }
-                                </script>
+                                                        if (isset($pdf)) {
+                                                            $font = $fontMetrics->getFont("Times New Roman", "normal");
+                                                            $size = 10;
+                                                            $pdf->page_script('
+                                                                if ($PAGE_COUNT > 1) {
+                                                                    $font = $fontMetrics->getFont("Times New Roman", "normal");
+                                                                    $pdf->text(520, 820, "Page $PAGE_NUM of $PAGE_COUNT", $font, 10);
+                                                                }
+                                                            ');
+                                                        }
+                                                    </script>
     @endif
 
 
