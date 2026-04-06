@@ -120,11 +120,18 @@ Route::get('/forget-password', [AuthController::class, 'showForgetPasswordForm']
 Route::get('/genadmin/gen-dashboard', [DashboardController::class, 'genAdminDashboard'])
     ->middleware(EnsureGenAdminRole::class)
     ->name('genadmin.gen-dashboard');
+Route::get('/genadmin/documentation', function () {
+    return view('genadmin.documentation');
+})->middleware(EnsureGenAdminRole::class)->name('genadmin.documentation');
 Route::get('/genadmin/ai-exam-generator', [CourseController::class, 'AllCourses'])
     ->name('genadmin.ai-exam-generator');
 
 // DEAN ROUTING
 
+
+Route::get('/deans/documentation', function () {
+    return view('deans.documentation');
+})->middleware(EnsureDeanRole::class)->name('dean.documentation');
 
 Route::middleware([EnsureDeanRole::class])->group(function () {
     Route::get('/deans/dean-dashboard', [DashboardController::class, 'dashboardStats'])->name('dean.dashboard');
@@ -171,6 +178,9 @@ Route::post('/download-exam', [UploadExamsController::class, 'generatePdf'])
 Route::get('/admin/dashboard', [DashboardController::class,'adminDashboard'])
     ->middleware(EnsureAdminRole::class)
     ->name('admin.dashboard');
+Route::get('/admin/documentation', function () {
+    return view('admin.documentation');
+})->middleware(EnsureAdminRole::class)->name('admin.documentation');
 
 
 Route::get('/admin/add-courses', function () {
@@ -305,6 +315,9 @@ Route::get('/lecturer/l-upload-questions', function () {
 Route::get('/lecturer/lecturer.l-upload-questions', [CourseController::class, 'CoursesList'])
     ->middleware(EnsureLecturerRole::class)
     ->name('lecturer.list');
+Route::get('/lecturer/documentation', function () {
+    return view('lecturer.documentation');
+})->middleware(EnsureLecturerRole::class)->name('lecturer.documentation');
 
 
 
@@ -315,6 +328,9 @@ Route::get('/lecturer/lecturer.l-upload-questions', [CourseController::class, 'C
 Route::get('/superadmin/super-adm-dashboard', function () {
     return view('superadmin.super-adm-dashboard');
 })->middleware(EnsureSuperAdminRole::class)->name('superadmin.super-admin-dashboard');
+Route::get('/superadmin/documentation', function () {
+    return view('superadmin.documentation');
+})->middleware(EnsureSuperAdminRole::class)->name('superadmin.documentation');
 
 // Audit Logs and Active Sessions Routes
 Route::get('/superadmin/audit-logs', [AuditController::class, 'auditLogs'])

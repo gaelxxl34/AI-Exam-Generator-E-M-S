@@ -3,14 +3,15 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Log;
+use App\Services\FirestoreRestService;
 
 class SessionService
 {
-    protected $firestore;
+    protected FirestoreRestService $firestoreRest;
 
     public function __construct()
     {
-        $this->firestore = app('firebase.firestore')->database();
+        $this->firestoreRest = app(FirestoreRestService::class);
     }
 
     /**
@@ -30,23 +31,21 @@ class SessionService
                 'device_type' => $this->detectDeviceType(),
                 'browser' => $this->detectBrowser(),
                 'os' => $this->detectOS(),
-                'started_at' => new \DateTime(),
-                'last_activity' => new \DateTime(),
+                'started_at' => (new \DateTime())->format('Y-m-d\TH:i:s.u\Z'),
+                'last_activity' => (new \DateTime())->format('Y-m-d\TH:i:s.u\Z'),
                 'is_active' => true,
             ];
 
-            // Store in ActiveSessions collection
-            $docRef = $this->firestore->collection('ActiveSessions')->add($sessionData);
+            $result = $this->firestoreRest->addDocument('ActiveSessions', $sessionData);
             
-            // Store the session document ID in the PHP session
-            session(['active_session_doc_id' => $docRef->id()]);
+            session(['active_session_doc_id' => $result['id']]);
             
             Log::info("Session tracked for user: {$userId}", [
-                'session_doc_id' => $docRef->id(),
+                'session_doc_id' => $result['id'],
                 'ip' => $sessionData['ip_address'],
             ]);
 
-            return $docRef->id();
+            return $result['id'];
         } catch (\Exception $e) {
             Log::error("Failed to track session: " . $e->getMessage());
             return null;
@@ -61,11 +60,9 @@ class SessionService
         try {
             $sessionDocId = session('active_session_doc_id');
             if ($sessionDocId) {
-                $this->firestore->collection('ActiveSessions')
-                    ->document($sessionDocId)
-                    ->update([
-                        ['path' => 'last_activity', 'value' => new \DateTime()],
-                    ]);
+                $this->firestoreRest->updateDocument('ActiveSessions', $sessionDocId, [
+                    'last_activity' => (new \DateTime())->format('Y-m-d\TH:i:s.u\Z'),
+                ]);
             }
         } catch (\Exception $e) {
             Log::warning("Failed to update session activity: " . $e->getMessage());
@@ -80,12 +77,10 @@ class SessionService
         try {
             $sessionDocId = session('active_session_doc_id');
             if ($sessionDocId) {
-                $this->firestore->collection('ActiveSessions')
-                    ->document($sessionDocId)
-                    ->update([
-                        ['path' => 'is_active', 'value' => false],
-                        ['path' => 'ended_at', 'value' => new \DateTime()],
-                    ]);
+                $this->firestoreRest->updateDocument('ActiveSessions', $sessionDocId, [
+                    'is_active' => false,
+                    'ended_at' => (new \DateTime())->format('Y-m-d\TH:i:s.u\Z'),
+                ]);
                 
                 Log::info("Session ended: {$sessionDocId}");
             }
@@ -100,21 +95,14 @@ class SessionService
     public function getUserActiveSessions(string $userId): array
     {
         try {
-            $sessions = $this->firestore->collection('ActiveSessions')
-                ->where('user_id', '==', $userId)
-                ->where('is_active', '==', true)
-                ->orderBy('last_activity', 'DESC')
-                ->documents();
-
-            $result = [];
-            foreach ($sessions as $session) {
-                if ($session->exists()) {
-                    $data = $session->data();
-                    $data['id'] = $session->id();
-                    $result[] = $data;
-                }
-            }
-            return $result;
+            return $this->firestoreRest->runQuery(
+                'ActiveSessions',
+                [
+                    ['field' => 'user_id', 'op' => '==', 'value' => $userId],
+                    ['field' => 'is_active', 'op' => '==', 'value' => true],
+                ],
+                [['field' => 'last_activity', 'direction' => 'DESCENDING']]
+            );
         } catch (\Exception $e) {
             Log::error("Failed to get user sessions: " . $e->getMessage());
             return [];
@@ -127,21 +115,12 @@ class SessionService
     public function getAllActiveSessions(int $limit = 100): array
     {
         try {
-            $sessions = $this->firestore->collection('ActiveSessions')
-                ->where('is_active', '==', true)
-                ->orderBy('last_activity', 'DESC')
-                ->limit($limit)
-                ->documents();
-
-            $result = [];
-            foreach ($sessions as $session) {
-                if ($session->exists()) {
-                    $data = $session->data();
-                    $data['id'] = $session->id();
-                    $result[] = $data;
-                }
-            }
-            return $result;
+            return $this->firestoreRest->runQuery(
+                'ActiveSessions',
+                [['field' => 'is_active', 'op' => '==', 'value' => true]],
+                [['field' => 'last_activity', 'direction' => 'DESCENDING']],
+                $limit
+            );
         } catch (\Exception $e) {
             Log::error("Failed to get all active sessions: " . $e->getMessage());
             return [];
@@ -149,19 +128,17 @@ class SessionService
     }
 
     /**
-     * Terminate a specific session (for admin or user security)
+     * Terminate a specific session
      */
     public function terminateSession(string $sessionDocId): bool
     {
         try {
-            $this->firestore->collection('ActiveSessions')
-                ->document($sessionDocId)
-                ->update([
-                    ['path' => 'is_active', 'value' => false],
-                    ['path' => 'ended_at', 'value' => new \DateTime()],
-                    ['path' => 'terminated_by' , 'value' => session('user_email') ?? 'system'],
-                    ['path' => 'termination_reason', 'value' => 'manual_termination'],
-                ]);
+            $this->firestoreRest->updateDocument('ActiveSessions', $sessionDocId, [
+                'is_active' => false,
+                'ended_at' => (new \DateTime())->format('Y-m-d\TH:i:s.u\Z'),
+                'terminated_by' => session('user_email') ?? 'system',
+                'termination_reason' => 'manual_termination',
+            ]);
             
             Log::info("Session terminated: {$sessionDocId}");
             return true;
@@ -172,22 +149,23 @@ class SessionService
     }
 
     /**
-     * Terminate all sessions for a user (useful when disabling account)
+     * Terminate all sessions for a user
      */
     public function terminateAllUserSessions(string $userId): int
     {
         try {
-            $sessions = $this->firestore->collection('ActiveSessions')
-                ->where('user_id', '==', $userId)
-                ->where('is_active', '==', true)
-                ->documents();
+            $sessions = $this->firestoreRest->runQuery(
+                'ActiveSessions',
+                [
+                    ['field' => 'user_id', 'op' => '==', 'value' => $userId],
+                    ['field' => 'is_active', 'op' => '==', 'value' => true],
+                ]
+            );
 
             $count = 0;
             foreach ($sessions as $session) {
-                if ($session->exists()) {
-                    $this->terminateSession($session->id());
-                    $count++;
-                }
+                $this->terminateSession($session['id']);
+                $count++;
             }
             
             Log::info("Terminated {$count} sessions for user: {$userId}");
@@ -199,32 +177,32 @@ class SessionService
     }
 
     /**
-     * Clean up stale sessions (sessions inactive for more than 24 hours)
+     * Clean up stale sessions (inactive for more than 24 hours)
      */
     public function cleanupStaleSessions(): int
     {
         try {
             $cutoff = (new \DateTime())->modify('-24 hours');
             
-            $sessions = $this->firestore->collection('ActiveSessions')
-                ->where('is_active', '==', true)
-                ->documents();
+            $sessions = $this->firestoreRest->runQuery(
+                'ActiveSessions',
+                [['field' => 'is_active', 'op' => '==', 'value' => true]]
+            );
 
             $count = 0;
-            foreach ($sessions as $session) {
-                if ($session->exists()) {
-                    $data = $session->data();
-                    if (isset($data['last_activity'])) {
-                        $lastActivity = $data['last_activity']->get();
+            foreach ($sessions as $data) {
+                if (isset($data['last_activity'])) {
+                    try {
+                        $lastActivity = new \DateTime($data['last_activity']);
                         if ($lastActivity < $cutoff) {
-                            $session->reference()->update([
-                                ['path' => 'is_active', 'value' => false],
-                                ['path' => 'ended_at', 'value' => new \DateTime()],
-                                ['path' => 'termination_reason', 'value' => 'stale_session_cleanup'],
+                            $this->firestoreRest->updateDocument('ActiveSessions', $data['id'], [
+                                'is_active' => false,
+                                'ended_at' => (new \DateTime())->format('Y-m-d\TH:i:s.u\Z'),
+                                'termination_reason' => 'stale_session_cleanup',
                             ]);
                             $count++;
                         }
-                    }
+                    } catch (\Exception $e) {}
                 }
             }
             
@@ -242,9 +220,10 @@ class SessionService
     public function getSessionStats(): array
     {
         try {
-            $activeSessions = $this->firestore->collection('ActiveSessions')
-                ->where('is_active', '==', true)
-                ->documents();
+            $activeSessions = $this->firestoreRest->runQuery(
+                'ActiveSessions',
+                [['field' => 'is_active', 'op' => '==', 'value' => true]]
+            );
 
             $stats = [
                 'total_active' => 0,
@@ -253,20 +232,17 @@ class SessionService
                 'by_browser' => [],
             ];
 
-            foreach ($activeSessions as $session) {
-                if ($session->exists()) {
-                    $data = $session->data();
-                    $stats['total_active']++;
+            foreach ($activeSessions as $data) {
+                $stats['total_active']++;
 
-                    $role = $data['user_role'] ?? 'unknown';
-                    $stats['by_role'][$role] = ($stats['by_role'][$role] ?? 0) + 1;
+                $role = $data['user_role'] ?? 'unknown';
+                $stats['by_role'][$role] = ($stats['by_role'][$role] ?? 0) + 1;
 
-                    $device = $data['device_type'] ?? 'unknown';
-                    $stats['by_device'][$device] = ($stats['by_device'][$device] ?? 0) + 1;
+                $device = $data['device_type'] ?? 'unknown';
+                $stats['by_device'][$device] = ($stats['by_device'][$device] ?? 0) + 1;
 
-                    $browser = $data['browser'] ?? 'unknown';
-                    $stats['by_browser'][$browser] = ($stats['by_browser'][$browser] ?? 0) + 1;
-                }
+                $browser = $data['browser'] ?? 'unknown';
+                $stats['by_browser'][$browser] = ($stats['by_browser'][$browser] ?? 0) + 1;
             }
 
             return $stats;

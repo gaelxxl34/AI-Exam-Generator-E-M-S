@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use Kreait\Firebase\Auth as FirebaseAuth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use App\Services\FirestoreRestService;
 
 class SuperAdminController extends Controller
 {
@@ -64,17 +65,13 @@ class SuperAdminController extends Controller
             \Log::info('Firebase user created with UID: ' . $createdUser->uid);
 
 
-            $firestore = app('firebase.firestore');
-            $database = $firestore->database();
-            $usersRef = $database->collection('Users');
-
-            $usersRef->document($createdUser->uid)->set([
+            $db = app(FirestoreRestService::class);
+            $db->setDocument('Users', $createdUser->uid, [
                 'firstName' => $validatedData['firstName'],
                 'lastName' => $validatedData['lastName'],
                 'email' => $validatedData['email'],
-                // 'profile_picture' => $imagePath,
-                'created_at' => new \DateTime(),
-                'faculty' => $validatedData['faculty'], // Use the faculty from the validated data
+                'created_at' => (new \DateTime())->format('Y-m-d\TH:i:s.u\Z'),
+                'faculty' => $validatedData['faculty'],
                 'role' => $validatedData['role']
             ]);
             \Log::info('Lecturer data added to Firestore with courses');
@@ -91,33 +88,23 @@ class SuperAdminController extends Controller
         \Log::info('adminsList method called');
 
         try {
-            $firestore = app('firebase.firestore');
-            $database = $firestore->database();
-            $usersRef = $database->collection('Users');
+            $db = app(FirestoreRestService::class);
 
-            // Query for users where role is 'admin', 'dean' or 'genadmin'
-            $adminQuery = $usersRef->where('role', 'in', ['admin', 'genadmin', 'dean']);
-            $adminSnapshot = $adminQuery->documents();
+            $admins = $db->runQuery('Users', [
+                ['field' => 'role', 'op' => 'in', 'value' => ['admin', 'genadmin', 'dean']]
+            ]);
 
             $adminsByRole = [];
-            $storage = app('firebase.storage');
-            $bucket = $storage->getBucket();
 
-            foreach ($adminSnapshot as $admin) {
-                $adminData = $admin->data();
-                $role = $adminData['role'] ?? 'Other';
-                // $imageReference = $bucket->object($adminData['profile_picture']);
-
-                // Generate a signed URL for the image
-                // $profilePictureUrl = $imageReference->exists() ? $imageReference->signedUrl(new \DateTime('+5 minutes')) : null;
+            foreach ($admins as $admin) {
+                $role = $admin['role'] ?? 'Other';
 
                 $adminsByRole[$role][] = [
-                    'id' => $admin->id(),
-                    'firstName' => $adminData['firstName'] ?? 'N/A',
-                    'lastName' => $adminData['lastName'] ?? 'N/A',
-                    'email' => $adminData['email'] ?? 'N/A',
-                    'role' => $adminData['role'] ?? 'N/A',
-                    // 'profile_picture' => $profilePictureUrl,
+                    'id' => $admin['id'],
+                    'firstName' => $admin['firstName'] ?? 'N/A',
+                    'lastName' => $admin['lastName'] ?? 'N/A',
+                    'email' => $admin['email'] ?? 'N/A',
+                    'role' => $admin['role'] ?? 'N/A',
                 ];
             }
 
@@ -132,26 +119,20 @@ class SuperAdminController extends Controller
     public function editAdmin($id)
     {
         try {
-            // Get a reference to the Firestore database
-            $database = app('firebase.firestore')->database();
+            $db = app(FirestoreRestService::class);
+            $adminSnapshot = $db->getDocument('Users', $id);
 
-            // Query Firestore to get the admin by ID
-            $adminRef = $database->collection('Users')->document($id);
-            $adminSnapshot = $adminRef->snapshot();
-
-            if ($adminSnapshot->exists()) {
-              
-                // Prepare admin data
+            if ($adminSnapshot) {
                 $adminData = [
-                    'id' => $adminSnapshot->id(),
-                    'firstName' => $adminSnapshot->data()['firstName'] ?? 'N/A',
-                    'lastName' => $adminSnapshot->data()['lastName'] ?? 'N/A',
-                    'email' => $adminSnapshot->data()['email'] ?? 'N/A',
-                    'faculty' => $adminSnapshot->data()['faculty'] ?? 'N/A',
-                    'role' => $adminSnapshot->data()['role'] ?? 'N/A',  // Include role in the data
+                    'id' => $adminSnapshot['id'],
+                    'firstName' => $adminSnapshot['firstName'] ?? 'N/A',
+                    'lastName' => $adminSnapshot['lastName'] ?? 'N/A',
+                    'email' => $adminSnapshot['email'] ?? 'N/A',
+                    'faculty' => $adminSnapshot['faculty'] ?? 'N/A',
+                    'role' => $adminSnapshot['role'] ?? 'N/A',
                 ];
 
-                return view('superadmin.edit-admin', ['admin' => $adminData]); // Ensure the view name is correct
+                return view('superadmin.edit-admin', ['admin' => $adminData]);
             } else {
                 return 'Admin not found';
             }
@@ -174,27 +155,25 @@ class SuperAdminController extends Controller
             ]);
 
             // Initialize Firebase services
-            $firestore = app('firebase.firestore')->database();
+            $db = app(FirestoreRestService::class);
             $auth = app('firebase.auth');
 
             // Fetch the current user data
-            $adminRef = $firestore->collection('Users')->document($id);
-            $adminSnapshot = $adminRef->snapshot();
+            $currentData = $db->getDocument('Users', $id);
 
-            if (!$adminSnapshot->exists()) {
+            if (!$currentData) {
                 return back()->with('error', 'User not found.');
             }
 
-            $currentData = $adminSnapshot->data();
             $currentEmail = $currentData['email'] ?? null;
 
-            // **Update Firestore Data**
-            $adminRef->update([
-                ['path' => 'firstName', 'value' => $validatedData['firstName']],
-                ['path' => 'lastName', 'value' => $validatedData['lastName']],
-                ['path' => 'email', 'value' => $validatedData['email']],
-                ['path' => 'role', 'value' => $validatedData['role']],
-                ['path' => 'faculty', 'value' => $validatedData['faculty']],
+            // Update Firestore Data
+            $db->updateDocument('Users', $id, [
+                'firstName' => $validatedData['firstName'],
+                'lastName' => $validatedData['lastName'],
+                'email' => $validatedData['email'],
+                'role' => $validatedData['role'],
+                'faculty' => $validatedData['faculty'],
             ]);
 
             // **Update Firebase Authentication Email if it changed**
@@ -220,25 +199,27 @@ class SuperAdminController extends Controller
     public function deleteAdmin($id)
     {
         try {
-            // Initialize Firebase services
-            $firestore = app('firebase.firestore')->database();
+            $db = app(FirestoreRestService::class);
             $auth = app('firebase.auth');
-            $storage = app('firebase.storage')->getBucket();
 
-            // Get the Firestore document reference
-            $lecturerRef = $firestore->collection('Users')->document($id);
-            $lecturerSnapshot = $lecturerRef->snapshot();
+            // Get document data before deleting
+            $lecturerData = $db->getDocument('Users', $id);
 
             // Delete profile picture from Firebase Storage if it exists
-            if ($lecturerSnapshot->exists() && isset($lecturerSnapshot['profile_picture'])) {
-                $profilePicturePath = $lecturerSnapshot->data()['profile_picture'];
-                if ($storage->object($profilePicturePath)->exists()) {
-                    $storage->object($profilePicturePath)->delete();
+            if ($lecturerData && isset($lecturerData['profile_picture'])) {
+                try {
+                    $storage = app('firebase.storage')->getBucket();
+                    $profilePicturePath = $lecturerData['profile_picture'];
+                    if ($storage->object($profilePicturePath)->exists()) {
+                        $storage->object($profilePicturePath)->delete();
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning("Could not delete profile picture: " . $e->getMessage());
                 }
             }
 
             // Delete the Firestore document
-            $lecturerRef->delete();
+            $db->deleteDocument('Users', $id);
 
             // Delete the user from Firebase Authentication
             $auth->deleteUser($id);
@@ -256,16 +237,12 @@ class SuperAdminController extends Controller
     public function manageLecturers()
     {
         try {
-            $firestore = app('firebase.firestore')->database();
-            $usersRef = $firestore->collection('Users')->where('role', '==', 'lecturer');
-            $lecturers = $usersRef->documents();
+            $db = app(FirestoreRestService::class);
+            $lecturers = $db->queryCollection('Users', 'role', '==', 'lecturer');
 
             $lecturersByFaculty = [];
             
-            foreach ($lecturers as $lecturer) {
-                if ($lecturer->exists()) {
-                    $data = $lecturer->data();
-                    
+            foreach ($lecturers as $data) {
                     // Ensure faculties is always an array
                     $faculties = $data['faculties'] ?? [];
                     if (!is_array($faculties)) {
@@ -279,7 +256,7 @@ class SuperAdminController extends Controller
                     }
                     
                     $lecturerData = [
-                        'id' => $lecturer->id(),
+                        'id' => $data['id'],
                         'name' => trim(($data['firstName'] ?? '') . ' ' . ($data['lastName'] ?? '')),
                         'email' => $data['email'] ?? 'No Email',
                         'status' => $data['disabled'] ?? false,
@@ -300,7 +277,6 @@ class SuperAdminController extends Controller
                     else {
                         $lecturersByFaculty['Unassigned'][] = $lecturerData;
                     }
-                }
             }
 
             // Sort faculties alphabetically, but keep special categories at the end
@@ -335,11 +311,10 @@ class SuperAdminController extends Controller
         try {
             \Log::info("Attempting to toggle status for lecturer UID: {$uid}");
             
-            $firestore = app('firebase.firestore')->database();
-            $userRef = $firestore->collection('Users')->document($uid);
-            $userSnapshot = $userRef->snapshot();
+            $db = app(FirestoreRestService::class);
+            $userData = $db->getDocument('Users', $uid);
 
-            if (!$userSnapshot->exists()) {
+            if (!$userData) {
                 \Log::error("❌ User with UID {$uid} not found in Firestore.");
                 return response()->json([
                     'success' => false, 
@@ -348,16 +323,13 @@ class SuperAdminController extends Controller
             }
 
             // Fetch current status and toggle
-            $userData = $userSnapshot->data();
             $currentStatus = $userData['disabled'] ?? false;
             $newStatus = !$currentStatus; // Toggle the status
 
             \Log::info("Current status: " . ($currentStatus ? 'disabled' : 'enabled') . ", New status: " . ($newStatus ? 'disabled' : 'enabled'));
 
             // Update Firestore
-            $userRef->update([
-                ['path' => 'disabled', 'value' => $newStatus]
-            ]);
+            $db->updateDocument('Users', $uid, ['disabled' => $newStatus]);
 
             // Log status change clearly
             \Log::info("✅ User {$uid} was " . ($newStatus ? 'DISABLED ❌' : 'ENABLED ✅'));
@@ -392,36 +364,30 @@ class SuperAdminController extends Controller
             $disable = $request->input('disable') === true || $request->input('disable') === 'true';
             \Log::info("Bulk toggle all lecturers to: " . ($disable ? 'disabled' : 'enabled'));
             
-            $firestore = app('firebase.firestore')->database();
-            $usersRef = $firestore->collection('Users')->where('role', '==', 'lecturer');
-            $lecturers = $usersRef->documents();
+            $db = app(FirestoreRestService::class);
+            $lecturers = $db->queryCollection('Users', 'role', '==', 'lecturer');
 
             $updateCount = 0;
             $failedCount = 0;
-            $batchSize = 50; // Process in batches to avoid overwhelming Firebase
+            $batchSize = 50;
             $currentBatch = 0;
             
             foreach ($lecturers as $lecturer) {
-                if ($lecturer->exists()) {
                     try {
-                        $lecturer->reference()->update([
-                            ['path' => 'disabled', 'value' => $disable]
-                        ]);
-                        \Log::info("Lecturer {$lecturer->id()} status set to " . ($disable ? 'DISABLED' : 'ENABLED'));
+                        $db->updateDocument('Users', $lecturer['id'], ['disabled' => $disable]);
+                        \Log::info("Lecturer {$lecturer['id']} status set to " . ($disable ? 'DISABLED' : 'ENABLED'));
                         $updateCount++;
                         $currentBatch++;
                         
-                        // Add small delay every batch to prevent rate limiting
                         if ($currentBatch >= $batchSize) {
-                            usleep(100000); // 0.1 second delay
+                            usleep(100000);
                             $currentBatch = 0;
                             \Log::info("Processed batch of {$batchSize} lecturers. Total processed: {$updateCount}");
                         }
                     } catch (\Exception $e) {
                         $failedCount++;
-                        \Log::error("Failed to update lecturer {$lecturer->id()}: " . $e->getMessage());
+                        \Log::error("Failed to update lecturer {$lecturer['id']}: " . $e->getMessage());
                     }
-                }
             }
 
             $message = "Successfully updated {$updateCount} lecturers.";
@@ -452,11 +418,10 @@ class SuperAdminController extends Controller
         try {
             \Log::info("Attempting to clear courses for lecturer UID: {$uid}");
             
-            $firestore = app('firebase.firestore')->database();
-            $userRef = $firestore->collection('Users')->document($uid);
-            $userSnapshot = $userRef->snapshot();
+            $db = app(FirestoreRestService::class);
+            $userData = $db->getDocument('Users', $uid);
 
-            if (!$userSnapshot->exists()) {
+            if (!$userData) {
                 \Log::error("❌ User with UID {$uid} not found in Firestore.");
                 return response()->json([
                     'success' => false, 
@@ -465,7 +430,6 @@ class SuperAdminController extends Controller
             }
 
             // Check if user is a lecturer
-            $userData = $userSnapshot->data();
             if (($userData['role'] ?? '') !== 'lecturer') {
                 return response()->json([
                     'success' => false, 
@@ -474,9 +438,7 @@ class SuperAdminController extends Controller
             }
 
             // Clear the courses array
-            $userRef->update([
-                ['path' => 'courses', 'value' => []]
-            ]);
+            $db->updateDocument('Users', $uid, ['courses' => []]);
 
             \Log::info("✅ Courses cleared for lecturer {$uid}");
 
@@ -512,33 +474,27 @@ class SuperAdminController extends Controller
                 // Clear courses for all lecturers
                 \Log::info("Bulk clear courses for all lecturers");
                 
-                $firestore = app('firebase.firestore')->database();
-                $usersRef = $firestore->collection('Users')->where('role', '==', 'lecturer');
-                $lecturers = $usersRef->documents();
+                $db = app(FirestoreRestService::class);
+                $lecturers = $db->queryCollection('Users', 'role', '==', 'lecturer');
 
                 $updateCount = 0;
-                $batchSize = 50; // Process in batches to avoid overwhelming Firebase
+                $batchSize = 50;
                 $currentBatch = 0;
                 
                 foreach ($lecturers as $lecturer) {
-                    if ($lecturer->exists()) {
                         try {
-                            $lecturer->reference()->update([
-                                ['path' => 'courses', 'value' => []]
-                            ]);
-                            \Log::info("Courses cleared for lecturer {$lecturer->id()}");
+                            $db->updateDocument('Users', $lecturer['id'], ['courses' => []]);
+                            \Log::info("Courses cleared for lecturer {$lecturer['id']}");
                             $updateCount++;
                             $currentBatch++;
                             
-                            // Add small delay every batch to prevent rate limiting
                             if ($currentBatch >= $batchSize) {
-                                usleep(100000); // 0.1 second delay
+                                usleep(100000);
                                 $currentBatch = 0;
                             }
                         } catch (\Exception $e) {
-                            \Log::error("Failed to clear courses for lecturer {$lecturer->id()}: " . $e->getMessage());
+                            \Log::error("Failed to clear courses for lecturer {$lecturer['id']}: " . $e->getMessage());
                         }
-                    }
                 }
 
                 return response()->json([
@@ -549,30 +505,25 @@ class SuperAdminController extends Controller
                 // Clear courses for specific lecturers
                 \Log::info("Bulk clear courses for selected lecturers: " . implode(', ', $lecturerIds));
                 
-                $firestore = app('firebase.firestore')->database();
+                $db = app(FirestoreRestService::class);
                 $updateCount = 0;
                 $failedCount = 0;
-                $batchSize = 50; // Process in batches
+                $batchSize = 50;
                 $currentBatch = 0;
 
                 foreach ($lecturerIds as $uid) {
                     try {
-                        $userRef = $firestore->collection('Users')->document($uid);
-                        $userSnapshot = $userRef->snapshot();
+                        $userData = $db->getDocument('Users', $uid);
 
-                        if ($userSnapshot->exists()) {
-                            $userData = $userSnapshot->data();
+                        if ($userData) {
                             if (($userData['role'] ?? '') === 'lecturer') {
-                                $userRef->update([
-                                    ['path' => 'courses', 'value' => []]
-                                ]);
+                                $db->updateDocument('Users', $uid, ['courses' => []]);
                                 $updateCount++;
                                 $currentBatch++;
                                 \Log::info("Courses cleared for lecturer {$uid}");
                                 
-                                // Add small delay every batch to prevent rate limiting
                                 if ($currentBatch >= $batchSize) {
-                                    usleep(100000); // 0.1 second delay
+                                    usleep(100000);
                                     $currentBatch = 0;
                                 }
                             }
@@ -622,17 +573,15 @@ class SuperAdminController extends Controller
         $archiveCollection = 'archive_' . $semester . '_' . $year;
 
         try {
-            $firestore = app('firebase.firestore')->database();
-            $examsRef = $firestore->collection('Exams');
-            $exams = $examsRef->documents();
-            $archiveRef = $firestore->collection($archiveCollection);
+            $db = app(FirestoreRestService::class);
+            $exams = $db->getCollection('Exams');
 
             $archivedCount = 0;
             foreach ($exams as $exam) {
-                if ($exam->exists()) {
-                    $archiveRef->document($exam->id())->set($exam->data());
-                    $archivedCount++;
-                }
+                $examId = $exam['id'];
+                unset($exam['id']); // Don't store the id field as data
+                $db->setDocument($archiveCollection, $examId, $exam);
+                $archivedCount++;
             }
 
             // Optionally, clear the Exams collection after archiving
@@ -666,21 +615,18 @@ class SuperAdminController extends Controller
         try {
             set_time_limit(600); // 10 minutes
             ini_set('max_execution_time', 600);
-            $firestore = app('firebase.firestore')->database();
-            $examsRef = $firestore->collection('Exams');
-            $exams = $examsRef->documents();
-            $archiveRef = $firestore->collection($archiveCollection);
-            $examsArray = iterator_to_array($exams);
-            $total = count($examsArray);
+            $db = app(FirestoreRestService::class);
+            $exams = $db->getCollection('Exams');
+            $total = count($exams);
             $archived = 0;
             Cache::put('archive_progress_' . $jobId, 0, 600);
-            foreach ($examsArray as $exam) {
-                if ($exam->exists()) {
-                    $archiveRef->document($exam->id())->set($exam->data());
+            foreach ($exams as $exam) {
+                    $examId = $exam['id'];
+                    unset($exam['id']);
+                    $db->setDocument($archiveCollection, $examId, $exam);
                     $archived++;
                     $progress = $total > 0 ? intval(($archived / $total) * 100) : 100;
                     Cache::put('archive_progress_' . $jobId, $progress, 600);
-                }
             }
             Cache::put('archive_progress_' . $jobId, 100, 600);
             return response()->json(['job_id' => $jobId, 'message' => 'Archive started.']);
@@ -714,20 +660,17 @@ class SuperAdminController extends Controller
         try {
             set_time_limit(600);
             ini_set('max_execution_time', 600);
-            $firestore = app('firebase.firestore')->database();
-            $examsRef = $firestore->collection('Exams');
-            $exams = iterator_to_array($examsRef->documents());
+            $db = app(FirestoreRestService::class);
+            $exams = $db->getCollection('Exams');
             $total = ($option === 'number' && $count) ? min($count, count($exams)) : count($exams);
             $deleted = 0;
             Cache::put('delete_exams_progress_' . $jobId, 0, 600);
             foreach ($exams as $exam) {
                 if ($deleted >= $total) break;
-                if ($exam->exists()) {
-                    $examsRef->document($exam->id())->delete();
+                    $db->deleteDocument('Exams', $exam['id']);
                     $deleted++;
                     $progress = $total > 0 ? intval(($deleted / $total) * 100) : 100;
                     Cache::put('delete_exams_progress_' . $jobId, $progress, 600);
-                }
             }
             Cache::put('delete_exams_progress_' . $jobId, 100, 600);
             return response()->json(['job_id' => $jobId, 'message' => 'Delete started.']);

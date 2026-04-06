@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\File;
 use App\Services\AuditService;
 use App\Services\DownloadLogService;
+use App\Services\FirestoreRestService;
 
 class UploadExamsController extends Controller
 {
@@ -79,14 +80,12 @@ class UploadExamsController extends Controller
         }
 
         try {
-            $firestore = app('firebase.firestore')->database();
-            $examsRef = $firestore->collection('Exams');
+            $db = app(FirestoreRestService::class);
 
-            // Check if an exam with the same courseCode already exists (courseCode is unique identifier)
-            $existingExamQuery = $examsRef->where('courseCode', '==', $validatedData['courseCode']);
-            $existingExamSnapshots = $existingExamQuery->documents();
+            // Check if an exam with the same courseCode already exists
+            $existingExams = $db->queryCollection('Exams', 'courseCode', '==', $validatedData['courseCode']);
 
-            if (!$existingExamSnapshots->isEmpty()) {
+            if (!empty($existingExams)) {
                 Log::warning('⚠ Exam already exists for course code: ' . $validatedData['courseCode']);
                 return back()->with('error', 'An exam for this course already exists. Please review the existing exam.');
             }
@@ -103,7 +102,7 @@ class UploadExamsController extends Controller
             // Prepare exam data for Firestore
             // Store courseCode and lecturer info directly to avoid extra queries later
             $examData = [
-                'created_at' => new \DateTime(),
+                'created_at' => (new \DateTime())->format('Y-m-d\TH:i:s.u\Z'),
                 'courseUnit' => $validatedData['courseUnit'],
                 'courseCode' => $validatedData['courseCode'], // Unique identifier
                 'faculty' => $validatedData['faculty'],
@@ -142,11 +141,11 @@ class UploadExamsController extends Controller
             Log::info('✅ Section content processed.');
 
             // Save exam data to Firestore
-            $docRef = $examsRef->add($examData);
+            $docRef = $db->addDocument('Exams', $examData);
 
             // Log the exam creation
             app(AuditService::class)->logExamCreated(
-                $docRef->id(),
+                $docRef['id'],
                 $validatedData['courseUnit'],
                 $validatedData['faculty']
             );
@@ -168,30 +167,17 @@ public function getRandomQuestions(Request $request)
     $selectedCourse = $request->input('course');
 
     try {
-        $firestore = app('firebase.firestore')->database();
+        $db = app(FirestoreRestService::class);
 
         // Fetch course information directly from the Courses collection
-        $coursesRef = $firestore->collection('Courses');
-        $query = $coursesRef->where('name', '==', $selectedCourse);
-        $courseSnapshots = $query->documents();
+        $courseSnapshots = $db->queryCollection('Courses', 'name', '==', $selectedCourse);
 
-        if ($courseSnapshots->isEmpty()) {
+        if (empty($courseSnapshots)) {
             \Log::error("No course found with the name: $selectedCourse");
             throw new \Exception("No course found with the specified name.");
         }
 
-        $courseData = null;
-        foreach ($courseSnapshots as $snapshot) {
-            if ($snapshot->exists()) {
-                $courseData = $snapshot->data();
-                break;
-            }
-        }
-
-        if ($courseData === null) {
-            \Log::error("No existing course found with the name: $selectedCourse");
-            throw new \Exception("No existing course found.");
-        }
+        $courseData = $courseSnapshots[0];
 
         $code = $courseData['code'] ?? 'default_code';
         $program = $courseData['program'] ?? 'default_program';
@@ -203,14 +189,11 @@ public function getRandomQuestions(Request $request)
         $sectionAInstructions = '';
         $sectionBInstructions = '';
 
-        $examsQuery = $firestore->collection('Exams')->where('courseUnit', '==', $selectedCourse);
-        $examsSnapshot = $examsQuery->documents();
+        $examsSnapshot = $db->queryCollection('Exams', 'courseUnit', '==', $selectedCourse);
 
         $sections = [];
 
-        foreach ($examsSnapshot as $exam) {
-            if ($exam->exists()) {
-                $data = $exam->data();
+        foreach ($examsSnapshot as $data) {
 
                 $sectionAInstructions = $data['sectionA_instructions'] ?? '';
                 $sectionBInstructions = $data['sectionB_instructions'] ?? '';
@@ -224,7 +207,6 @@ public function getRandomQuestions(Request $request)
                         $sections[$section][] = $content;
                     }
                 }
-            }
         }
 
         // Shuffle and trim questions by faculty rules

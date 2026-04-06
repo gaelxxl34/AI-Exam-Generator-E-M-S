@@ -17,6 +17,12 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+.DS_Store
+*.bak
 firebase_credentials.json
+firebase_credentials_new.json
+migrate_firestore.php
+migrate_course.php
+composer.phar
 database/database.sqlite
 resources/views/test-pdf-generator.blade.php

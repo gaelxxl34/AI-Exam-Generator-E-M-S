@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Services\AuditService;
 use App\Services\DownloadLogService;
+use App\Services\FirestoreRestService;
 
 
 class PastExamController extends Controller
@@ -27,24 +28,20 @@ class PastExamController extends Controller
 
         $file = $request->file('fileUpload');
 
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
         $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
         \Log::info("Current user email: $currentUserEmail");
 
         // Fetch current user's faculty from Firestore
-        $usersRef = $database->collection('Users');
-        $query = $usersRef->where('email', '==', $currentUserEmail);
-        $currentUserSnapshots = $query->documents();
+        $currentUserSnapshots = $db->queryCollection('Users', 'email', '==', $currentUserEmail);
 
-        if ($currentUserSnapshots->isEmpty()) {
+        if (empty($currentUserSnapshots)) {
             \Log::error("Firestore user not found with email: $currentUserEmail");
             throw new \Exception('Current user not found in Firestore.');
         }
 
-        $currentUserDocument = iterator_to_array($currentUserSnapshots)[0];
-        $currentUserData = $currentUserDocument->data();
+        $currentUserData = $currentUserSnapshots[0];
         $facultyField = $currentUserData['faculty'] ?? 'default_faculty';
         \Log::info("Faculty fetched: $facultyField");
 
@@ -89,11 +86,11 @@ class PastExamController extends Controller
             'download_count' => 0,
         ];
 
-        $docRef = $database->collection('pastExams')->add($data);
+        $docRef = $db->addDocument('pastExams', $data);
 
         // Log the upload action
         app(AuditService::class)->logPastExamUploaded(
-            $docRef->id(),
+            $docRef['id'],
             $validatedData['courseUnit'],
             $validatedData['program'],
             $validatedData['year']
@@ -105,33 +102,27 @@ class PastExamController extends Controller
 
     public function fetchPastExams()
     {
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
         $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
 
-        $usersRef = $database->collection('Users');
-        $currentUserQuery = $usersRef->where('email', '==', $currentUserEmail);
-        $currentUserSnapshots = $currentUserQuery->documents();
+        $currentUserSnapshots = $db->queryCollection('Users', 'email', '==', $currentUserEmail);
 
-        if ($currentUserSnapshots->isEmpty()) {
+        if (empty($currentUserSnapshots)) {
             throw new \Exception('Current user not found in Firestore.');
         }
 
-        $currentUserDocument = iterator_to_array($currentUserSnapshots)[0];
-        $currentUserData = $currentUserDocument->data();
+        $currentUserData = $currentUserSnapshots[0];
         $facultyField = $currentUserData['faculty'] ?? 'default_faculty';
 
-        $pastExamsQuery = $database->collection('pastExams')->where('faculty', '==', $facultyField);
-        $pastExams = $pastExamsQuery->documents();
+        $pastExams = $db->queryCollection('pastExams', 'faculty', '==', $facultyField);
 
         $groupedData = [];
         foreach ($pastExams as $exam) {
-            $data = $exam->data();
-            $year = $data['year'] ?? 'Unknown';
-            $examPeriod = $data['examPeriod'] ?? 'Unknown'; // April, August, December
-            $program = $data['program'] ?? 'Unknown';
-            $courseUnit = $data['courseUnit'] ?? 'Unknown';
+            $year = $exam['year'] ?? 'Unknown';
+            $examPeriod = $exam['examPeriod'] ?? 'Unknown'; // April, August, December
+            $program = $exam['program'] ?? 'Unknown';
+            $courseUnit = $exam['courseUnit'] ?? 'Unknown';
 
             if (!isset($groupedData[$year])) {
                 $groupedData[$year] = [
@@ -146,10 +137,10 @@ class PastExamController extends Controller
             }
 
             $groupedData[$year][$examPeriod][] = [
-                'id' => $exam->id(),
+                'id' => $exam['id'],
                 'program' => $program,
                 'courseUnit' => $courseUnit,
-                'file' => $data['file'],
+                'file' => $exam['file'] ?? null,
             ];
         }
 
@@ -165,24 +156,22 @@ class PastExamController extends Controller
 
     public function delete($id)
     {
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
         try {
             // Get the document first to retrieve file path for deletion from Storage
-            $document = $database->collection('pastExams')->document($id)->snapshot();
+            $document = $db->getDocument('pastExams', $id);
             
-            if ($document->exists()) {
-                $data = $document->data();
-                $courseUnit = $data['courseUnit'] ?? 'Unknown';
+            if ($document !== null) {
+                $courseUnit = $document['courseUnit'] ?? 'Unknown';
                 
                 // Delete from Firebase Storage if file_path exists
-                if (isset($data['file_path'])) {
+                if (isset($document['file_path'])) {
                     try {
                         $storage = app('firebase.storage');
                         $bucket = $storage->getBucket();
-                        $bucket->object($data['file_path'])->delete();
-                        \Log::info("Deleted file from Firebase Storage: " . $data['file_path']);
+                        $bucket->object($document['file_path'])->delete();
+                        \Log::info("Deleted file from Firebase Storage: " . $document['file_path']);
                     } catch (\Exception $e) {
                         \Log::warning("Could not delete file from Storage: " . $e->getMessage());
                     }
@@ -192,7 +181,7 @@ class PastExamController extends Controller
                 app(AuditService::class)->logPastExamDeleted($id, $courseUnit);
             }
             
-            $database->collection('pastExams')->document($id)->delete();
+            $db->deleteDocument('pastExams', $id);
             return back()->with('success', 'Exam deleted successfully.');
         } catch (\Throwable $e) {
             return back()->withErrors('Error deleting the exam: ' . $e->getMessage());
@@ -201,28 +190,21 @@ class PastExamController extends Controller
 
     public function fetchMITExams()
     {
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
         // Query to fetch past exams for 'MIT' - only load metadata
-        $pastExamsQuery = $database->collection('pastExams')
-            ->where('program', '==', 'MIT')
-            ->select(['courseUnit', 'year']);
-        $pastExams = $pastExamsQuery->documents();
+        $pastExams = $db->queryCollection('pastExams', 'program', '==', 'MIT');
 
         $groupedData = [];
         foreach ($pastExams as $exam) {
-            if ($exam->exists()) {
-                $data = $exam->data();
-                $courseUnit = $data['courseUnit'];
+                $courseUnit = $exam['courseUnit'];
                 if (!isset($groupedData[$courseUnit])) {
                     $groupedData[$courseUnit] = [];
                 }
                 $groupedData[$courseUnit][] = [
-                    'id' => $exam->id(), // Store document ID for lazy loading
-                    'year' => $data['year'],
+                    'id' => $exam['id'],
+                    'year' => $exam['year'],
                 ];
-            }
         }
 
         // Pass the organized data to the view
@@ -233,23 +215,17 @@ class PastExamController extends Controller
     {
         Log::info('Starting to fetch bachelor exams');
 
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
         $programs = ['BIT', 'BSCS', 'BSSE', 'BSEM'];
         $groupedData = [];
 
         foreach ($programs as $program) {
             Log::info("Querying past exams for program: {$program}");
-            $query = $database->collection('pastExams')
-                ->where('program', '==', $program)
-                ->select(['courseUnit', 'year']); // Only fetch minimal fields
-            $exams = $query->documents();
+            $exams = $db->queryCollection('pastExams', 'program', '==', $program);
 
             foreach ($exams as $exam) {
-                if ($exam->exists()) {
-                    $data = $exam->data();
-                    $courseUnit = $data['courseUnit'];
+                    $courseUnit = $exam['courseUnit'];
 
                     if (!isset($groupedData[$program])) {
                         $groupedData[$program] = [];
@@ -260,10 +236,9 @@ class PastExamController extends Controller
                     }
 
                     $groupedData[$program][$courseUnit][] = [
-                        'id' => $exam->id(), // Store document ID for lazy loading
-                        'year' => $data['year'],
+                        'id' => $exam['id'],
+                        'year' => $exam['year'],
                     ];
-                }
             }
         }
 
@@ -276,30 +251,23 @@ class PastExamController extends Controller
     {
         Log::info('Starting to fetch DCS diploma exams');
 
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
         // Define the DCS program identifier
         $program = 'DCS';
-        $query = $database->collection('pastExams')
-            ->where('program', '==', $program)
-            ->select(['courseUnit', 'year']);
-        $exams = $query->documents();
+        $exams = $db->queryCollection('pastExams', 'program', '==', $program);
 
         $groupedData = [];
         foreach ($exams as $exam) {
-            if ($exam->exists()) {
-                $data = $exam->data();
-                $courseUnit = $data['courseUnit'];
+                $courseUnit = $exam['courseUnit'];
 
                 if (!isset($groupedData[$courseUnit])) {
                     $groupedData[$courseUnit] = [];
                 }
                 $groupedData[$courseUnit][] = [
-                    'id' => $exam->id(),
-                    'year' => $data['year'],
+                    'id' => $exam['id'],
+                    'year' => $exam['year'],
                 ];
-            }
         }
 
         Log::info('Completed fetching DCS diploma exams', ['groupedDataCount' => count($groupedData)]);
@@ -312,8 +280,7 @@ class PastExamController extends Controller
     {
         Log::info('Starting to fetch FBM bachelor exams');
 
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
         // Define the bachelor programs for FBM to search for
         $programs = ['BBA', 'BHRM', 'BPA', 'BPALM', 'BTHM'];
@@ -321,15 +288,10 @@ class PastExamController extends Controller
 
         foreach ($programs as $program) {
             Log::info("Querying past exams for FBM program: {$program}");
-            $query = $database->collection('pastExams')
-                ->where('program', '==', $program)
-                ->select(['courseUnit', 'year']);
-            $exams = $query->documents();
+            $exams = $db->queryCollection('pastExams', 'program', '==', $program);
 
             foreach ($exams as $exam) {
-                if ($exam->exists()) {
-                    $data = $exam->data();
-                    $courseUnit = $data['courseUnit'];
+                    $courseUnit = $exam['courseUnit'];
 
                     if (!isset($groupedData[$program])) {
                         $groupedData[$program] = [];
@@ -340,10 +302,9 @@ class PastExamController extends Controller
                     }
 
                     $groupedData[$program][$courseUnit][] = [
-                        'id' => $exam->id(),
-                        'year' => $data['year'],
+                        'id' => $exam['id'],
+                        'year' => $exam['year'],
                     ];
-                }
             }
         }
 
@@ -357,8 +318,7 @@ class PastExamController extends Controller
     {
         Log::info('Starting to fetch diploma exams for DBA and DPA programs');
 
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
         // Define the diploma programs to search for
         $programs = ['DBA', 'DPA'];
@@ -366,15 +326,10 @@ class PastExamController extends Controller
 
         foreach ($programs as $program) {
             Log::info("Querying past exams for program: {$program}");
-            $query = $database->collection('pastExams')
-                ->where('program', '==', $program)
-                ->select(['courseUnit', 'year']);
-            $exams = $query->documents();
+            $exams = $db->queryCollection('pastExams', 'program', '==', $program);
 
             foreach ($exams as $exam) {
-                if ($exam->exists()) {
-                    $data = $exam->data();
-                    $courseUnit = $data['courseUnit'];
+                    $courseUnit = $exam['courseUnit'];
 
                     if (!isset($groupedData[$program])) {
                         $groupedData[$program] = [];
@@ -385,10 +340,9 @@ class PastExamController extends Controller
                     }
 
                     $groupedData[$program][$courseUnit][] = [
-                        'id' => $exam->id(),
-                        'year' => $data['year'],
+                        'id' => $exam['id'],
+                        'year' => $exam['year'],
                     ];
-                }
             }
         }
 
@@ -401,8 +355,7 @@ class PastExamController extends Controller
     {
         Log::info('Starting to fetch FOE bachelor exams');
 
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
         // Define the bachelor programs for FOE to search for
         $programs = ['BSPE', 'BARC', 'BSCE', 'BSEE'];
@@ -410,15 +363,10 @@ class PastExamController extends Controller
 
         foreach ($programs as $program) {
             Log::info("Querying past exams for FOE program: {$program}");
-            $query = $database->collection('pastExams')
-                ->where('program', '==', $program)
-                ->select(['courseUnit', 'year']);
-            $exams = $query->documents();
+            $exams = $db->queryCollection('pastExams', 'program', '==', $program);
 
             foreach ($exams as $exam) {
-                if ($exam->exists()) {
-                    $data = $exam->data();
-                    $courseUnit = $data['courseUnit'];
+                    $courseUnit = $exam['courseUnit'];
 
                     if (!isset($groupedData[$program])) {
                         $groupedData[$program] = [];
@@ -429,10 +377,9 @@ class PastExamController extends Controller
                     }
 
                     $groupedData[$program][$courseUnit][] = [
-                        'id' => $exam->id(),
-                        'year' => $data['year'],
+                        'id' => $exam['id'],
+                        'year' => $exam['year'],
                     ];
-                }
             }
         }
 
@@ -446,8 +393,7 @@ class PastExamController extends Controller
     {
         Log::info('Starting to fetch FOE diploma exams');
 
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
         // Define the diploma programs for FOE to search for
         $programs = ['DCE', 'DEE', 'DARC'];
@@ -455,15 +401,10 @@ class PastExamController extends Controller
 
         foreach ($programs as $program) {
             Log::info("Querying past exams for FOE diploma program: {$program}");
-            $query = $database->collection('pastExams')
-                ->where('program', '==', $program)
-                ->select(['courseUnit', 'year']);
-            $exams = $query->documents();
+            $exams = $db->queryCollection('pastExams', 'program', '==', $program);
 
             foreach ($exams as $exam) {
-                if ($exam->exists()) {
-                    $data = $exam->data();
-                    $courseUnit = $data['courseUnit'];
+                    $courseUnit = $exam['courseUnit'];
 
                     if (!isset($groupedData[$program])) {
                         $groupedData[$program] = [];
@@ -474,10 +415,9 @@ class PastExamController extends Controller
                     }
 
                     $groupedData[$program][$courseUnit][] = [
-                        'id' => $exam->id(),
-                        'year' => $data['year'],
+                        'id' => $exam['id'],
+                        'year' => $exam['year'],
                     ];
-                }
             }
         }
 
@@ -491,31 +431,24 @@ class PastExamController extends Controller
     {
         Log::info('Starting to fetch LLB exams for the Faculty of Law');
 
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
         // The LLB program identifier
         $program = 'LLB';
-        $query = $database->collection('pastExams')
-            ->where('program', '==', $program)
-            ->select(['courseUnit', 'year']);
-        $exams = $query->documents();
+        $exams = $db->queryCollection('pastExams', 'program', '==', $program);
 
         $groupedData = [];
         foreach ($exams as $exam) {
-            if ($exam->exists()) {
-                $data = $exam->data();
-                $courseUnit = $data['courseUnit'];
+                $courseUnit = $exam['courseUnit'];
 
                 if (!isset($groupedData[$courseUnit])) {
                     $groupedData[$courseUnit] = [];
                 }
 
                 $groupedData[$courseUnit][] = [
-                    'id' => $exam->id(),
-                    'year' => $data['year'],
+                    'id' => $exam['id'],
+                    'year' => $exam['year'],
                 ];
-            }
         }
 
         Log::info('Completed fetching LLB exams', ['groupedDataCount' => count($groupedData)]);
@@ -528,31 +461,24 @@ class PastExamController extends Controller
     {
         Log::info('Starting to fetch HEC exams');
 
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
         // The HEC program identifier
         $program = 'HEC';
-        $query = $database->collection('pastExams')
-            ->where('program', '==', $program)
-            ->select(['courseUnit', 'year']);
-        $exams = $query->documents();
+        $exams = $db->queryCollection('pastExams', 'program', '==', $program);
 
         $groupedData = [];
         foreach ($exams as $exam) {
-            if ($exam->exists()) {
-                $data = $exam->data();
-                $courseUnit = $data['courseUnit'];
+                $courseUnit = $exam['courseUnit'];
 
                 if (!isset($groupedData[$courseUnit])) {
                     $groupedData[$courseUnit] = [];
                 }
 
                 $groupedData[$courseUnit][] = [
-                    'id' => $exam->id(),
-                    'year' => $data['year'],
+                    'id' => $exam['id'],
+                    'year' => $exam['year'],
                 ];
-            }
         }
 
         Log::info('Completed fetching HEC exams', ['groupedDataCount' => count($groupedData)]);
@@ -563,30 +489,28 @@ class PastExamController extends Controller
     // New method to fetch a single PDF file on demand
     public function fetchPdfFile($id)
     {
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
         try {
-            $document = $database->collection('pastExams')->document($id)->snapshot();
+            $document = $db->getDocument('pastExams', $id);
             
-            if ($document->exists()) {
-                $data = $document->data();
-                $courseUnit = $data['courseUnit'] ?? 'exam';
-                $program = $data['program'] ?? '';
-                $year = $data['year'] ?? '';
+            if ($document !== null) {
+                $courseUnit = $document['courseUnit'] ?? 'exam';
+                $program = $document['program'] ?? '';
+                $year = $document['year'] ?? '';
                 
                 // Log the download
                 app(DownloadLogService::class)->logPastExamDownload($id, $courseUnit, $program, $year);
                 
                 // Check if we have a file_url (new Storage-based files)
-                if (isset($data['file_url'])) {
+                if (isset($document['file_url'])) {
                     // Redirect to the signed URL
-                    return redirect($data['file_url']);
+                    return redirect($document['file_url']);
                 }
                 
                 // Fallback for old Base64 files (backward compatibility)
-                if (isset($data['file'])) {
-                    $pdfContent = base64_decode($data['file']);
+                if (isset($document['file'])) {
+                    $pdfContent = base64_decode($document['file']);
                     
                     return response($pdfContent)
                         ->header('Content-Type', 'application/pdf')
@@ -612,8 +536,7 @@ class PastExamController extends Controller
     {
         Log::info("Starting to fetch {$degree} exams for {$faculty}");
 
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
         // Configuration mapping for each faculty and degree combination
         $config = [
@@ -693,15 +616,10 @@ class PastExamController extends Controller
         // Fetch exams for each program
         foreach ($programs as $program) {
             Log::info("Querying past exams for program: {$program}");
-            $query = $database->collection('pastExams')
-                ->where('program', '==', $program)
-                ->select(['courseUnit', 'year']);
-            $exams = $query->documents();
+            $exams = $db->queryCollection('pastExams', 'program', '==', $program);
 
             foreach ($exams as $exam) {
-                if ($exam->exists()) {
-                    $data = $exam->data();
-                    $courseUnit = $data['courseUnit'];
+                    $courseUnit = $exam['courseUnit'];
 
                     if (!isset($groupedData[$program])) {
                         $groupedData[$program] = [];
@@ -712,10 +630,9 @@ class PastExamController extends Controller
                     }
 
                     $groupedData[$program][$courseUnit][] = [
-                        'id' => $exam->id(),
-                        'year' => $data['year'],
+                        'id' => $exam['id'],
+                        'year' => $exam['year'],
                     ];
-                }
             }
         }
 

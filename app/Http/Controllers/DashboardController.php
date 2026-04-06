@@ -12,13 +12,13 @@ use Carbon\Carbon;
 use App\Services\AuditService;
 use App\Services\DownloadLogService;
 use App\Services\CacheService;
+use App\Services\FirestoreRestService;
 
 class DashboardController extends Controller
 {
     public function adminDashboard()
     {
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
         try {
             // 🔹 Get the current admin's email from session
@@ -26,15 +26,14 @@ class DashboardController extends Controller
             \Log::info("🔍 Current user email: $currentUserEmail");
 
             // 🔹 Fetch admin's data to get faculties
-            $userQuery = $database->collection('Users')->where('email', '==', $currentUserEmail);
-            $userSnapshots = $userQuery->documents();
+            $userSnapshots = $db->queryCollection('Users', 'email', '==', $currentUserEmail);
 
-            if ($userSnapshots->isEmpty()) {
+            if (empty($userSnapshots)) {
                 \Log::error("❌ User not found: $currentUserEmail");
                 return back()->withErrors(['error' => 'User not found.']);
             }
 
-            $currentUserData = $userSnapshots->rows()[0]->data();
+            $currentUserData = $userSnapshots[0];
             $adminFaculties = $currentUserData['faculties'] ?? ($currentUserData['faculty'] ?? []);
 
             // Convert to array if it's a single string
@@ -45,45 +44,39 @@ class DashboardController extends Controller
             \Log::info("🔍 Admin Faculties: " . json_encode($adminFaculties));
 
             // 🔹 Fetch all lecturers (Since Firestore doesn't allow array contains for direct filtering)
-            $lecturersQuery = $database->collection('Users')->where('role', '==', 'lecturer')->documents();
+            $lecturersQuery = $db->queryCollection('Users', 'role', '==', 'lecturer');
             $lecturerCount = 0;
 
             foreach ($lecturersQuery as $lecturer) {
-                if ($lecturer->exists()) {
-                    $lecturerFaculties = $lecturer->data()['faculties'] ?? [];
+                    $lecturerFaculties = $lecturer['faculties'] ?? [];
 
                     // 🔥 **Check if any faculty in `adminFaculties` matches lecturer's faculties**
                     if (!empty(array_intersect($adminFaculties, $lecturerFaculties))) {
-                        $lecturerCount++;
-                    }
+                    $lecturerCount++;
                 }
             }
 
             \Log::info("✅ Total Lecturers Found: $lecturerCount");
 
             // 🔹 Fetch past exams matching the admin’s faculties
-            $pastExamsQuery = $database->collection('pastExams')->documents();
+            $pastExamsQuery = $db->getCollection('pastExams');
             $pastExamsCount = 0;
 
             foreach ($pastExamsQuery as $exam) {
-                if ($exam->exists()) {
-                    $examFaculty = $exam->data()['faculty'] ?? null;
-                    if ($examFaculty && in_array($examFaculty, $adminFaculties)) {
-                        $pastExamsCount++;
-                    }
+                $examFaculty = $exam['faculty'] ?? null;
+                if ($examFaculty && in_array($examFaculty, $adminFaculties)) {
+                    $pastExamsCount++;
                 }
             }
 
             // 🔹 Fetch courses matching the admin’s faculties
-            $coursesQuery = $database->collection('Courses')->documents();
+            $coursesQuery = $db->getCollection('Courses');
             $coursesCount = 0;
 
             foreach ($coursesQuery as $course) {
-                if ($course->exists()) {
-                    $courseFaculty = $course->data()['faculty'] ?? null;
-                    if ($courseFaculty && in_array($courseFaculty, $adminFaculties)) {
-                        $coursesCount++;
-                    }
+                $courseFaculty = $course['faculty'] ?? null;
+                if ($courseFaculty && in_array($courseFaculty, $adminFaculties)) {
+                    $coursesCount++;
                 }
             }
 
@@ -105,23 +98,21 @@ class DashboardController extends Controller
 
     public function genAdminDashboard()
     {
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
         // Fetch the current user's email and faculty
         $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
 
         // Fetch current user's data to get their faculty
-        $userRef = $database->collection('Users')->where('email', '==', $currentUserEmail);
-        $currentUserSnapshots = $userRef->documents();
+        $currentUserSnapshots = $db->queryCollection('Users', 'email', '==', $currentUserEmail);
 
-        if ($currentUserSnapshots->isEmpty()) {
+        if (empty($currentUserSnapshots)) {
             \Log::error("User not found with email: $currentUserEmail");
             throw new \Exception('User not found.');
         }
 
-        $currentUserDocument = iterator_to_array($currentUserSnapshots)[0];
-        $currentUserFaculty = $currentUserDocument->data()['faculty'] ?? 'No faculty assigned';
+        $currentUserData = $currentUserSnapshots[0];
+        $currentUserFaculty = $currentUserData['faculty'] ?? 'No faculty assigned';
         \Log::info("Current user faculty: $currentUserFaculty");
 
         $containsComma = strpos($currentUserFaculty, ',') !== false;
@@ -129,15 +120,15 @@ class DashboardController extends Controller
 
         if ($containsComma) {
             // If faculty field contains a comma, fetch counts without faculty filters
-            $lecturerCount = $database->collection('Users')->where('role', '==', 'lecturer')->documents()->size();
-            $pastExamsCount = $database->collection('pastExams')->documents()->size();
-            $coursesCount = $database->collection('Courses')->documents()->size();
+            $lecturerCount = count($db->queryCollection('Users', 'role', '==', 'lecturer'));
+            $pastExamsCount = count($db->getCollection('pastExams'));
+            $coursesCount = count($db->getCollection('Courses'));
             \Log::info("Fetching counts for all faculties.");
         } else {
             // Filter and count documents based on a specific faculty
-            $lecturerCount = $database->collection('Users')->where('role', '==', 'lecturer')->where('faculty', '==', $currentUserFaculty)->documents()->size();
-            $pastExamsCount = $database->collection('pastExams')->where('faculty', '==', $currentUserFaculty)->documents()->size();
-            $coursesCount = $database->collection('Courses')->where('faculty', '==', $currentUserFaculty)->documents()->size();
+            $lecturerCount = count($db->runQuery('Users', [['field' => 'role', 'op' => '==', 'value' => 'lecturer'], ['field' => 'faculty', 'op' => '==', 'value' => $currentUserFaculty]]));
+            $pastExamsCount = count($db->queryCollection('pastExams', 'faculty', '==', $currentUserFaculty));
+            $coursesCount = count($db->queryCollection('Courses', 'faculty', '==', $currentUserFaculty));
             \Log::info("Fetching counts for specific faculty: $currentUserFaculty");
         }
 
@@ -176,10 +167,7 @@ private function getDashboardData(): array
  */
 private function fetchDashboardDataFromFirestore(array $faculty): array
 {
-    $firestore = app('firebase.firestore')->database();
-    $usersRef = $firestore->collection('Users');
-    $coursesRef = $firestore->collection('Courses');
-    $examsRef = $firestore->collection('Exams');
+    $db = app(FirestoreRestService::class);
 
     $lecturerDataMap = [];
     $facultyCourses = [];
@@ -203,36 +191,28 @@ private function fetchDashboardDataFromFirestore(array $faculty): array
         \Log::info("🔍 Processing faculty: $fac");
 
         // Lecturers
-        $usersSnapshot = $usersRef
-            ->where('faculties', 'array-contains', $fac)
-            ->where('role', '==', 'lecturer')
-            ->documents();
+        $usersSnapshot = $db->runQuery('Users', [
+                ['field' => 'faculties', 'op' => 'array-contains', 'value' => $fac],
+                ['field' => 'role', 'op' => '==', 'value' => 'lecturer']
+            ]);
 
-        foreach ($usersSnapshot as $userDoc) {
-            if ($userDoc->exists()) {
-                $data = $userDoc->data();
+        foreach ($usersSnapshot as $data) {
                 $email = $data['email'] ?? null;
                 if ($email) {
                     $lecturerDataMap[$email] = $data;
                 }
-            }
         }
 
         // Courses
-        $coursesSnapshot = $coursesRef->where('faculty', '==', $fac)->documents();
+        $coursesSnapshot = $db->queryCollection('Courses', 'faculty', '==', $fac);
         foreach ($coursesSnapshot as $doc) {
-            if ($doc->exists()) {
-                $name = strtolower(trim($doc->data()['name'] ?? ''));
-                $facultyCourses[$name] = $doc->data();
-            }
+                $name = strtolower(trim($doc['name'] ?? ''));
+                $facultyCourses[$name] = $doc;
         }
 
         // Exams
-        $examsSnapshot = $examsRef->where('faculty', '==', $fac)->documents();
-        foreach ($examsSnapshot as $doc) {
-            if ($doc->exists()) {
-                $data = $doc->data();
-                $data['id'] = $doc->id();
+        $examsSnapshot = $db->queryCollection('Exams', 'faculty', '==', $fac);
+        foreach ($examsSnapshot as $data) {
                 $allExams[] = $data;
 
                 if (!isset($data['status'])) $pendingExams++;
@@ -240,7 +220,6 @@ private function fetchDashboardDataFromFirestore(array $faculty): array
                 elseif ($data['status'] === 'Declined') $declinedExams++;
 
                 $submittedCourses[] = strtolower(trim($data['courseUnit'] ?? ''));
-            }
         }
 
         // Lecturer evaluation
@@ -504,8 +483,7 @@ public function loadExamsAjax(Request $request)
         $allCourses = Cache::remember($cacheKey, 120, function () use ($faculty, $status) {
             \Log::info("📊 Cache MISS - Fetching moderation exams from Firestore");
             
-            $firestore = app('firebase.firestore')->database();
-            $examsRef = $firestore->collection('Exams');
+            $db = app(FirestoreRestService::class);
 
             $minQuestions = [
                 "FST" => ["A" => 2, "B" => 12],
@@ -518,7 +496,7 @@ public function loadExamsAjax(Request $request)
             $courses = [];
 
             foreach ($faculty as $fac) {
-                $query = $examsRef->where('faculty', '==', $fac);
+                $filters = [['field' => 'faculty', 'op' => '==', 'value' => $fac]];
                 
                 // Filter by status at Firestore level if specified
                 if ($status !== 'all') {
@@ -528,16 +506,13 @@ public function loadExamsAjax(Request $request)
                         'declined' => 'Declined'
                     ];
                     if (isset($statusMap[$status])) {
-                        $query = $query->where('status', '==', $statusMap[$status]);
+                        $filters[] = ['field' => 'status', 'op' => '==', 'value' => $statusMap[$status]];
                     }
                 }
                 
-                $examsSnapshot = $query->documents();
+                $examsSnapshot = $db->runQuery('Exams', $filters);
 
-                foreach ($examsSnapshot as $document) {
-                    if ($document->exists()) {
-                        $examData = $document->data();
-                        $examData['id'] = $document->id();
+                foreach ($examsSnapshot as $examData) {
                         $examData['status'] = $examData['status'] ?? 'Pending Review';
 
                         // Check minimum question requirements
@@ -573,7 +548,6 @@ public function loadExamsAjax(Request $request)
                         }
                     }
                 }
-            }
 
             // Sort by created_at descending (newest first)
             usort($courses, function($a, $b) {
@@ -670,18 +644,15 @@ public function loadExamsAjax(Request $request)
     public function updateStatus(Request $request, $id)
     {
         try {
-            $firestore = app('firebase.firestore')->database();
-            $examRef = $firestore->collection('Exams')->document($id);
-            $examSnapshot = $examRef->snapshot();
+            $db = app(FirestoreRestService::class);
+            $examSnapshot = $db->getDocument('Exams', $id);
 
-            if (!$examSnapshot->exists()) {
+            if (!$examSnapshot) {
                 return response()->json(['error' => 'Exam not found'], 404);
             }
 
             $status = $request->input('status');
-            $examRef->update([
-                ['path' => 'status', 'value' => $status]
-            ]);
+            $db->updateDocument('Exams', $id, ['status' => $status]);
 
             return response()->json(['success' => true, 'status' => $status]);
         } catch (\Exception $e) {
@@ -692,20 +663,15 @@ public function loadExamsAjax(Request $request)
 
     public function approve($id)
     {
-        $firestore = app('firebase.firestore')->database();
-        $courseRef = $firestore->collection('Exams')->document($id);
+        $db = app(FirestoreRestService::class);
         
         // Get exam data for logging
-        $examSnapshot = $courseRef->snapshot();
-        $examData = $examSnapshot->exists() ? $examSnapshot->data() : [];
+        $examData = $db->getDocument('Exams', $id) ?? [];
         $courseUnit = $examData['courseUnit'] ?? 'Unknown';
         $faculty = $examData['faculty'] ?? null;
 
         // Update status and remove comment field
-        $courseRef->update([
-            ['path' => 'status', 'value' => 'Approved'],
-            ['path' => 'comment', 'value' => null] // Remove comment field
-        ]);
+        $db->updateDocument('Exams', $id, ['status' => 'Approved', 'comment' => null]);
 
         // Invalidate moderation cache for this faculty
         $this->invalidateModerationCache($faculty);
@@ -718,22 +684,17 @@ public function loadExamsAjax(Request $request)
 
     public function decline(Request $request, $id)
     {
-        $firestore = app('firebase.firestore')->database();
-        $courseRef = $firestore->collection('Exams')->document($id);
+        $db = app(FirestoreRestService::class);
 
         // Get exam data for logging
-        $examSnapshot = $courseRef->snapshot();
-        $examData = $examSnapshot->exists() ? $examSnapshot->data() : [];
+        $examData = $db->getDocument('Exams', $id) ?? [];
         $courseUnit = $examData['courseUnit'] ?? 'Unknown';
         $faculty = $examData['faculty'] ?? null;
 
         $comment = $request->input('comment');
 
         // Update status and store comment
-        $courseRef->update([
-            ['path' => 'status', 'value' => 'Declined'],
-            ['path' => 'comment', 'value' => $comment]
-        ]);
+        $db->updateDocument('Exams', $id, ['status' => 'Declined', 'comment' => $comment]);
 
         // Invalidate moderation cache for this faculty
         $this->invalidateModerationCache($faculty);
@@ -773,16 +734,12 @@ public function loadExamsAjax(Request $request)
     public function showReviewExam($examId)
     {
         try {
-            $firestore = app('firebase.firestore')->database();
-            $examRef = $firestore->collection('Exams')->document($examId);
-            $examSnapshot = $examRef->snapshot();
+            $db = app(FirestoreRestService::class);
+            $exam = $db->getDocument('Exams', $examId);
 
-            if (!$examSnapshot->exists()) {
+            if (!$exam) {
                 return back()->withErrors(['error' => 'Exam not found.']);
             }
-
-            $exam = $examSnapshot->data();
-            $exam['id'] = $examId;
 
             // Calculate total questions
             $totalQuestions = 0;
@@ -817,15 +774,12 @@ public function loadExamsAjax(Request $request)
         ]);
 
         try {
-            $firestore = app('firebase.firestore')->database();
-            $examRef = $firestore->collection('Exams')->document($request->exam_id);
-            $examSnapshot = $examRef->snapshot();
+            $db = app(FirestoreRestService::class);
+            $examData = $db->getDocument('Exams', $request->exam_id);
 
-            if (!$examSnapshot->exists()) {
+            if (!$examData) {
                 return back()->withErrors(['error' => 'Exam not found.']);
             }
-
-            $examData = $examSnapshot->data();
 
             if (!isset($examData['sections'][$sectionName])) {
                 return back()->withErrors(['error' => "Section '{$sectionName}' not found."]);
@@ -854,10 +808,10 @@ public function loadExamsAjax(Request $request)
             $deanEdits[] = $deanEdit;
 
             // Update Firestore
-            $examRef->update([
-                ['path' => "sections.{$sectionName}", 'value' => $examData['sections'][$sectionName]],
-                ['path' => 'dean_edits', 'value' => $deanEdits],
-                ['path' => 'last_dean_edit', 'value' => now()->toIso8601String()],
+            $db->updateDocument('Exams', $request->exam_id, [
+                'sections' => $examData['sections'],
+                'dean_edits' => $deanEdits,
+                'last_dean_edit' => now()->toIso8601String(),
             ]);
 
             // Log the edit
@@ -891,15 +845,12 @@ public function loadExamsAjax(Request $request)
                 'type' => 'required|string',
             ]);
 
-            $firestore = app('firebase.firestore')->database();
-            $examRef = $firestore->collection('Exams')->document($request->exam_id);
-            $examSnapshot = $examRef->snapshot();
+            $db = app(FirestoreRestService::class);
+            $examData = $db->getDocument('Exams', $request->exam_id);
 
-            if (!$examSnapshot->exists()) {
+            if (!$examData) {
                 return response()->json(['error' => 'Exam not found'], 404);
             }
-
-            $examData = $examSnapshot->data();
 
             // Create review log entry
             $reviewLog = [
@@ -916,9 +867,9 @@ public function loadExamsAjax(Request $request)
             $deanEdits[] = $reviewLog;
 
             // Update Firestore
-            $examRef->update([
-                ['path' => 'dean_edits', 'value' => $deanEdits],
-                ['path' => 'last_dean_review', 'value' => now()->toIso8601String()],
+            $db->updateDocument('Exams', $request->exam_id, [
+                'dean_edits' => $deanEdits,
+                'last_dean_review' => now()->toIso8601String(),
             ]);
 
             return response()->json(['success' => true]);
@@ -943,15 +894,12 @@ public function loadExamsAjax(Request $request)
                 'type' => 'required|string|in:suggestion,issue,general',
             ]);
 
-            $firestore = app('firebase.firestore')->database();
-            $examRef = $firestore->collection('Exams')->document($request->exam_id);
-            $examSnapshot = $examRef->snapshot();
+            $db = app(FirestoreRestService::class);
+            $examData = $db->getDocument('Exams', $request->exam_id);
 
-            if (!$examSnapshot->exists()) {
+            if (!$examData) {
                 return response()->json(['error' => 'Exam not found'], 404);
             }
-
-            $examData = $examSnapshot->data();
 
             // Create comment entry
             $newComment = [
@@ -969,10 +917,10 @@ public function loadExamsAjax(Request $request)
             $deanComments[] = $newComment;
 
             // Update Firestore
-            $examRef->update([
-                ['path' => 'dean_comments', 'value' => $deanComments],
-                ['path' => 'last_dean_comment', 'value' => now()->toIso8601String()],
-                ['path' => 'has_dean_feedback', 'value' => true],
+            $db->updateDocument('Exams', $request->exam_id, [
+                'dean_comments' => $deanComments,
+                'last_dean_comment' => now()->toIso8601String(),
+                'has_dean_feedback' => true,
             ]);
 
             // Log the activity

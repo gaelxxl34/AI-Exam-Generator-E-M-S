@@ -13,7 +13,7 @@
 </head>
 
 <body class="bg-gray-50">
-    @include('partials.superadmin-navbar')
+    @include('partials.super-admin-navbar')
 
     <div class="p-4 sm:ml-64 mt-20">
         <!-- Page Header -->
@@ -175,7 +175,7 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     @if(isset($session['started_at']))
-                                        {{ $session['started_at']->get()->format('M d, H:i') }}
+                                        {{ \Carbon\Carbon::parse($session['started_at'])->format('M d, H:i') }}
                                     @else
                                         N/A
                                     @endif

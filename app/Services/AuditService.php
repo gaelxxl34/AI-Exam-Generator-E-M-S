@@ -3,28 +3,25 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Log;
+use App\Services\FirestoreRestService;
 
 class AuditService
 {
-    protected $firestore;
+    protected FirestoreRestService $firestoreRest;
 
     public function __construct()
     {
-        $this->firestore = app('firebase.firestore')->database();
+        $this->firestoreRest = app(FirestoreRestService::class);
     }
 
     /**
      * Log an audit event to Firestore
-     *
-     * @param string $action The action being performed
-     * @param array $details Additional details about the action
-     * @return string|null The document ID of the created audit log
      */
     public function log(string $action, array $details = []): ?string
     {
         try {
             $auditData = [
-                'timestamp' => new \DateTime(),
+                'timestamp' => (new \DateTime())->format('Y-m-d\TH:i:s.u\Z'),
                 'user_id' => session('user') ?? 'anonymous',
                 'user_email' => session('user_email') ?? 'anonymous',
                 'user_role' => session('user_role') ?? 'unknown',
@@ -42,14 +39,14 @@ class AuditService
                 'details' => $details,
             ];
 
-            $docRef = $this->firestore->collection('AuditLogs')->add($auditData);
+            $result = $this->firestoreRest->addDocument('AuditLogs', $auditData);
             
             Log::info("Audit log created: {$action}", [
-                'doc_id' => $docRef->id(),
+                'doc_id' => $result['id'],
                 'user' => $auditData['user_email'],
             ]);
 
-            return $docRef->id();
+            return $result['id'];
         } catch (\Exception $e) {
             Log::error("Failed to create audit log: " . $e->getMessage(), [
                 'action' => $action,
@@ -311,20 +308,9 @@ class AuditService
     public function getRecentLogs(int $limit = 100): array
     {
         try {
-            $logs = $this->firestore->collection('AuditLogs')
-                ->orderBy('timestamp', 'DESC')
-                ->limit($limit)
-                ->documents();
-
-            $result = [];
-            foreach ($logs as $log) {
-                if ($log->exists()) {
-                    $data = $log->data();
-                    $data['id'] = $log->id();
-                    $result[] = $data;
-                }
-            }
-            return $result;
+            return $this->firestoreRest->runQuery(
+                'AuditLogs', [], [['field' => 'timestamp', 'direction' => 'DESCENDING']], $limit
+            );
         } catch (\Exception $e) {
             Log::error("Failed to fetch audit logs: " . $e->getMessage());
             return [];
@@ -334,21 +320,12 @@ class AuditService
     public function getLogsByUser(string $userId, int $limit = 50): array
     {
         try {
-            $logs = $this->firestore->collection('AuditLogs')
-                ->where('user_id', '==', $userId)
-                ->orderBy('timestamp', 'DESC')
-                ->limit($limit)
-                ->documents();
-
-            $result = [];
-            foreach ($logs as $log) {
-                if ($log->exists()) {
-                    $data = $log->data();
-                    $data['id'] = $log->id();
-                    $result[] = $data;
-                }
-            }
-            return $result;
+            return $this->firestoreRest->runQuery(
+                'AuditLogs',
+                [['field' => 'user_id', 'op' => '==', 'value' => $userId]],
+                [['field' => 'timestamp', 'direction' => 'DESCENDING']],
+                $limit
+            );
         } catch (\Exception $e) {
             Log::error("Failed to fetch user audit logs: " . $e->getMessage());
             return [];
@@ -358,21 +335,12 @@ class AuditService
     public function getLogsByAction(string $action, int $limit = 50): array
     {
         try {
-            $logs = $this->firestore->collection('AuditLogs')
-                ->where('action', '==', $action)
-                ->orderBy('timestamp', 'DESC')
-                ->limit($limit)
-                ->documents();
-
-            $result = [];
-            foreach ($logs as $log) {
-                if ($log->exists()) {
-                    $data = $log->data();
-                    $data['id'] = $log->id();
-                    $result[] = $data;
-                }
-            }
-            return $result;
+            return $this->firestoreRest->runQuery(
+                'AuditLogs',
+                [['field' => 'action', 'op' => '==', 'value' => $action]],
+                [['field' => 'timestamp', 'direction' => 'DESCENDING']],
+                $limit
+            );
         } catch (\Exception $e) {
             Log::error("Failed to fetch audit logs by action: " . $e->getMessage());
             return [];
@@ -385,36 +353,32 @@ class AuditService
     public function getLogsByFaculty(array $faculties, int $limit = 100, ?string $actionFilter = null): array
     {
         try {
-            $query = $this->firestore->collection('AuditLogs')
-                ->orderBy('timestamp', 'DESC')
-                ->limit($limit * 3); // Fetch more to filter
-
-            $logs = $query->documents();
+            $logs = $this->firestoreRest->runQuery(
+                'AuditLogs', [], [['field' => 'timestamp', 'direction' => 'DESCENDING']], $limit * 3
+            );
 
             $result = [];
             $count = 0;
 
-            foreach ($logs as $log) {
-                if ($log->exists() && $count < $limit) {
-                    $data = $log->data();
-                    $logFaculty = $data['faculty'] ?? [];
-                    
-                    if (!is_array($logFaculty)) {
-                        $logFaculty = [$logFaculty];
-                    }
-                    
-                    // Filter by faculty and optionally by action
-                    if (!empty(array_intersect($faculties, $logFaculty))) {
-                        if ($actionFilter === null || $data['action'] === $actionFilter) {
-                            $data['id'] = $log->id();
-                            // Format timestamp for display
-                            if (isset($data['timestamp']) && is_object($data['timestamp'])) {
-                                $data['timestamp_formatted'] = $data['timestamp']->get()->format('M d, Y H:i');
-                                $data['timestamp_iso'] = $data['timestamp']->get()->format('c');
-                            }
-                            $result[] = $data;
-                            $count++;
+            foreach ($logs as $data) {
+                if ($count >= $limit) break;
+
+                $logFaculty = $data['faculty'] ?? [];
+                if (!is_array($logFaculty)) {
+                    $logFaculty = [$logFaculty];
+                }
+
+                if (!empty(array_intersect($faculties, $logFaculty))) {
+                    if ($actionFilter === null || ($data['action'] ?? '') === $actionFilter) {
+                        if (isset($data['timestamp']) && is_string($data['timestamp'])) {
+                            try {
+                                $ts = new \DateTime($data['timestamp']);
+                                $data['timestamp_formatted'] = $ts->format('M d, Y H:i');
+                                $data['timestamp_iso'] = $ts->format('c');
+                            } catch (\Exception $e) {}
                         }
+                        $result[] = $data;
+                        $count++;
                     }
                 }
             }
@@ -426,46 +390,42 @@ class AuditService
     }
 
     /**
-     * Get security-related audit logs for faculty (logins, unauthorized access, etc.)
+     * Get security-related audit logs for faculty
      */
     public function getFacultySecurityLogs(array $faculties, int $limit = 50): array
     {
         try {
             $securityActions = [
-                'login_success', 
-                'login_failed', 
-                'logout', 
-                'unauthorized_access_attempt',
-                'password_reset_request'
+                'login_success', 'login_failed', 'logout',
+                'unauthorized_access_attempt', 'password_reset_request'
             ];
 
-            $logs = $this->firestore->collection('AuditLogs')
-                ->orderBy('timestamp', 'DESC')
-                ->limit($limit * 5)
-                ->documents();
+            $logs = $this->firestoreRest->runQuery(
+                'AuditLogs', [], [['field' => 'timestamp', 'direction' => 'DESCENDING']], $limit * 5
+            );
 
             $result = [];
             $count = 0;
 
-            foreach ($logs as $log) {
-                if ($log->exists() && $count < $limit) {
-                    $data = $log->data();
-                    $logFaculty = $data['faculty'] ?? [];
-                    $action = $data['action'] ?? '';
-                    
-                    if (!is_array($logFaculty)) {
-                        $logFaculty = [$logFaculty];
+            foreach ($logs as $data) {
+                if ($count >= $limit) break;
+
+                $logFaculty = $data['faculty'] ?? [];
+                $action = $data['action'] ?? '';
+                if (!is_array($logFaculty)) {
+                    $logFaculty = [$logFaculty];
+                }
+
+                if (!empty(array_intersect($faculties, $logFaculty)) && in_array($action, $securityActions)) {
+                    if (isset($data['timestamp']) && is_string($data['timestamp'])) {
+                        try {
+                            $ts = new \DateTime($data['timestamp']);
+                            $data['timestamp_formatted'] = $ts->format('M d, Y H:i');
+                            $data['timestamp_iso'] = $ts->format('c');
+                        } catch (\Exception $e) {}
                     }
-                    
-                    if (!empty(array_intersect($faculties, $logFaculty)) && in_array($action, $securityActions)) {
-                        $data['id'] = $log->id();
-                        if (isset($data['timestamp']) && is_object($data['timestamp'])) {
-                            $data['timestamp_formatted'] = $data['timestamp']->get()->format('M d, Y H:i');
-                            $data['timestamp_iso'] = $data['timestamp']->get()->format('c');
-                        }
-                        $result[] = $data;
-                        $count++;
-                    }
+                    $result[] = $data;
+                    $count++;
                 }
             }
             return $result;
@@ -476,51 +436,43 @@ class AuditService
     }
 
     /**
-     * Get exam-related activity for faculty (for Dean monitoring)
+     * Get exam-related activity for faculty
      */
     public function getFacultyExamActivity(array $faculties, int $limit = 50): array
     {
         try {
             $examActions = [
-                'exam_created',
-                'exam_updated',
-                'exam_approved',
-                'exam_declined',
-                'question_added',
-                'question_edited',
-                'question_deleted',
-                'dean_question_edit',
-                'pdf_generated',
-                'marking_guide_downloaded',
+                'exam_created', 'exam_updated', 'exam_approved', 'exam_declined',
+                'question_added', 'question_edited', 'question_deleted',
+                'dean_question_edit', 'pdf_generated', 'marking_guide_downloaded',
             ];
 
-            $logs = $this->firestore->collection('AuditLogs')
-                ->orderBy('timestamp', 'DESC')
-                ->limit($limit * 5)
-                ->documents();
+            $logs = $this->firestoreRest->runQuery(
+                'AuditLogs', [], [['field' => 'timestamp', 'direction' => 'DESCENDING']], $limit * 5
+            );
 
             $result = [];
             $count = 0;
 
-            foreach ($logs as $log) {
-                if ($log->exists() && $count < $limit) {
-                    $data = $log->data();
-                    $logFaculty = $data['faculty'] ?? [];
-                    $action = $data['action'] ?? '';
-                    
-                    if (!is_array($logFaculty)) {
-                        $logFaculty = [$logFaculty];
+            foreach ($logs as $data) {
+                if ($count >= $limit) break;
+
+                $logFaculty = $data['faculty'] ?? [];
+                $action = $data['action'] ?? '';
+                if (!is_array($logFaculty)) {
+                    $logFaculty = [$logFaculty];
+                }
+
+                if (!empty(array_intersect($faculties, $logFaculty)) && in_array($action, $examActions)) {
+                    if (isset($data['timestamp']) && is_string($data['timestamp'])) {
+                        try {
+                            $ts = new \DateTime($data['timestamp']);
+                            $data['timestamp_formatted'] = $ts->format('M d, Y H:i');
+                            $data['timestamp_iso'] = $ts->format('c');
+                        } catch (\Exception $e) {}
                     }
-                    
-                    if (!empty(array_intersect($faculties, $logFaculty)) && in_array($action, $examActions)) {
-                        $data['id'] = $log->id();
-                        if (isset($data['timestamp']) && is_object($data['timestamp'])) {
-                            $data['timestamp_formatted'] = $data['timestamp']->get()->format('M d, Y H:i');
-                            $data['timestamp_iso'] = $data['timestamp']->get()->format('c');
-                        }
-                        $result[] = $data;
-                        $count++;
-                    }
+                    $result[] = $data;
+                    $count++;
                 }
             }
             return $result;
@@ -536,10 +488,9 @@ class AuditService
     public function getFacultyActivityStats(array $faculties): array
     {
         try {
-            $logs = $this->firestore->collection('AuditLogs')
-                ->orderBy('timestamp', 'DESC')
-                ->limit(2000)
-                ->documents();
+            $logs = $this->firestoreRest->runQuery(
+                'AuditLogs', [], [['field' => 'timestamp', 'direction' => 'DESCENDING']], 2000
+            );
 
             $stats = [
                 'total_actions' => 0,
@@ -558,71 +509,51 @@ class AuditService
             $today = new \DateTime();
             $weekAgo = (new \DateTime())->modify('-7 days');
 
-            foreach ($logs as $log) {
-                if ($log->exists()) {
-                    $data = $log->data();
-                    $logFaculty = $data['faculty'] ?? [];
-                    
-                    if (!is_array($logFaculty)) {
-                        $logFaculty = [$logFaculty];
+            foreach ($logs as $data) {
+                $logFaculty = $data['faculty'] ?? [];
+                if (!is_array($logFaculty)) {
+                    $logFaculty = [$logFaculty];
+                }
+
+                if (!empty(array_intersect($faculties, $logFaculty))) {
+                    $stats['total_actions']++;
+                    $action = $data['action'] ?? '';
+                    $userEmail = $data['user_email'] ?? 'anonymous';
+
+                    switch ($action) {
+                        case 'login_success': $stats['login_success']++; break;
+                        case 'login_failed': $stats['login_failed']++; break;
+                        case 'exam_created': $stats['exams_created']++; break;
+                        case 'exam_approved': $stats['exams_approved']++; break;
+                        case 'exam_declined': $stats['exams_declined']++; break;
+                        case 'question_edited':
+                        case 'dean_question_edit': $stats['questions_edited']++; break;
+                        case 'pdf_generated': $stats['pdfs_generated']++; break;
                     }
-                    
-                    if (!empty(array_intersect($faculties, $logFaculty))) {
-                        $stats['total_actions']++;
-                        $action = $data['action'] ?? '';
-                        $userEmail = $data['user_email'] ?? 'anonymous';
 
-                        // Count by action type
-                        switch ($action) {
-                            case 'login_success':
-                                $stats['login_success']++;
-                                break;
-                            case 'login_failed':
-                                $stats['login_failed']++;
-                                break;
-                            case 'exam_created':
-                                $stats['exams_created']++;
-                                break;
-                            case 'exam_approved':
-                                $stats['exams_approved']++;
-                                break;
-                            case 'exam_declined':
-                                $stats['exams_declined']++;
-                                break;
-                            case 'question_edited':
-                            case 'dean_question_edit':
-                                $stats['questions_edited']++;
-                                break;
-                            case 'pdf_generated':
-                                $stats['pdfs_generated']++;
-                                break;
-                        }
+                    if (!isset($stats['active_users'][$userEmail])) {
+                        $stats['active_users'][$userEmail] = [
+                            'name' => $data['user_name'] ?? 'Unknown',
+                            'role' => $data['user_role'] ?? 'unknown',
+                            'actions' => 0,
+                        ];
+                    }
+                    $stats['active_users'][$userEmail]['actions']++;
 
-                        // Track active users
-                        if (!isset($stats['active_users'][$userEmail])) {
-                            $stats['active_users'][$userEmail] = [
-                                'name' => $data['user_name'] ?? 'Unknown',
-                                'role' => $data['user_role'] ?? 'unknown',
-                                'actions' => 0,
-                            ];
-                        }
-                        $stats['active_users'][$userEmail]['actions']++;
-
-                        // Time-based stats
-                        if (isset($data['timestamp'])) {
-                            $timestamp = $data['timestamp']->get();
+                    if (isset($data['timestamp']) && is_string($data['timestamp'])) {
+                        try {
+                            $timestamp = new \DateTime($data['timestamp']);
                             if ($timestamp->format('Y-m-d') === $today->format('Y-m-d')) {
                                 $stats['today']++;
                             }
                             if ($timestamp >= $weekAgo) {
                                 $stats['this_week']++;
                             }
-                        }
+                        } catch (\Exception $e) {}
                     }
                 }
             }
 
-            // Sort and limit active users
             uasort($stats['active_users'], fn($a, $b) => $b['actions'] <=> $a['actions']);
             $stats['active_users'] = array_slice($stats['active_users'], 0, 10, true);
 

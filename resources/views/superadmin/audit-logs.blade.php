@@ -13,7 +13,7 @@
 </head>
 
 <body class="bg-gray-50">
-    @include('partials.superadmin-navbar')
+    @include('partials.super-admin-navbar')
 
     <div class="p-4 sm:ml-64 mt-20">
         <!-- Page Header -->
@@ -157,7 +157,7 @@
                             <tr class="hover:bg-gray-50">
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     @if(isset($log['timestamp']))
-                                        {{ $log['timestamp']->get()->format('Y-m-d H:i:s') }}
+                                        {{ \Carbon\Carbon::parse($log['timestamp'])->format('Y-m-d H:i:s') }}
                                     @else
                                         N/A
                                     @endif

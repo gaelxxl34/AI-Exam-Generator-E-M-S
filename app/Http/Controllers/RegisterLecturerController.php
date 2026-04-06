@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Log;
+use App\Services\FirestoreRestService;
 
 
 
@@ -69,18 +70,16 @@ class RegisterLecturerController extends Controller
             $createdUser = $auth->createUser($userProperties);
             \Log::info('Firebase user created with UID: ' . $createdUser->uid);
 
-            $firestore = app('firebase.firestore');
-            $database = $firestore->database();
-            $usersRef = $database->collection('Users');
+            $db = app(FirestoreRestService::class);
 
-            $usersRef->document($createdUser->uid)->set([
+            $db->setDocument('Users', $createdUser->uid, [
                 'firstName' => $validatedData['firstName'],
                 'lastName' => $validatedData['lastName'],
                 'email' => $validatedData['email'],
-                'created_at' => new \DateTime(),
+                'created_at' => (new \DateTime())->format('Y-m-d\TH:i:s.u\Z'),
                 'role' => 'lecturer',
-                'faculties' => $validatedData['faculties'], // Store as an array
-                'courses' => $validatedData['courses'], // Store courses as an array
+                'faculties' => $validatedData['faculties'],
+                'courses' => $validatedData['courses'],
             ]);
 
             \Log::info('Lecturer data added to Firestore with faculties and courses');
@@ -101,47 +100,41 @@ class RegisterLecturerController extends Controller
         \Log::info('lecturerList method called');
 
         try {
-            $firestore = app('firebase.firestore');
-            $database = $firestore->database();
+            $db = app(FirestoreRestService::class);
 
-            // 🔍 Fetch the current user's email and faculty
+            // Fetch the current user's email and faculty
             $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
-            $userRef = $database->collection('Users')->where('email', '==', $currentUserEmail);
-            $currentUserSnapshots = $userRef->documents();
+            $currentUserSnapshots = $db->queryCollection('Users', 'email', '==', $currentUserEmail);
 
-            if ($currentUserSnapshots->isEmpty()) {
-                \Log::error("❌ User not found with email: $currentUserEmail");
+            if (empty($currentUserSnapshots)) {
+                \Log::error("User not found with email: $currentUserEmail");
                 throw new \Exception('User not found.');
             }
 
-            $currentUserData = iterator_to_array($currentUserSnapshots)[0]->data();
+            $currentUserData = $currentUserSnapshots[0];
             $userFaculty = $currentUserData['faculty'] ?? 'default_faculty';
 
             \Log::info("🔍 User Faculty: $userFaculty");
 
-            // 🔹 Fetch all lecturers
-            $lecturerQuery = $database->collection('Users')->where('role', '=', 'lecturer');
-            $lecturerSnapshot = $lecturerQuery->documents();
+            // Fetch all lecturers
+            $lecturerSnapshot = $db->queryCollection('Users', 'role', '==', 'lecturer');
 
             $lecturersByFaculty = [];
 
             foreach ($lecturerSnapshot as $lecturer) {
-                if ($lecturer->exists()) {
-                    $lecturerData = $lecturer->data();
-                    $lecturerFaculties = $lecturerData['faculties'] ?? []; // Get faculties array
-                    $lecturerCourses = $lecturerData['courses'] ?? []; // Get courses array
+                    $lecturerFaculties = $lecturer['faculties'] ?? [];
+                    $lecturerCourses = $lecturer['courses'] ?? [];
 
-                    // 🔥 Check if lecturer belongs to the same faculty
-                    if (in_array($userFaculty, $lecturerFaculties)) {
+                    // Check if lecturer belongs to the same faculty
+                    if (is_array($lecturerFaculties) && in_array($userFaculty, $lecturerFaculties)) {
                         $lecturersByFaculty[$userFaculty][] = [
-                            'id' => $lecturer->id(),
-                            'firstName' => $lecturerData['firstName'] ?? 'N/A',
-                            'lastName' => $lecturerData['lastName'] ?? 'N/A',
-                            'email' => $lecturerData['email'] ?? 'N/A',
-                            'courses' => $lecturerCourses, // ✅ Include courses they are teaching
+                            'id' => $lecturer['id'],
+                            'firstName' => $lecturer['firstName'] ?? 'N/A',
+                            'lastName' => $lecturer['lastName'] ?? 'N/A',
+                            'email' => $lecturer['email'] ?? 'N/A',
+                            'courses' => $lecturerCourses,
                         ];
                     }
-                }
             }
 
             \Log::info('✅ Lecturers fetched successfully.', ['count' => count($lecturersByFaculty)]);
@@ -161,63 +154,55 @@ class RegisterLecturerController extends Controller
     public function editLecturer($id)
     {
         try {
-            $firestore = app('firebase.firestore')->database();
+            $db = app(FirestoreRestService::class);
 
             // Fetch logged-in user's faculty
             $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
-            $usersRef = $firestore->collection('Users');
-            $userQuery = $usersRef->where('email', '==', $currentUserEmail);
-            $currentUserSnapshots = $userQuery->documents();
+            $currentUserSnapshots = $db->queryCollection('Users', 'email', '==', $currentUserEmail);
 
-            if ($currentUserSnapshots->isEmpty()) {
-                \Log::error("❌ Firestore user not found with email: $currentUserEmail");
+            if (empty($currentUserSnapshots)) {
+                \Log::error("Firestore user not found with email: $currentUserEmail");
                 return back()->withErrors(['error' => 'Current user not found in Firestore.']);
             }
 
-            $currentUserData = iterator_to_array($currentUserSnapshots)[0]->data();
+            $currentUserData = $currentUserSnapshots[0];
             $adminFaculty = $currentUserData['faculty'] ?? null;
 
             if (!$adminFaculty) {
-                \Log::error("❌ Current user has no assigned faculty.");
+                \Log::error("Current user has no assigned faculty.");
                 return back()->withErrors(['error' => 'Faculty information missing for current user.']);
             }
 
             // Fetch lecturer data by ID
-            $lecturerRef = $firestore->collection('Users')->document($id);
-            $lecturerSnapshot = $lecturerRef->snapshot();
+            $lecturerSnapshot = $db->getDocument('Users', $id);
 
-            if (!$lecturerSnapshot->exists()) {
+            if ($lecturerSnapshot === null) {
                 return back()->withErrors(['error' => 'Lecturer not found']);
             }
 
             // Prepare lecturer data
             $lecturerData = [
-                'id' => $lecturerSnapshot->id(),
-                'firstName' => $lecturerSnapshot->data()['firstName'] ?? 'N/A',
-                'lastName' => $lecturerSnapshot->data()['lastName'] ?? 'N/A',
-                'email' => $lecturerSnapshot->data()['email'] ?? 'N/A',
-                'faculties' => $lecturerSnapshot->data()['faculties'] ?? [], // Fetch faculties array
-                'courses' => $lecturerSnapshot->data()['courses'] ?? [], // Fetch courses array
+                'id' => $lecturerSnapshot['id'],
+                'firstName' => $lecturerSnapshot['firstName'] ?? 'N/A',
+                'lastName' => $lecturerSnapshot['lastName'] ?? 'N/A',
+                'email' => $lecturerSnapshot['email'] ?? 'N/A',
+                'faculties' => $lecturerSnapshot['faculties'] ?? [],
+                'courses' => $lecturerSnapshot['courses'] ?? [],
             ];
 
             // Define available faculties (Static List)
             $availableFaculties = ['FST', 'FBM', 'FOE', 'FOL', 'HEC'];
 
             // Fetch only courses from the logged-in user's faculty
-            $coursesRef = $firestore->collection('Courses');
-            $coursesQuery = $coursesRef->where('faculty', '==', $adminFaculty);
-            $coursesSnapshot = $coursesQuery->documents();
+            $coursesSnapshot = $db->queryCollection('Courses', 'faculty', '==', $adminFaculty);
 
             $courseNames = [];
             foreach ($coursesSnapshot as $course) {
-                if ($course->exists()) {
-                    $courseData = $course->data();
                     $courseNames[] = [
-                        'id' => $course->id(), // Document ID
-                        'name' => $courseData['name'], // Course name
-                        'code' => $courseData['code'] ?? 'N/A', // ✅ Added course code (Handles missing codes)
+                        'id' => $course['id'],
+                        'name' => $course['name'],
+                        'code' => $course['code'] ?? 'N/A',
                     ];
-                }
             }
 
             return view('admin.edit-lecturer', [
@@ -247,45 +232,36 @@ public function updateLecturer(Request $request, $id)
             'courses' => 'nullable|array', // Allow empty courses - lecturers can have no courses assigned
         ]);
 
-        $firestore = app('firebase.firestore')->database();
+        $db = app(FirestoreRestService::class);
         $auth = app('firebase.auth');
 
-        // Reference to Firestore document
-        $lecturerRef = $firestore->collection('Users')->document($id);
-        $lecturerSnapshot = $lecturerRef->snapshot();
+        // Get lecturer document
+        $lecturerSnapshot = $db->getDocument('Users', $id);
 
-        if (!$lecturerSnapshot->exists()) {
+        if ($lecturerSnapshot === null) {
             return back()->withErrors(['error' => 'Lecturer not found in Firestore.']);
         }
 
         // Get the current user's faculty (admin making the update)
         $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
-        $usersRef = $firestore->collection('Users');
-        $userQuery = $usersRef->where('email', '==', $currentUserEmail);
-        $currentUserSnapshots = $userQuery->documents();
+        $currentUserSnapshots = $db->queryCollection('Users', 'email', '==', $currentUserEmail);
 
-        if ($currentUserSnapshots->isEmpty()) {
+        if (empty($currentUserSnapshots)) {
             return back()->withErrors(['error' => 'Current user not found.']);
         }
 
-        $currentUserData = iterator_to_array($currentUserSnapshots)[0]->data();
+        $currentUserData = $currentUserSnapshots[0];
         $adminFaculty = $currentUserData['faculty'] ?? null;
 
         // Get existing lecturer data
-        $existingData = $lecturerSnapshot->data();
-        $existingCourses = $existingData['courses'] ?? [];
+        $existingCourses = $lecturerSnapshot['courses'] ?? [];
 
         // Get courses from admin's faculty to identify which ones to manage
-        $coursesRef = $firestore->collection('Courses');
-        $coursesQuery = $coursesRef->where('faculty', '==', $adminFaculty);
-        $coursesSnapshot = $coursesQuery->documents();
+        $coursesSnapshot = $db->queryCollection('Courses', 'faculty', '==', $adminFaculty);
 
         $adminFacultyCourses = [];
         foreach ($coursesSnapshot as $course) {
-            if ($course->exists()) {
-                $courseData = $course->data();
-                $adminFacultyCourses[] = $courseData['name'];
-            }
+                $adminFacultyCourses[] = $course['name'];
         }
 
         // Remove courses from admin's faculty that are no longer selected
@@ -298,12 +274,12 @@ public function updateLecturer(Request $request, $id)
         $mergedCourses = array_unique(array_merge(array_values($coursesToKeep), $newCourses));
 
         // Update lecturer data
-        $lecturerRef->update([
-            ['path' => 'firstName', 'value' => $validatedData['firstName']],
-            ['path' => 'lastName', 'value' => $validatedData['lastName']],
-            ['path' => 'email', 'value' => $validatedData['email']], // Update email
-            ['path' => 'faculties', 'value' => $validatedData['faculties']], // Update faculties
-            ['path' => 'courses', 'value' => $mergedCourses], // Merge courses instead of replacing
+        $db->updateDocument('Users', $id, [
+            'firstName' => $validatedData['firstName'],
+            'lastName' => $validatedData['lastName'],
+            'email' => $validatedData['email'],
+            'faculties' => $validatedData['faculties'],
+            'courses' => array_values($mergedCourses),
         ]);
 
         // Update Firebase Authentication Email
@@ -326,15 +302,11 @@ public function updateLecturer(Request $request, $id)
     {
         try {
             // Initialize Firebase services
-            $firestore = app('firebase.firestore')->database();
+            $db = app(FirestoreRestService::class);
             $auth = app('firebase.auth');
-            $storage = app('firebase.storage')->getBucket();
-
-            // Get the Firestore document reference
-            $lecturerRef = $firestore->collection('Users')->document($id);
 
             // Delete the Firestore document
-            $lecturerRef->delete();
+            $db->deleteDocument('Users', $id);
 
             // Delete the user from Firebase Authentication
             $auth->deleteUser($id);

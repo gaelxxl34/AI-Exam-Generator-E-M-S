@@ -11,12 +11,13 @@ use Kreait\Firebase\Exception\Auth\InvalidPassword;
 use Illuminate\Support\Facades\Log;
 use App\Services\AuditService;
 use App\Services\SessionService;
+use App\Services\FirestoreRestService;
 
 
 class AuthController extends Controller
 {
     protected $firebaseAuth;
-    protected $firebaseFirestore;
+    protected $firestoreRest;
     
     public function __construct()
     {
@@ -57,8 +58,8 @@ class AuthController extends Controller
         
             $this->firebaseAuth = $firebaseFactory->createAuth();
             
-            // Fix: Get the correct Firestore client instance
-            $this->firebaseFirestore = $firebaseFactory->createFirestore()->database();
+            // Use REST-based Firestore service (no gRPC extension needed)
+            $this->firestoreRest = app(FirestoreRestService::class);
             
         } catch (\Throwable $e) {
             Log::error('Firebase initialization error: ' . $e->getMessage());
@@ -105,20 +106,16 @@ class AuthController extends Controller
             $uid = $signInResult->firebaseUserId();
             
             try {
-                // Access the Firestore collection properly
-                $userSnapshot = $this->firebaseFirestore
-                    ->collection('Users')
-                    ->document($uid)
-                    ->snapshot();
+                // Access Firestore via REST API (no gRPC needed)
+                $userData = $this->firestoreRest->getDocument('Users', $uid);
                 
-                Log::info('User document snapshot retrieved');
+                Log::info('User document retrieved via REST');
                 
-                if (!$userSnapshot->exists()) {
+                if (!$userData) {
                     Log::warning('User document not found in Firestore for UID: ' . $uid);
                     return redirect()->route('login')->withErrors(['login_error' => 'Account not found in our database. Please contact support.']);
                 }
                 
-                $userData = $userSnapshot->data();
                 Log::info('User data retrieved from Firestore: ' . json_encode(array_keys($userData)));
             
                 if (!empty($userData['disabled'])) {

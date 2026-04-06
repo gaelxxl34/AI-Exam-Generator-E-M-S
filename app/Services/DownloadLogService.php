@@ -3,29 +3,25 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Log;
+use App\Services\FirestoreRestService;
 
 class DownloadLogService
 {
-    protected $firestore;
+    protected FirestoreRestService $firestoreRest;
 
     public function __construct()
     {
-        $this->firestore = app('firebase.firestore')->database();
+        $this->firestoreRest = app(FirestoreRestService::class);
     }
 
     /**
      * Log a file download event
-     *
-     * @param string $fileType Type of file (past_exam, marking_guide, generated_pdf)
-     * @param string $fileId The document ID of the file
-     * @param array $details Additional details
-     * @return string|null The document ID of the created log
      */
     public function logDownload(string $fileType, string $fileId, array $details = []): ?string
     {
         try {
             $downloadData = [
-                'timestamp' => new \DateTime(),
+                'timestamp' => (new \DateTime())->format('Y-m-d\TH:i:s.u\Z'),
                 'user_id' => session('user') ?? 'anonymous',
                 'user_email' => session('user_email') ?? 'anonymous',
                 'user_role' => session('user_role') ?? 'unknown',
@@ -42,18 +38,18 @@ class DownloadLogService
                 'session_id' => session()->getId(),
             ];
 
-            $docRef = $this->firestore->collection('DownloadLogs')->add($downloadData);
+            $result = $this->firestoreRest->addDocument('DownloadLogs', $downloadData);
             
             // Also increment the download counter on the file document
             $this->incrementDownloadCount($fileType, $fileId);
             
             Log::info("Download logged: {$fileType}", [
-                'doc_id' => $docRef->id(),
+                'doc_id' => $result['id'],
                 'file_id' => $fileId,
                 'user' => $downloadData['user_email'],
             ]);
 
-            return $docRef->id();
+            return $result['id'];
         } catch (\Exception $e) {
             Log::error("Failed to log download: " . $e->getMessage(), [
                 'file_type' => $fileType,
@@ -76,15 +72,14 @@ class DownloadLogService
             };
 
             if ($collection) {
-                $docRef = $this->firestore->collection($collection)->document($fileId);
-                $doc = $docRef->snapshot();
+                $doc = $this->firestoreRest->getDocument($collection, $fileId);
                 
-                if ($doc->exists()) {
-                    $currentCount = $doc->data()['download_count'] ?? 0;
-                    $docRef->update([
-                        ['path' => 'download_count', 'value' => $currentCount + 1],
-                        ['path' => 'last_downloaded_at', 'value' => new \DateTime()],
-                        ['path' => 'last_downloaded_by', 'value' => session('user_email') ?? 'anonymous'],
+                if ($doc) {
+                    $currentCount = $doc['download_count'] ?? 0;
+                    $this->firestoreRest->updateDocument($collection, $fileId, [
+                        'download_count' => $currentCount + 1,
+                        'last_downloaded_at' => (new \DateTime())->format('Y-m-d\TH:i:s.u\Z'),
+                        'last_downloaded_by' => session('user_email') ?? 'anonymous',
                     ]);
                 }
             }
@@ -146,9 +141,7 @@ class DownloadLogService
     public function getFileDownloadStats(string $fileId): array
     {
         try {
-            $logs = $this->firestore->collection('DownloadLogs')
-                ->where('file_id', '==', $fileId)
-                ->documents();
+            $logs = $this->firestoreRest->queryCollection('DownloadLogs', 'file_id', '==', $fileId);
 
             $stats = [
                 'total_downloads' => 0,
@@ -157,28 +150,27 @@ class DownloadLogService
                 'downloads_by_date' => [],
             ];
 
-            foreach ($logs as $log) {
-                if ($log->exists()) {
-                    $data = $log->data();
-                    $stats['total_downloads']++;
-                    
-                    $userId = $data['user_id'] ?? 'anonymous';
-                    if (!in_array($userId, $stats['unique_users'])) {
-                        $stats['unique_users'][] = $userId;
-                    }
+            foreach ($logs as $data) {
+                $stats['total_downloads']++;
+                
+                $userId = $data['user_id'] ?? 'anonymous';
+                if (!in_array($userId, $stats['unique_users'])) {
+                    $stats['unique_users'][] = $userId;
+                }
 
-                    $role = $data['user_role'] ?? 'unknown';
-                    $stats['downloads_by_role'][$role] = ($stats['downloads_by_role'][$role] ?? 0) + 1;
+                $role = $data['user_role'] ?? 'unknown';
+                $stats['downloads_by_role'][$role] = ($stats['downloads_by_role'][$role] ?? 0) + 1;
 
-                    if (isset($data['timestamp'])) {
-                        $date = $data['timestamp']->get()->format('Y-m-d');
+                if (isset($data['timestamp']) && is_string($data['timestamp'])) {
+                    try {
+                        $date = (new \DateTime($data['timestamp']))->format('Y-m-d');
                         $stats['downloads_by_date'][$date] = ($stats['downloads_by_date'][$date] ?? 0) + 1;
-                    }
+                    } catch (\Exception $e) {}
                 }
             }
 
             $stats['unique_user_count'] = count($stats['unique_users']);
-            unset($stats['unique_users']); // Don't expose user list
+            unset($stats['unique_users']);
 
             return $stats;
         } catch (\Exception $e) {
@@ -193,20 +185,9 @@ class DownloadLogService
     public function getRecentDownloads(int $limit = 50): array
     {
         try {
-            $logs = $this->firestore->collection('DownloadLogs')
-                ->orderBy('timestamp', 'DESC')
-                ->limit($limit)
-                ->documents();
-
-            $result = [];
-            foreach ($logs as $log) {
-                if ($log->exists()) {
-                    $data = $log->data();
-                    $data['id'] = $log->id();
-                    $result[] = $data;
-                }
-            }
-            return $result;
+            return $this->firestoreRest->runQuery(
+                'DownloadLogs', [], [['field' => 'timestamp', 'direction' => 'DESCENDING']], $limit
+            );
         } catch (\Exception $e) {
             Log::error("Failed to fetch recent downloads: " . $e->getMessage());
             return [];
@@ -219,21 +200,12 @@ class DownloadLogService
     public function getDownloadsByUser(string $userId, int $limit = 50): array
     {
         try {
-            $logs = $this->firestore->collection('DownloadLogs')
-                ->where('user_id', '==', $userId)
-                ->orderBy('timestamp', 'DESC')
-                ->limit($limit)
-                ->documents();
-
-            $result = [];
-            foreach ($logs as $log) {
-                if ($log->exists()) {
-                    $data = $log->data();
-                    $data['id'] = $log->id();
-                    $result[] = $data;
-                }
-            }
-            return $result;
+            return $this->firestoreRest->runQuery(
+                'DownloadLogs',
+                [['field' => 'user_id', 'op' => '==', 'value' => $userId]],
+                [['field' => 'timestamp', 'direction' => 'DESCENDING']],
+                $limit
+            );
         } catch (\Exception $e) {
             Log::error("Failed to fetch user downloads: " . $e->getMessage());
             return [];
@@ -246,35 +218,31 @@ class DownloadLogService
     public function getDownloadsByFaculty(array $faculties, int $limit = 100): array
     {
         try {
-            // Query DownloadLogs and filter by faculty
-            $logs = $this->firestore->collection('DownloadLogs')
-                ->orderBy('timestamp', 'DESC')
-                ->limit($limit * 3) // Fetch more to ensure we get enough after filtering
-                ->documents();
+            $logs = $this->firestoreRest->runQuery(
+                'DownloadLogs', [], [['field' => 'timestamp', 'direction' => 'DESCENDING']], $limit * 3
+            );
 
             $result = [];
             $count = 0;
 
-            foreach ($logs as $log) {
-                if ($log->exists() && $count < $limit) {
-                    $data = $log->data();
-                    $logFaculty = $data['faculty'] ?? [];
-                    
-                    // Check if log belongs to any of the dean's faculties
-                    if (!is_array($logFaculty)) {
-                        $logFaculty = [$logFaculty];
+            foreach ($logs as $data) {
+                if ($count >= $limit) break;
+
+                $logFaculty = $data['faculty'] ?? [];
+                if (!is_array($logFaculty)) {
+                    $logFaculty = [$logFaculty];
+                }
+
+                if (!empty(array_intersect($faculties, $logFaculty))) {
+                    if (isset($data['timestamp']) && is_string($data['timestamp'])) {
+                        try {
+                            $ts = new \DateTime($data['timestamp']);
+                            $data['timestamp_formatted'] = $ts->format('M d, Y H:i');
+                            $data['timestamp_iso'] = $ts->format('c');
+                        } catch (\Exception $e) {}
                     }
-                    
-                    if (!empty(array_intersect($faculties, $logFaculty))) {
-                        $data['id'] = $log->id();
-                        // Format timestamp for display
-                        if (isset($data['timestamp']) && is_object($data['timestamp'])) {
-                            $data['timestamp_formatted'] = $data['timestamp']->get()->format('M d, Y H:i');
-                            $data['timestamp_iso'] = $data['timestamp']->get()->format('c');
-                        }
-                        $result[] = $data;
-                        $count++;
-                    }
+                    $result[] = $data;
+                    $count++;
                 }
             }
             return $result;
@@ -290,10 +258,9 @@ class DownloadLogService
     public function getFacultyDownloadStats(array $faculties): array
     {
         try {
-            $logs = $this->firestore->collection('DownloadLogs')
-                ->orderBy('timestamp', 'DESC')
-                ->limit(2000)
-                ->documents();
+            $logs = $this->firestoreRest->runQuery(
+                'DownloadLogs', [], [['field' => 'timestamp', 'direction' => 'DESCENDING']], 2000
+            );
 
             $stats = [
                 'total_downloads' => 0,
@@ -309,33 +276,31 @@ class DownloadLogService
             $weekAgo = (new \DateTime())->modify('-7 days');
             $monthAgo = (new \DateTime())->modify('-30 days');
 
-            foreach ($logs as $log) {
-                if ($log->exists()) {
-                    $data = $log->data();
-                    $logFaculty = $data['faculty'] ?? [];
-                    
-                    if (!is_array($logFaculty)) {
-                        $logFaculty = [$logFaculty];
+            foreach ($logs as $data) {
+                $logFaculty = $data['faculty'] ?? [];
+                if (!is_array($logFaculty)) {
+                    $logFaculty = [$logFaculty];
+                }
+
+                if (!empty(array_intersect($faculties, $logFaculty))) {
+                    $stats['total_downloads']++;
+
+                    $fileType = $data['file_type'] ?? 'unknown';
+                    $stats['by_file_type'][$fileType] = ($stats['by_file_type'][$fileType] ?? 0) + 1;
+
+                    $userEmail = $data['user_email'] ?? 'anonymous';
+                    if (!isset($stats['by_user'][$userEmail])) {
+                        $stats['by_user'][$userEmail] = [
+                            'count' => 0,
+                            'name' => $data['user_name'] ?? 'Unknown',
+                            'role' => $data['user_role'] ?? 'unknown',
+                        ];
                     }
-                    
-                    if (!empty(array_intersect($faculties, $logFaculty))) {
-                        $stats['total_downloads']++;
+                    $stats['by_user'][$userEmail]['count']++;
 
-                        $fileType = $data['file_type'] ?? 'unknown';
-                        $stats['by_file_type'][$fileType] = ($stats['by_file_type'][$fileType] ?? 0) + 1;
-
-                        $userEmail = $data['user_email'] ?? 'anonymous';
-                        if (!isset($stats['by_user'][$userEmail])) {
-                            $stats['by_user'][$userEmail] = [
-                                'count' => 0,
-                                'name' => $data['user_name'] ?? 'Unknown',
-                                'role' => $data['user_role'] ?? 'unknown',
-                            ];
-                        }
-                        $stats['by_user'][$userEmail]['count']++;
-
-                        if (isset($data['timestamp'])) {
-                            $timestamp = $data['timestamp']->get();
+                    if (isset($data['timestamp']) && is_string($data['timestamp'])) {
+                        try {
+                            $timestamp = new \DateTime($data['timestamp']);
                             if ($timestamp->format('Y-m-d') === $today->format('Y-m-d')) {
                                 $stats['today']++;
                             }
@@ -345,14 +310,13 @@ class DownloadLogService
                             if ($timestamp >= $monthAgo) {
                                 $stats['this_month']++;
                             }
-                        }
+                        } catch (\Exception $e) {}
                     }
                 }
             }
 
-            // Sort users by download count
             uasort($stats['by_user'], fn($a, $b) => $b['count'] <=> $a['count']);
-            $stats['by_user'] = array_slice($stats['by_user'], 0, 10, true); // Top 10
+            $stats['by_user'] = array_slice($stats['by_user'], 0, 10, true);
 
             return $stats;
         } catch (\Exception $e) {
@@ -367,10 +331,9 @@ class DownloadLogService
     public function getDownloadSummary(): array
     {
         try {
-            $logs = $this->firestore->collection('DownloadLogs')
-                ->orderBy('timestamp', 'DESC')
-                ->limit(1000) // Last 1000 downloads for stats
-                ->documents();
+            $logs = $this->firestoreRest->runQuery(
+                'DownloadLogs', [], [['field' => 'timestamp', 'direction' => 'DESCENDING']], 1000
+            );
 
             $summary = [
                 'total_downloads' => 0,
@@ -386,21 +349,20 @@ class DownloadLogService
             $weekAgo = (new \DateTime())->modify('-7 days');
             $monthAgo = (new \DateTime())->modify('-30 days');
 
-            foreach ($logs as $log) {
-                if ($log->exists()) {
-                    $data = $log->data();
-                    $summary['total_downloads']++;
+            foreach ($logs as $data) {
+                $summary['total_downloads']++;
 
-                    $fileType = $data['file_type'] ?? 'unknown';
-                    $summary['by_file_type'][$fileType] = ($summary['by_file_type'][$fileType] ?? 0) + 1;
+                $fileType = $data['file_type'] ?? 'unknown';
+                $summary['by_file_type'][$fileType] = ($summary['by_file_type'][$fileType] ?? 0) + 1;
 
-                    $program = $data['program'] ?? 'unknown';
-                    if ($program !== 'unknown') {
-                        $summary['by_program'][$program] = ($summary['by_program'][$program] ?? 0) + 1;
-                    }
+                $program = $data['program'] ?? 'unknown';
+                if ($program !== 'unknown') {
+                    $summary['by_program'][$program] = ($summary['by_program'][$program] ?? 0) + 1;
+                }
 
-                    if (isset($data['timestamp'])) {
-                        $timestamp = $data['timestamp']->get();
+                if (isset($data['timestamp']) && is_string($data['timestamp'])) {
+                    try {
+                        $timestamp = new \DateTime($data['timestamp']);
                         if ($timestamp->format('Y-m-d') === $today->format('Y-m-d')) {
                             $summary['today']++;
                         }
@@ -410,7 +372,7 @@ class DownloadLogService
                         if ($timestamp >= $monthAgo) {
                             $summary['this_month']++;
                         }
-                    }
+                    } catch (\Exception $e) {}
                 }
             }
 

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Storage;
 // use PDF;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\File;
+use App\Services\FirestoreRestService;
 class CourseController extends Controller
 
 {
@@ -20,21 +21,17 @@ public function CoursesList()
         $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
         \Log::info('Current user email: ' . $currentUserEmail);
 
-        $firestore = app('firebase.firestore')->database();
-        $usersRef = $firestore->collection('Users');
+        $db = app(FirestoreRestService::class);
 
         // Fetch the current user from Firestore
-        $query = $usersRef->where('email', '==', $currentUserEmail);
-        $currentUserSnapshots = $query->documents();
+        $currentUserSnapshots = $db->queryCollection('Users', 'email', '==', $currentUserEmail);
 
-        if ($currentUserSnapshots->isEmpty()) {
+        if (empty($currentUserSnapshots)) {
             \Log::error("Firestore user not found with email: $currentUserEmail");
             throw new \Exception('Current user not found in Firestore.');
         }
 
-        // Get user data
-        $currentUserDataArray = iterator_to_array($currentUserSnapshots);
-        $currentUserData = $currentUserDataArray[0]->data();
+        $currentUserData = $currentUserSnapshots[0];
 
         // Get the courses assigned to this lecturer
         $lecturerCourses = $currentUserData['courses'] ?? [];
@@ -46,19 +43,17 @@ public function CoursesList()
         }
 
         // Fetch only the courses that belong to this lecturer from Firestore "Courses" collection
-        $coursesRef = $firestore->collection('Courses');
-        $coursesSnapshots = $coursesRef->where('name', 'in', $lecturerCourses)->documents();
+        $coursesSnapshots = $db->runQuery('Courses', [
+            ['field' => 'name', 'op' => 'in', 'value' => $lecturerCourses]
+        ]);
 
         $courses = [];
-        foreach ($coursesSnapshots as $course) {
-            if ($course->exists()) {
-                $data = $course->data();
+        foreach ($coursesSnapshots as $data) {
                 $courses[] = [
                     'name' => $data['name'] ?? 'Unknown Course',
-                    'code' => $data['code'] ?? 'No Code', // Now includes course code
+                    'code' => $data['code'] ?? 'No Code',
                     'faculty' => $data['faculty'] ?? 'Unknown Faculty'
                 ];
-            }
         }
 
         \Log::info('Courses fetched for the lecturer: ' . json_encode($courses));
@@ -78,21 +73,18 @@ public function CoursesList()
         \Log::info('Fetching courses for dashboard');
 
         try {
-            $firestore = app('firebase.firestore')->database();
+            $db = app(FirestoreRestService::class);
             $lecturerEmail = session()->get('user_email');
             \Log::info('Current user email: ' . $lecturerEmail);
 
-            // Query the Users collection to find the lecturer's document by email
-            $usersRef = $firestore->collection('Users');
-            $query = $usersRef->where('email', '=', $lecturerEmail);
-            $snapshot = $query->documents();
+            $snapshot = $db->queryCollection('Users', 'email', '==', $lecturerEmail);
 
             $lecturerCourses = [];
 
             foreach ($snapshot as $doc) {
-                if ($doc->exists() && $doc['email'] === $lecturerEmail) {
+                if (($doc['email'] ?? '') === $lecturerEmail) {
                     $lecturerCourses = $doc['courses'] ?? [];
-                    break; // Assuming one match, we can break the loop once found
+                    break;
                 }
             }
 
@@ -105,7 +97,6 @@ public function CoursesList()
                 ]);
             }
 
-            $examsRef = $firestore->collection('Exams');
             $courses = [];
             
             // Initialize statistics
@@ -120,10 +111,8 @@ public function CoursesList()
             ];
 
             foreach ($lecturerCourses as $courseUnit) {
-                $courseExams = $examsRef->where('courseUnit', '=', $courseUnit)->documents();
-                foreach ($courseExams as $document) {
-                    if ($document->exists()) {
-                        $data = $document->data();
+                $courseExams = $db->queryCollection('Exams', 'courseUnit', '==', $courseUnit);
+                foreach ($courseExams as $data) {
                         if (!isset($courses[$courseUnit])) {
                             $courses[$courseUnit] = [
                                 'exams' => [],
@@ -139,7 +128,6 @@ public function CoursesList()
                         $examStatus = strtolower($data['status'] ?? 'draft');
                         $this->updateCourseStatus($courses[$courseUnit], $examStatus);
                         $this->updateStatistics($statistics, $examStatus);
-                    }
                 }
             }
             
@@ -255,15 +243,11 @@ public function CoursesList()
     {
         \Log::info("Fetching details for course unit: $courseUnit");
         try {
-            $firestore = app('firebase.firestore')->database();
-            $examsRef = $firestore->collection('Exams');
-            $query = $examsRef->where('courseUnit', '==', $courseUnit);
-            $examsSnapshot = $query->documents();
+            $db = app(FirestoreRestService::class);
+            $examsSnapshot = $db->queryCollection('Exams', 'courseUnit', '==', $courseUnit);
             $exams = [];
-            $firebaseBaseUrl = env('FIREBASE_STORAGE_BASE_URL'); // e.g. https://firebasestorage.googleapis.com/v0/b/your-bucket/o/
-            foreach ($examsSnapshot as $document) {
-                if ($document->exists()) {
-                    $data = $document->data();
+            $firebaseBaseUrl = env('FIREBASE_STORAGE_BASE_URL');
+            foreach ($examsSnapshot as $data) {
                     // Ensure all image src are full URLs
                     foreach ($data['sections'] as $section => $contents) {
                         foreach ($contents as $index => $content) {
@@ -286,7 +270,6 @@ public function CoursesList()
                         }
                     }
                     $exams[] = $data;
-                }
             }
             return view('lecturer.l-course-exams', ['exams' => $exams, 'courseUnit' => $courseUnit]);
         } catch (\Throwable $e) {
@@ -303,22 +286,18 @@ public function CoursesList()
 
     public function uploadCourses(Request $request)
     {
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
         // Retrieve current user email from session or authentication
         $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
-        $usersRef = $database->collection('Users');
-        $query = $usersRef->where('email', '==', $currentUserEmail);
-        $currentUserSnapshots = $query->documents();
+        $currentUserSnapshots = $db->queryCollection('Users', 'email', '==', $currentUserEmail);
 
-        if ($currentUserSnapshots->isEmpty()) {
+        if (empty($currentUserSnapshots)) {
             \Log::error("Firestore user not found with email: $currentUserEmail");
             throw new \Exception('Current user not found in Firestore.');
         }
 
-        $currentUserDocument = iterator_to_array($currentUserSnapshots)[0];
-        $currentUserData = $currentUserDocument->data();
+        $currentUserData = $currentUserSnapshots[0];
         $faculty = $currentUserData['faculty'] ?? 'default_faculty';
 
         // Extract form inputs
@@ -328,13 +307,10 @@ public function CoursesList()
         $yearSem = 'Year ' . $request->input('year') . '/Semester ' . $request->input('semester');
 
         // Check if the course code already exists in the Courses collection
-        $coursesRef = $database->collection('Courses');
-        $query = $coursesRef->where('code', '==', $courseCode);
-        $existingCourses = $query->documents();
+        $existingCourses = $db->queryCollection('Courses', 'code', '==', $courseCode);
 
-        if (!$existingCourses->isEmpty()) {
-            foreach ($existingCourses as $doc) {
-                $existingCourseData = $doc->data();
+        if (!empty($existingCourses)) {
+            foreach ($existingCourses as $existingCourseData) {
                 $existingCourseName = $existingCourseData['name'] ?? 'Unknown Course';
 
                 \Log::warning("Course code '$courseCode' already exists for '$existingCourseName'.");
@@ -352,7 +328,7 @@ public function CoursesList()
         ];
 
         // Upload to Firestore
-        $coursesRef->add($courseData);
+        $db->addDocument('Courses', $courseData);
 
         \Log::info("New course '$courseUnit' added successfully with code '$courseCode'.");
 
@@ -364,36 +340,24 @@ public function CoursesList()
 
     public function showCourses()
     {
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
-        // Retrieve current user email from session or authentication
         $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
-        $usersRef = $database->collection('Users');
-        $query = $usersRef->where('email', '==', $currentUserEmail);
-        $currentUserSnapshots = $query->documents();
+        $currentUserSnapshots = $db->queryCollection('Users', 'email', '==', $currentUserEmail);
 
-        if ($currentUserSnapshots->isEmpty()) {
+        if (empty($currentUserSnapshots)) {
             \Log::error("Firestore user not found with email: $currentUserEmail");
             throw new \Exception('Current user not found in Firestore.');
         }
 
-        $currentUserDocument = iterator_to_array($currentUserSnapshots)[0];
-        $currentUserData = $currentUserDocument->data();
+        $currentUserData = $currentUserSnapshots[0];
         $currentFaculty = $currentUserData['faculty'] ?? 'default_faculty';
 
-        // Fetch courses that match the current user's faculty
-        $coursesRef = $database->collection('Courses');
-        $courseQuery = $coursesRef->where('faculty', '==', $currentFaculty);
-        $matchingCoursesSnapshots = $courseQuery->documents();
+        $matchingCourses = $db->queryCollection('Courses', 'faculty', '==', $currentFaculty);
 
         $organizedCourses = [];
-        foreach ($matchingCoursesSnapshots as $document) {
-            if ($document->exists()) {
-                $data = $document->data();
-                $data['id'] = $document->id();
+        foreach ($matchingCourses as $data) {
                 $organizedCourses[$data['faculty']][$data['program']][] = $data;
-            }
         }
 
         // Pass organized data to the view
@@ -407,14 +371,10 @@ public function CoursesList()
 
     public function editCourse($id)
     {
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
-        $courseRef = $database->collection('Courses')->document($id);
-        $snapshot = $courseRef->snapshot();
+        $db = app(FirestoreRestService::class);
+        $course = $db->getDocument('Courses', $id);
 
-        if ($snapshot->exists()) {
-            $course = $snapshot->data();
-            $course['id'] = $snapshot->id();
+        if ($course) {
             return view('admin.edit-courses', ['course' => $course]);
         } else {
             return redirect()->route('admin.edit-courses')->with('error', 'Course not found.');
@@ -423,15 +383,13 @@ public function CoursesList()
 
     public function updateCourse(Request $request, $id)
     {
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
-        $courseRef = $database->collection('Courses')->document($id);
+        $db = app(FirestoreRestService::class);
 
         try {
-            $courseRef->update([
-                ['path' => 'name', 'value' => $request->courseUnit],
-                ['path' => 'code', 'value' => $request->courseCode],
-                ['path' => 'year_sem', 'value' => $request->year_sem],
+            $db->updateDocument('Courses', $id, [
+                'name' => $request->courseUnit,
+                'code' => $request->courseCode,
+                'year_sem' => $request->year_sem,
             ]);
 
             return back()->with('success', 'Course updated successfully!');
@@ -442,13 +400,10 @@ public function CoursesList()
 
     public function deleteCourse($id)
     {
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
-        $courseRef = $database->collection('Courses')->document($id);
+        $db = app(FirestoreRestService::class);
 
         try {
-            // Delete the course document
-            $courseRef->delete();
+            $db->deleteDocument('Courses', $id);
 
             return redirect()->intended('admin/courses-list')->with('success', ' Deleted successfully!');;
         } catch (\Throwable $e) {
@@ -467,43 +422,32 @@ public function CoursesList()
             \Log::info('Entering fetchCoursesForFaculty method');
 
         try {
-            $firestore = app('firebase.firestore');
-            $database = $firestore->database();
+            $db = app(FirestoreRestService::class);
 
             $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
             \Log::info("Current user email: $currentUserEmail");
 
-            // Fetch the current user's data from Firestore
-            $usersRef = $database->collection('Users');
-            $query = $usersRef->where('email', '==', $currentUserEmail);
-            $currentUserSnapshots = $query->documents();
+            $currentUserSnapshots = $db->queryCollection('Users', 'email', '==', $currentUserEmail);
 
-            if ($currentUserSnapshots->isEmpty()) {
+            if (empty($currentUserSnapshots)) {
                 \Log::error("Firestore user not found with email: $currentUserEmail");
                 throw new \Exception('Current user not found in Firestore.');
             }
 
-            $currentUserDocument = iterator_to_array($currentUserSnapshots)[0];
-            $currentUserData = $currentUserDocument->data();
+            $currentUserData = $currentUserSnapshots[0];
             $facultyField = $currentUserData['faculty'] ?? 'default_faculty';
             \Log::info("Faculty fetched on fetchCoursesForFaculty: $facultyField");
 
-            // Fetch courses from 'Courses' collection that match the current user's faculty
-            $coursesRef = $database->collection('Courses');
-            $coursesQuery = $coursesRef->where('faculty', '==', $facultyField);
-            $courseDocuments = $coursesQuery->documents();
+            $courseDocuments = $db->queryCollection('Courses', 'faculty', '==', $facultyField);
 
             $courseDetails = [];
-            foreach ($courseDocuments as $document) {
-                if ($document->exists()) {
-                    $data = $document->data();
+            foreach ($courseDocuments as $data) {
                     $courseDetails[] = [
-                        'id' => $document->id(),  // Document ID
-                        'name' => $data['name'] ?? 'Unknown Course',  // Course name
-                        'code' => $data['code'] ?? 'N/A'  // Course code (ensure key exists)
+                        'id' => $data['id'],
+                        'name' => $data['name'] ?? 'Unknown Course',
+                        'code' => $data['code'] ?? 'N/A'
                     ];
                     \Log::info("Course fetched: " . $data['name'] . " (Code: " . ($data['code'] ?? 'N/A') . ")");
-                }
             }
 
             \Log::info('Courses fetched successfully', ['courseDetails' => $courseDetails]);
@@ -520,39 +464,32 @@ public function CoursesList()
 
     public function AllCourses()
     {
-        $firestore = app('firebase.firestore');
-        $database = $firestore->database();
+        $db = app(FirestoreRestService::class);
 
         try {
-            // Fetch the current user's email and faculty
             $currentUserEmail = session()->get('user_email') ?? auth()->user()->email;
-            $usersRef = $database->collection('Users');
-            $userQuery = $usersRef->where('email', '==', $currentUserEmail);
-            $currentUserSnapshots = $userQuery->documents();
+            $currentUserSnapshots = $db->queryCollection('Users', 'email', '==', $currentUserEmail);
 
-            if ($currentUserSnapshots->isEmpty()) {
+            if (empty($currentUserSnapshots)) {
                 \Log::error("Firestore user not found with email: $currentUserEmail");
                 throw new \Exception('Current user not found in Firestore.');
             }
 
-            $currentUserDocument = iterator_to_array($currentUserSnapshots)[0];
-            $currentUserData = $currentUserDocument->data();
+            $currentUserData = $currentUserSnapshots[0];
             $userFaculty = $currentUserData['faculty'] ?? 'default_faculty';
             \Log::info("Current user faculty: $userFaculty");
 
             // 1️⃣ **Fetch all approved exams first**
-            $approvedExamsRef = $database->collection('Exams')->where('status', '==', 'Approved');
-            $approvedExamsSnapshots = $approvedExamsRef->documents();
+            $approvedExamsSnapshots = $db->queryCollection('Exams', 'status', '==', 'Approved');
 
-            if ($approvedExamsSnapshots->isEmpty()) {
+            if (empty($approvedExamsSnapshots)) {
                 \Log::info("No approved exams found.");
                 return view('genadmin.ai-exam-generator', ['courses' => []]);
             }
 
             // 2️⃣ **Extract course names from approved exams**
             $approvedCourseNames = [];
-            foreach ($approvedExamsSnapshots as $exam) {
-                $examData = $exam->data();
+            foreach ($approvedExamsSnapshots as $examData) {
                 if (!empty($examData['courseUnit'])) {
                     $approvedCourseNames[] = $examData['courseUnit'];
                 }
@@ -562,21 +499,17 @@ public function CoursesList()
             \Log::info("Approved course names: " . implode(", ", $approvedCourseNames));
 
             // 3️⃣ **Fetch only the courses that match these names**
-            $coursesRef = $database->collection('Courses');
-            $coursesSnapshots = $coursesRef->documents();
+            $allCourses = $db->getCollection('Courses');
 
             $filteredCourses = [];
-            foreach ($coursesSnapshots as $document) {
-                if ($document->exists()) {
-                    $data = $document->data();
-                    if (in_array($data['name'], $approvedCourseNames)) { // Match with approved courses
+            foreach ($allCourses as $data) {
+                    if (in_array($data['name'] ?? '', $approvedCourseNames)) {
                         $filteredCourses[] = [
-                            'id' => $document->id(),
+                            'id' => $data['id'],
                             'name' => $data['name'] ?? 'Unknown Course',
-                            'code' => $data['code'] ?? 'N/A' // Ensure we get the course code
+                            'code' => $data['code'] ?? 'N/A'
                         ];
                     }
-                }
             }
 
             \Log::info("Number of approved courses fetched: " . count($filteredCourses));
@@ -600,16 +533,11 @@ public function CoursesList()
     {
         Log::info("🗑 Entering deleteQuestion with parameters: Course Unit - {$courseUnit}, Section Name - {$sectionName}, Question Index - {$questionIndex}");
 
-        $firestore = app('firebase.firestore')->database();
+        $db = app(FirestoreRestService::class);
         $storage = app('firebase.storage')->getBucket();
-        $examsRef = $firestore->collection('Exams');
-        $query = $examsRef->where('courseUnit', '==', $courseUnit);
-        $examsSnapshot = $query->documents();
+        $examsSnapshot = $db->queryCollection('Exams', 'courseUnit', '==', $courseUnit);
 
-        foreach ($examsSnapshot as $document) {
-            if ($document->exists()) {
-                $examRef = $document->reference();
-                $examData = $document->data();
+        foreach ($examsSnapshot as $examData) {
 
                 if (isset($examData['sections'][$sectionName][$questionIndex])) {
                     $questionToRemove = $examData['sections'][$sectionName][$questionIndex]; // Now HTML, not base64
@@ -642,8 +570,8 @@ public function CoursesList()
 
                     // Remove Question from Firestore
                     array_splice($examData['sections'][$sectionName], $questionIndex, 1);
-                    $examRef->update([
-                        ['path' => 'sections.' . $sectionName, 'value' => $examData['sections'][$sectionName]]
+                    $db->updateDocument('Exams', $examData['id'], [
+                        'sections' => $examData['sections']
                     ]);
 
                     Log::info("✅ Successfully deleted question. Course Unit: {$courseUnit}, Section: {$sectionName}, Index: {$questionIndex}");
@@ -651,7 +579,6 @@ public function CoursesList()
                 } else {
                     Log::warning("❌ Question not found for deletion. Course Unit: {$courseUnit}, Section: {$sectionName}, Index: {$questionIndex}");
                 }
-            }
         }
 
         Log::error("❌ Exam not found for deletion. Course Unit: {$courseUnit}");
@@ -694,20 +621,15 @@ public function CoursesList()
             'question' => 'required|string',
         ]);
 
-        $firestore = app('firebase.firestore')->database();
-        $examsRef = $firestore->collection('Exams');
-        $query = $examsRef->where('courseUnit', '==', $courseUnit);
-        $examsSnapshot = $query->documents();
+        $db = app(FirestoreRestService::class);
+        $examsSnapshot = $db->queryCollection('Exams', 'courseUnit', '==', $courseUnit);
 
-        if ($examsSnapshot->isEmpty()) {
+        if (empty($examsSnapshot)) {
             Log::error("No exam found for Course Unit: {$courseUnit}");
             return back()->withErrors(['error' => 'No exam found.']);
         }
 
-        foreach ($examsSnapshot as $document) {
-            if ($document->exists()) {
-                $examRef = $document->reference();
-                $examData = $document->data();
+        foreach ($examsSnapshot as $examData) {
 
                 if (!isset($examData['sections'][$sectionName])) {
                     Log::error("Section '{$sectionName}' not found.");
@@ -719,8 +641,8 @@ public function CoursesList()
                 $examData['sections'][$sectionName][$questionIndex] = $processedHtml;
 
                 try {
-                    $examRef->update([
-                        ['path' => "sections.{$sectionName}", 'value' => $examData['sections'][$sectionName]]
+                    $db->updateDocument('Exams', $examData['id'], [
+                        'sections' => $examData['sections']
                     ]);
                     Log::info("Question updated successfully.");
                     return back()->with('success', 'Question updated successfully.');
@@ -728,7 +650,6 @@ public function CoursesList()
                     Log::error("Firestore update failed: " . $e->getMessage());
                     return back()->withErrors(['error' => 'Failed to update question.']);
                 }
-            }
         }
 
         Log::error("Failed to update question.");
@@ -748,15 +669,10 @@ public function CoursesList()
             'newQuestion' => 'required|string',
         ]);
 
-        $firestore = app('firebase.firestore')->database();
-        $examsRef = $firestore->collection('Exams');
-        $query = $examsRef->where('courseUnit', '==', $courseUnit);
-        $examsSnapshot = $query->documents();
+        $db = app(FirestoreRestService::class);
+        $examsSnapshot = $db->queryCollection('Exams', 'courseUnit', '==', $courseUnit);
 
-        foreach ($examsSnapshot as $document) {
-            if ($document->exists()) {
-                $examRef = $document->reference();
-                $examData = $document->data();
+        foreach ($examsSnapshot as $examData) {
 
                 // Process images in the new question HTML and store as HTML (not base64)
                 $processedQuestion = $this->processQuestionImages($request->newQuestion, $courseUnit, $request->section, count($examData['sections'][$request->section] ?? []));
@@ -770,13 +686,12 @@ public function CoursesList()
                 $examData['sections'][$request->section][] = $processedQuestion;
 
                 // Update the Firestore document
-                $examRef->update([
-                    ['path' => 'sections.' . $request->section, 'value' => $examData['sections'][$request->section]]
+                $db->updateDocument('Exams', $examData['id'], [
+                    'sections' => $examData['sections']
                 ]);
 
                 Log::info("Added new question to section: {$request->section} of course unit: {$courseUnit}");
                 return back()->with('success', 'New question added successfully.');
-            }
         }
 
         Log::error("Exam not found for course unit: {$courseUnit}");
@@ -792,15 +707,10 @@ public function CoursesList()
             'sectionC_instructions' => 'nullable|string' // Optional field
         ]);
 
-        $firestore = app('firebase.firestore')->database();
-        $examsRef = $firestore->collection('Exams');
-        $query = $examsRef->where('courseUnit', '==', $courseUnit);
-        $examsSnapshot = $query->documents();
+        $db = app(FirestoreRestService::class);
+        $examsSnapshot = $db->queryCollection('Exams', 'courseUnit', '==', $courseUnit);
 
-        foreach ($examsSnapshot as $document) {
-            if ($document->exists()) {
-                $examRef = $document->reference();
-                $examData = $document->data();
+        foreach ($examsSnapshot as $examData) {
 
                 // Update instructions for Section A and Section B
                 $examData['sectionA_instructions'] = $request->sectionA_instructions;
@@ -822,10 +732,13 @@ public function CoursesList()
                 }
 
                 // Update the Firestore document
-                $examRef->update($updateData);
+                $updateFields = [];
+                foreach ($updateData as $field) {
+                    $updateFields[$field['path']] = $field['value'];
+                }
+                $db->updateDocument('Exams', $examData['id'], $updateFields);
 
                 return back()->with('success', 'Instructions updated successfully.');
-            }
         }
 
         return back()->withErrors(['error' => 'Exam not found.']);
@@ -839,15 +752,10 @@ public function CoursesList()
             'attached_file' => 'required|mimes:pdf,doc,docx,xls,xlsx|max:3072', // Max size 3MB (3072 KB)
         ]);
 
-        $firestore = app('firebase.firestore')->database();
-        $examsRef = $firestore->collection('Exams');
-        $query = $examsRef->where('courseUnit', '==', $courseUnit);
-        $examsSnapshot = $query->documents();
+        $db = app(FirestoreRestService::class);
+        $examsSnapshot = $db->queryCollection('Exams', 'courseUnit', '==', $courseUnit);
 
-        foreach ($examsSnapshot as $document) {
-            if ($document->exists()) {
-                $examRef = $document->reference();
-                $examData = $document->data();
+        foreach ($examsSnapshot as $examData) {
 
                 // Handle file upload and conversion to base64
                 $file = $request->file('attached_file');
@@ -858,13 +766,12 @@ public function CoursesList()
                 $fileType = $file->getClientOriginalExtension();
 
                 // Update Firestore document with the base64-encoded file and its type
-                $examRef->update([
-                    ['path' => 'marking_guide', 'value' => $base64File],
-                    ['path' => 'attached_file_type', 'value' => $fileType],
+                $db->updateDocument('Exams', $examData['id'], [
+                    'marking_guide' => $base64File,
+                    'attached_file_type' => $fileType,
                 ]);
 
                 return back()->with('success_file', 'File uploaded and saved successfully.');
-            }
         }
 
         return back()->withErrors(['error_file' => 'Exam not found.']);
@@ -876,14 +783,10 @@ public function CoursesList()
 
         \Log::info("Download Marking Guide method hit for course: " . $courseUnit);
 
-        $firestore = app('firebase.firestore')->database();
-        $examsRef = $firestore->collection('Exams');
-        $query = $examsRef->where('courseUnit', '==', $courseUnit);
-        $examsSnapshot = $query->documents();
+        $db = app(FirestoreRestService::class);
+        $examsSnapshot = $db->queryCollection('Exams', 'courseUnit', '==', $courseUnit);
 
-        foreach ($examsSnapshot as $document) {
-            if ($document->exists()) {
-                $examData = $document->data();
+        foreach ($examsSnapshot as $examData) {
                 // Make sure to check for the correct field name: 'marking_guide'
                 if (isset($examData['marking_guide']) && isset($examData['attached_file_type'])) {
                     // Retrieve the base64 file and its type
@@ -925,7 +828,6 @@ public function CoursesList()
                 } else {
                     return back()->withErrors(['error_file' => 'No marking guide file found.']);
                 }
-            }
         }
 
         return back()->withErrors(['error_file' => 'Exam not found.']);
@@ -935,20 +837,12 @@ public function CoursesList()
     public function previewPdf($courseUnit)
     {
         Log::info("📝 Generating PDF preview for Course Unit: {$courseUnit}");
-        $firestore = app('firebase.firestore')->database();
-        $examsRef = $firestore->collection('Exams');
-        $query = $examsRef->where('courseUnit', '==', $courseUnit);
-        $examsSnapshot = $query->documents();
-        if ($examsSnapshot->isEmpty()) {
+        $db = app(FirestoreRestService::class);
+        $examsSnapshot = $db->queryCollection('Exams', 'courseUnit', '==', $courseUnit);
+        if (empty($examsSnapshot)) {
             return back()->withErrors(['error' => 'No exam found for this course unit.']);
         }
-        $examData = null;
-        foreach ($examsSnapshot as $document) {
-            if ($document->exists()) {
-                $examData = $document->data();
-                break;
-            }
-        }
+        $examData = $examsSnapshot[0] ?? null;
         if (!$examData) {
             return back()->withErrors(['error' => 'No exam data found for this course unit.']);
         }
